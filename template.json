@@ -1,0 +1,266 @@
+{
+  "Actor": {
+    "types": [
+      "hero",
+      "npc"
+    ],
+    "templates": {
+      "version": {
+        "version": 1
+      }
+    },
+    "hero": {
+      "templates": [
+        "version"
+      ],
+      "basic": {
+        "primeLevel": 1,
+        "phenotype": "",
+        "subtype": "",
+        "size": "Medium",
+        "background": "",
+        "powerset": ""
+      },
+      "abilities": {
+        "might": 0,
+        "agility": 0,
+        "endurance": 0,
+        "wits": 0,
+        "charm": 0
+      },
+      "combat": {
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "ac": 10,
+        "speed": 25,
+        "speeds": {
+          "land": 25
+        },
+        "initiative": {
+          "rank": "Novice",
+          "otherBonuses": 0
+        }
+      },
+      "skills": {},
+      "savingThrows": {
+        "might": { "rank": "Novice", "otherBonuses": 0 },
+        "agility": { "rank": "Novice", "otherBonuses": 0 },
+        "endurance": { "rank": "Novice", "otherBonuses": 0 },
+        "wits": { "rank": "Novice", "otherBonuses": 0 },
+        "charm": { "rank": "Novice", "otherBonuses": 0 }
+      },
+      "resistances": [],
+      "weaknesses": [],
+      "immunities": [],
+      "wounds": [],
+      "talents": [],
+      "attacks": [],
+      "equipment": {
+        "weapons": [],
+        "armor": [],
+        "other": [],
+        "credits": 10
+      },
+      "progression": {
+        "level1": {
+          "phenotype": null,
+          "phenotypeName": null,
+          "phenotypeImg": null,
+          "subtype": null,
+          "subtypeName": null,
+          "subtypeImg": null,
+          "background": null,
+          "backgroundName": null,
+          "backgroundImg": null,
+          "powerset": null,
+          "powersetName": null,
+          "powersetImg": null,
+          "humanAbilityBoost": null,
+          "humanAbilityBoostName": null,
+          "humanAbilityBoostImg": null,
+          "humanGenericTalent": null,
+          "humanGenericTalentName": null,
+          "humanGenericTalentImg": null,
+          "terranAbilityBoost": null,
+          "terranAbilityBoostName": null,
+          "terranAbilityBoostImg": null,
+          "terranGenericTalent": null,
+          "terranGenericTalentName": null,
+          "terranGenericTalentImg": null,
+          "backgroundAbilityBoost": null,
+          "backgroundSkillTraining": null
+        },
+        "level2": {
+          "genericTalent": null
+        },
+        "level3": {
+          "abilityScoreImprovement": false,
+          "powersetTalent": null
+        },
+        "level4": {
+          "genericTalent": null
+        },
+        "level5": {
+          "abilityScoreImprovement": false,
+          "powersetTalent": null
+        },
+        "level6": {
+          "genericTalent": null
+        },
+        "level7": {
+          "powersetTalent": null
+        },
+        "level8": {
+          "abilityScoreImprovement": false,
+          "genericTalent": null
+        },
+        "level9": {
+          "powersetTalent": null
+        },
+        "level10": {
+          "abilityScoreImprovement": false,
+          "powersetTalent": null
+        },
+        "level11": {
+          "genericTalent": null
+        },
+        "level12": {
+          "powersetTalent": null
+        },
+        "level13": {
+          "abilityScoreImprovement": false,
+          "genericTalent": null
+        },
+        "level14": {
+          "powersetTalent": null
+        },
+        "level15": {
+          "abilityScoreImprovement": false,
+          "powersetTalent": null
+        },
+        "level16": {
+          "genericTalent": null
+        },
+        "level17": {
+          "powersetTalent": null
+        },
+        "level18": {
+          "abilityScoreImprovement": false,
+          "genericTalent": null
+        },
+        "level19": {
+          "powersetTalent": null
+        },
+        "level20": {
+          "abilityScoreImprovement": false,
+          "powersetTalent": null
+        }
+      },
+      "notes": "",
+      "backstory": "",
+      "appearance": "",
+      "description": ""
+    },
+    "npc": {
+      "templates": [
+        "version"
+      ],
+      "basic": {
+        "challengeRating": "1/2",
+        "name": ""
+      },
+      "abilities": {
+        "might": 0,
+        "agility": 0,
+        "endurance": 0,
+        "wits": 0,
+        "charm": 0
+      },
+      "combat": {
+        "hp": {
+          "value": 0,
+          "max": 0
+        },
+        "ac": 10,
+        "speed": 25
+      },
+      "skills": {},
+      "traits": [],
+      "specialAbilities": [],
+      "resistances": [],
+      "weaknesses": [],
+      "immunities": [],
+      "weapons": [],
+      "equipment": [],
+      "notes": "",
+      "description": ""
+    }
+  },
+  "Item": {
+    "types": [
+      "weapon",
+      "armor",
+      "talent",
+      "equipment"
+    ],
+    "templates": {
+      "version": {
+        "version": 1
+      },
+      "core": {
+        "description": "",
+        "archived": false
+      }
+    },
+    "weapon": {
+      "templates": [
+        "version",
+        "core"
+      ],
+      "basic": {
+        "attackBonus": 0,
+        "damage": "",
+        "damageType": "kinetic",
+        "range": "",
+        "properties": []
+      }
+    },
+    "armor": {
+      "templates": [
+        "version",
+        "core"
+      ],
+      "basic": {
+        "baseAC": 11,
+        "agilityCap": null,
+        "mightRequirement": null,
+        "type": "light",
+        "price": 0,
+        "traits": [],
+        "description": "",
+        "equipped": false
+      }
+    },
+    "talent": {
+      "templates": [
+        "version",
+        "core"
+      ],
+      "basic": {
+        "type": "generic",
+        "prerequisites": ""
+      }
+    },
+    "equipment": {
+      "templates": [
+        "version",
+        "core"
+      ],
+      "basic": {
+        "quantity": 1
+      }
+    }
+  }
+}

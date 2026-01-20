@@ -1,0 +1,523 @@
+<form class="{{cssClass}} flexcol" autocomplete="off">
+  {{!-- Sheet Header --}}
+  <header class="sheet-header">
+    <img class="profile-img" src="{{actor.img}}" data-action="change-image" title="Click to change portrait or token image" height="100" width="100"/>
+    <div class="header-fields">
+      <h1 class="charname"><input name="name" type="text" value="{{actor.name}}" placeholder="NPC Name" required/></h1>
+      <div class="header-grid">
+        <div class="resource">
+          <label>Challenge Rating</label>
+          <input type="text" name="system.basic.challengeRating" value="{{system.basic.challengeRating}}" placeholder="CR"/>
+        </div>
+        <div class="resource">
+          <label>Size</label>
+          <select name="system.basic.size">
+            <option value="Tiny" {{#if (eq actor.system.basic.size "Tiny")}}selected{{/if}}>Tiny</option>
+            <option value="Small" {{#if (eq actor.system.basic.size "Small")}}selected{{/if}}>Small</option>
+            <option value="Medium" {{#if (or (eq actor.system.basic.size "Medium") (not actor.system.basic.size))}}selected{{/if}}>Medium</option>
+            <option value="Large" {{#if (eq actor.system.basic.size "Large")}}selected{{/if}}>Large</option>
+            <option value="Huge" {{#if (eq actor.system.basic.size "Huge")}}selected{{/if}}>Huge</option>
+            <option value="Gargantuan" {{#if (eq actor.system.basic.size "Gargantuan")}}selected{{/if}}>Gargantuan</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  {{!-- Sheet Tab Navigation --}}
+  <nav class="sheet-tabs tabs" data-group="primary">
+    <a class="item" data-tab="main">Main</a>
+    <a class="item" data-tab="abilities">Abilities</a>
+    <a class="item" data-tab="equipment">Equipment</a>
+    <a class="item" data-tab="notes">Notes</a>
+  </nav>
+
+  {{!-- Sheet Body --}}
+  <section class="sheet-body">
+    {{!-- Main Tab --}}
+    <div class="tab main" data-group="primary" data-tab="main">
+      <div class="abilities">
+        <h3>Ability Scores</h3>
+        <div class="ability-grid">
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="might" data-action="roll-ability">Might</label>
+            <div class="ability-value clickable" data-ability="might" data-action="show-ability-breakdown">{{calculatedAbilityScores.might}}</div>
+            <input type="number" name="system.abilities.might" value="{{actor.system.abilities.might}}" class="ability-input" style="display: none;"/>
+          </div>
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="agility" data-action="roll-ability">Agility</label>
+            <div class="ability-value clickable" data-ability="agility" data-action="show-ability-breakdown">{{calculatedAbilityScores.agility}}</div>
+            <input type="number" name="system.abilities.agility" value="{{actor.system.abilities.agility}}" class="ability-input" style="display: none;"/>
+          </div>
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="endurance" data-action="roll-ability">Endurance</label>
+            <div class="ability-value clickable" data-ability="endurance" data-action="show-ability-breakdown">{{calculatedAbilityScores.endurance}}</div>
+            <input type="number" name="system.abilities.endurance" value="{{actor.system.abilities.endurance}}" class="ability-input" style="display: none;"/>
+          </div>
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="wits" data-action="roll-ability">Wits</label>
+            <div class="ability-value clickable" data-ability="wits" data-action="show-ability-breakdown">{{calculatedAbilityScores.wits}}</div>
+            <input type="number" name="system.abilities.wits" value="{{actor.system.abilities.wits}}" class="ability-input" style="display: none;"/>
+          </div>
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="charm" data-action="roll-ability">Charm</label>
+            <div class="ability-value clickable" data-ability="charm" data-action="show-ability-breakdown">{{calculatedAbilityScores.charm}}</div>
+            <input type="number" name="system.abilities.charm" value="{{actor.system.abilities.charm}}" class="ability-input" style="display: none;"/>
+          </div>
+        </div>
+        <p class="notes" style="font-size: 11px; color: #999; margin-top: 5px;">Click ability name to roll check, click value to see breakdown. Double-click value to edit.</p>
+      </div>
+
+      <div class="combat">
+        <h3>Combat</h3>
+        <div class="combat-stats">
+          <div class="stat hp-stat">
+            <label>Hit Points</label>
+            <div class="hp-inputs">
+              <div class="hp-current">
+                <label class="hp-label">Current</label>
+                <input type="number" name="system.combat.hp.value" value="{{actor.system.combat.hp.value}}" min="0"/>
+              </div>
+              <span class="hp-separator">/</span>
+              <div class="hp-max">
+                <label class="hp-label">Max</label>
+                <input type="number" name="system.combat.hp.max" value="{{actor.system.combat.hp.max}}" min="0"/>
+              </div>
+            </div>
+          </div>
+          <div class="stat">
+            <label>Armor Class</label>
+            <span>{{system.combat.ac}}</span>
+          </div>
+          <div class="stat">
+            <label>Initiative</label>
+            <div class="initiative-controls">
+              <div class="initiative-value-wrapper">
+                {{#if calculatedInitiative}}
+                <div class="initiative-value clickable" data-action="show-initiative-breakdown" title="Click to see breakdown">{{calculatedInitiative}}</div>
+                {{else}}
+                <div class="initiative-value clickable" data-action="show-initiative-breakdown" title="Click to see breakdown">0</div>
+                {{/if}}
+              </div>
+              <div class="initiative-rank-wrapper">
+                <label class="initiative-rank-label">Competence</label>
+                <select class="initiative-rank" name="system.combat.initiative.rank">
+                  <option value="Novice" {{#if (eq actor.system.combat.initiative.rank "Novice")}}selected{{/if}}{{#unless actor.system.combat.initiative.rank}}selected{{/unless}}>Novice</option>
+                  <option value="Apprentice" {{#if (eq actor.system.combat.initiative.rank "Apprentice")}}selected{{/if}}>Apprentice</option>
+                  <option value="Competent" {{#if (eq actor.system.combat.initiative.rank "Competent")}}selected{{/if}}>Competent</option>
+                  <option value="Masterful" {{#if (eq actor.system.combat.initiative.rank "Masterful")}}selected{{/if}}>Masterful</option>
+                  <option value="Legendary" {{#if (eq actor.system.combat.initiative.rank "Legendary")}}selected{{/if}}>Legendary</option>
+                </select>
+              </div>
+              <div class="initiative-other-wrapper">
+                <label class="initiative-other-label">Other Bonuses</label>
+                <input type="number" class="initiative-other-bonus" name="system.combat.initiative.otherBonuses" value="{{#if actor.system.combat.initiative.otherBonuses}}{{actor.system.combat.initiative.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="speeds">
+        <h3>Speeds</h3>
+        <div class="speed-list">
+          {{#if speeds.land}}
+          <div class="speed-item">
+            <label class="speed-label">Land</label>
+            <input type="number" name="system.combat.speeds.land" value="{{speeds.land}}" min="0" class="speed-input"/>
+            <span class="speed-unit">ft.</span>
+          </div>
+          {{else}}
+          <div class="speed-item">
+            <label class="speed-label">Land</label>
+            <input type="number" name="system.combat.speeds.land" value="{{#if actor.system.combat.speed}}{{actor.system.combat.speed}}{{else}}0{{/if}}" min="0" class="speed-input"/>
+            <span class="speed-unit">ft.</span>
+          </div>
+          {{/if}}
+          {{#each speeds as |speedValue speedType|}}
+          {{#unless (eq speedType "land")}}
+          <div class="speed-item">
+            <label class="speed-label">{{speedType}}</label>
+            <input type="number" name="system.combat.speeds.{{speedType}}" value="{{speedValue}}" min="0" class="speed-input"/>
+            <span class="speed-unit">ft.</span>
+            <a class="speed-delete" data-speed-type="{{speedType}}" title="Remove"><i class="fas fa-times"></i></a>
+          </div>
+          {{/unless}}
+          {{/each}}
+        </div>
+        <button type="button" class="add-speed-type">Add Speed Type</button>
+        </div>
+      </div>
+
+      <div class="saving-throws">
+        <h3>Saving Throws</h3>
+        <div class="saving-throw-grid">
+          <div class="saving-throw">
+            <label>Might</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank-wrapper">
+                <label class="saving-throw-rank-label">Rank</label>
+                <select class="saving-throw-rank" data-saving-throw="might">
+                  <option value="Novice" {{#if (eq savingThrows.might.rank "Novice")}}selected{{/if}}{{#unless savingThrows.might.rank}}selected{{/unless}}>Novice</option>
+                  <option value="Apprentice" {{#if (eq savingThrows.might.rank "Apprentice")}}selected{{/if}}>Apprentice</option>
+                  <option value="Competent" {{#if (eq savingThrows.might.rank "Competent")}}selected{{/if}}>Competent</option>
+                  <option value="Masterful" {{#if (eq savingThrows.might.rank "Masterful")}}selected{{/if}}>Masterful</option>
+                  <option value="Legendary" {{#if (eq savingThrows.might.rank "Legendary")}}selected{{/if}}>Legendary</option>
+                </select>
+              </div>
+              <div class="saving-throw-other-wrapper">
+                <label class="saving-throw-other-label">Other Bonuses</label>
+                <input type="number" class="saving-throw-other-bonus" data-saving-throw="might" value="{{#if savingThrows.might.otherBonuses}}{{savingThrows.might.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
+              </div>
+              <button type="button" class="saving-throw-roll" data-saving-throw="might">Roll</button>
+            </div>
+          </div>
+          <div class="saving-throw">
+            <label>Agility</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank-wrapper">
+                <label class="saving-throw-rank-label">Rank</label>
+                <select class="saving-throw-rank" data-saving-throw="agility">
+                  <option value="Novice" {{#if (eq savingThrows.agility.rank "Novice")}}selected{{/if}}{{#unless savingThrows.agility.rank}}selected{{/unless}}>Novice</option>
+                  <option value="Apprentice" {{#if (eq savingThrows.agility.rank "Apprentice")}}selected{{/if}}>Apprentice</option>
+                  <option value="Competent" {{#if (eq savingThrows.agility.rank "Competent")}}selected{{/if}}>Competent</option>
+                  <option value="Masterful" {{#if (eq savingThrows.agility.rank "Masterful")}}selected{{/if}}>Masterful</option>
+                  <option value="Legendary" {{#if (eq savingThrows.agility.rank "Legendary")}}selected{{/if}}>Legendary</option>
+                </select>
+              </div>
+              <div class="saving-throw-other-wrapper">
+                <label class="saving-throw-other-label">Other Bonuses</label>
+                <input type="number" class="saving-throw-other-bonus" data-saving-throw="agility" value="{{#if savingThrows.agility.otherBonuses}}{{savingThrows.agility.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
+              </div>
+              <button type="button" class="saving-throw-roll" data-saving-throw="agility">Roll</button>
+            </div>
+          </div>
+          <div class="saving-throw">
+            <label>Endurance</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank-wrapper">
+                <label class="saving-throw-rank-label">Rank</label>
+                <select class="saving-throw-rank" data-saving-throw="endurance">
+                  <option value="Novice" {{#if (eq savingThrows.endurance.rank "Novice")}}selected{{/if}}{{#unless savingThrows.endurance.rank}}selected{{/unless}}>Novice</option>
+                  <option value="Apprentice" {{#if (eq savingThrows.endurance.rank "Apprentice")}}selected{{/if}}>Apprentice</option>
+                  <option value="Competent" {{#if (eq savingThrows.endurance.rank "Competent")}}selected{{/if}}>Competent</option>
+                  <option value="Masterful" {{#if (eq savingThrows.endurance.rank "Masterful")}}selected{{/if}}>Masterful</option>
+                  <option value="Legendary" {{#if (eq savingThrows.endurance.rank "Legendary")}}selected{{/if}}>Legendary</option>
+                </select>
+              </div>
+              <div class="saving-throw-other-wrapper">
+                <label class="saving-throw-other-label">Other Bonuses</label>
+                <input type="number" class="saving-throw-other-bonus" data-saving-throw="endurance" value="{{#if savingThrows.endurance.otherBonuses}}{{savingThrows.endurance.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
+              </div>
+              <button type="button" class="saving-throw-roll" data-saving-throw="endurance">Roll</button>
+            </div>
+          </div>
+          <div class="saving-throw">
+            <label>Wits</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank-wrapper">
+                <label class="saving-throw-rank-label">Rank</label>
+                <select class="saving-throw-rank" data-saving-throw="wits">
+                  <option value="Novice" {{#if (eq savingThrows.wits.rank "Novice")}}selected{{/if}}{{#unless savingThrows.wits.rank}}selected{{/unless}}>Novice</option>
+                  <option value="Apprentice" {{#if (eq savingThrows.wits.rank "Apprentice")}}selected{{/if}}>Apprentice</option>
+                  <option value="Competent" {{#if (eq savingThrows.wits.rank "Competent")}}selected{{/if}}>Competent</option>
+                  <option value="Masterful" {{#if (eq savingThrows.wits.rank "Masterful")}}selected{{/if}}>Masterful</option>
+                  <option value="Legendary" {{#if (eq savingThrows.wits.rank "Legendary")}}selected{{/if}}>Legendary</option>
+                </select>
+              </div>
+              <div class="saving-throw-other-wrapper">
+                <label class="saving-throw-other-label">Other Bonuses</label>
+                <input type="number" class="saving-throw-other-bonus" data-saving-throw="wits" value="{{#if savingThrows.wits.otherBonuses}}{{savingThrows.wits.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
+      </div>
+              <button type="button" class="saving-throw-roll" data-saving-throw="wits">Roll</button>
+            </div>
+          </div>
+          <div class="saving-throw">
+            <label>Charm</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank-wrapper">
+                <label class="saving-throw-rank-label">Rank</label>
+                <select class="saving-throw-rank" data-saving-throw="charm">
+                  <option value="Novice" {{#if (eq savingThrows.charm.rank "Novice")}}selected{{/if}}{{#unless savingThrows.charm.rank}}selected{{/unless}}>Novice</option>
+                  <option value="Apprentice" {{#if (eq savingThrows.charm.rank "Apprentice")}}selected{{/if}}>Apprentice</option>
+                  <option value="Competent" {{#if (eq savingThrows.charm.rank "Competent")}}selected{{/if}}>Competent</option>
+                  <option value="Masterful" {{#if (eq savingThrows.charm.rank "Masterful")}}selected{{/if}}>Masterful</option>
+                  <option value="Legendary" {{#if (eq savingThrows.charm.rank "Legendary")}}selected{{/if}}>Legendary</option>
+                </select>
+              </div>
+              <div class="saving-throw-other-wrapper">
+                <label class="saving-throw-other-label">Other Bonuses</label>
+                <input type="number" class="saving-throw-other-bonus" data-saving-throw="charm" value="{{#if savingThrows.charm.otherBonuses}}{{savingThrows.charm.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
+              </div>
+              <button type="button" class="saving-throw-roll" data-saving-throw="charm">Roll</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="attacks">
+        <h3>Attacks</h3>
+        <ol class="attack-list">
+          {{#each attacks as |attack id|}}
+          <li class="attack" data-attack-id="{{id}}">
+            {{#if attack.weaponImg}}
+            <img class="attack-icon weapon-icon" src="{{attack.weaponImg}}" alt="{{attack.name}}" onerror="this.src='icons/svg/sword.svg'">
+            {{/if}}
+            <div class="attack-content">
+              <div class="attack-header">
+                <h4>
+                  {{#unless attack.weaponImg}}
+                  {{#if attack.icon}}<i class="fas {{attack.icon}}"></i>{{/if}}
+                  {{/unless}}
+                  {{attack.name}}
+                </h4>
+                <div class="attack-controls">
+                  <button type="button" class="attack-roll" data-attack-id="{{id}}" title="Roll Attack">Roll Attack</button>
+                  <button type="button" class="damage-roll" data-attack-id="{{id}}" title="Roll Damage">Roll Damage</button>
+                  <a class="attack-edit" data-attack-id="{{id}}" title="Edit"><i class="fas fa-edit"></i></a>
+                  <a class="attack-delete" data-attack-id="{{id}}" title="Delete"><i class="fas fa-trash"></i></a>
+                </div>
+              </div>
+              <div class="attack-details">
+              <span>Attack Bonus: {{calculatedAttackBonus}} {{#if attackBonusBreakdown}}<span class="attack-breakdown" title="{{attackBonusBreakdown}}">({{attackBonusBreakdown}})</span>{{/if}}</span>
+              <span>Damage: {{calculatedDamage}}</span>
+              <span>Type: {{attack.damageType}}</span>
+              </div>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+      </div>
+    </div>
+
+    {{!-- Abilities Tab --}}
+    <div class="tab abilities" data-group="primary" data-tab="abilities">
+      <h3>Special Abilities</h3>
+      <ol class="ability-list">
+        {{#each specialAbilities as |ability index|}}
+        <li class="ability">
+          <div class="ability-name">
+            <strong>{{ability.name}}</strong>
+          </div>
+          <div class="ability-controls">
+            <a class="delete-special-ability" data-index="{{index}}" title="Delete"><i class="fas fa-trash"></i></a>
+          </div>
+          <div class="ability-description">
+            {{ability.description}}
+          </div>
+        </li>
+        {{/each}}
+      </ol>
+      <button class="add-special-ability">Add Special Ability</button>
+
+      <h3>Traits</h3>
+      <ol class="trait-list">
+        {{#each traits as |trait index|}}
+        <li class="trait">
+          <div class="trait-name">
+            <strong>{{trait}}</strong>
+          </div>
+          <div class="trait-controls">
+            <a class="delete-trait" data-index="{{index}}" title="Delete"><i class="fas fa-trash"></i></a>
+          </div>
+        </li>
+        {{/each}}
+      </ol>
+      <button class="add-trait">Add Trait</button>
+
+      <h3>Skills</h3>
+      <ol class="skill-list">
+        {{#each skills as |skill skillName|}}
+        <li class="skill">
+          <div class="skill-name">
+            <strong>{{skillName}}</strong>
+            <span class="skill-rank">{{skill.rank}}</span>
+          </div>
+        </li>
+        {{/each}}
+      </ol>
+
+      <h3>Resistances, Weaknesses & Immunities</h3>
+      <div class="rwi-container">
+        <div class="rwi-category">
+          <div class="rwi-header">
+            <h4>Resistances</h4>
+            <button type="button" class="add-rwi" data-type="resistance" title="Add Resistance"><i class="fas fa-plus"></i></button>
+          </div>
+          <ol class="rwi-list">
+            {{#each resistances as |resistance id|}}
+            <li class="rwi-item" data-id="{{id}}">
+              <span class="rwi-name">{{resistance.type}}</span>
+              {{#if resistance.value}}
+              <span class="rwi-value">({{resistance.value}})</span>
+              {{/if}}
+              <a class="rwi-delete" data-type="resistance" data-id="{{id}}" title="Remove"><i class="fas fa-times"></i></a>
+            </li>
+            {{else}}
+            <li class="rwi-empty">None</li>
+            {{/each}}
+          </ol>
+        </div>
+        <div class="rwi-category">
+          <div class="rwi-header">
+            <h4>Weaknesses</h4>
+            <button type="button" class="add-rwi" data-type="weakness" title="Add Weakness"><i class="fas fa-plus"></i></button>
+          </div>
+          <ol class="rwi-list">
+            {{#each weaknesses as |weakness id|}}
+            <li class="rwi-item" data-id="{{id}}">
+              <span class="rwi-name">{{weakness.type}}</span>
+              {{#if weakness.value}}
+              <span class="rwi-value">({{weakness.value}})</span>
+              {{/if}}
+              <a class="rwi-delete" data-type="weakness" data-id="{{id}}" title="Remove"><i class="fas fa-times"></i></a>
+            </li>
+            {{else}}
+            <li class="rwi-empty">None</li>
+            {{/each}}
+          </ol>
+        </div>
+        <div class="rwi-category">
+          <div class="rwi-header">
+            <h4>Immunities</h4>
+            <button type="button" class="add-rwi" data-type="immunity" title="Add Immunity"><i class="fas fa-plus"></i></button>
+          </div>
+          <ol class="rwi-list">
+            {{#each immunities as |immunity id|}}
+            <li class="rwi-item" data-id="{{id}}">
+              <span class="rwi-name">{{immunity.type}}</span>
+              <a class="rwi-delete" data-type="immunity" data-id="{{id}}" title="Remove"><i class="fas fa-times"></i></a>
+            </li>
+            {{else}}
+            <li class="rwi-empty">None</li>
+            {{/each}}
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    {{!-- Equipment Tab --}}
+    <div class="tab equipment" data-group="primary" data-tab="equipment">
+      <div class="weapons">
+        <h3>Weapons</h3>
+        <ol class="item-list">
+          {{#each weapons as |item id|}}
+          <li class="item {{#if item.system.basic.equipped}}equipped{{/if}}" data-item-id="{{item._id}}">
+            {{#if item.img}}
+            <img class="item-icon" src="{{item.img}}" alt="{{item.name}}" onerror="this.src='icons/svg/sword.svg'">
+            {{/if}}
+            <div class="item-name">
+              <h4>
+                {{item.name}}
+                {{#if item.system.basic.equipped}}
+                <span class="equipped-badge" title="Currently Equipped">✓ Equipped</span>
+                {{/if}}
+              </h4>
+            </div>
+            <div class="item-controls">
+              {{#if item.system.basic.equipped}}
+              <a class="weapon-unequip" data-item-id="{{item._id}}" title="Unequip"><i class="fas fa-hand-paper"></i></a>
+              {{else}}
+              <a class="weapon-equip" data-item-id="{{item._id}}" title="Equip"><i class="fas fa-hand-rock"></i></a>
+              {{/if}}
+              <a class="item-edit" title="Edit"><i class="fas fa-edit"></i></a>
+              <a class="item-delete" title="Delete"><i class="fas fa-trash"></i></a>
+            </div>
+            <div class="item-details">
+              <span><strong>Type:</strong> {{#if item.system.basic.type}}{{item.system.basic.type}}{{else}}Melee{{/if}}</span>
+              <span><strong>Attack:</strong> {{item.system.basic.attackBonus}}</span>
+              <span><strong>Damage:</strong> {{item.system.basic.damage}}</span>
+              {{#if item.system.basic.range}}
+              <span><strong>Range:</strong> {{item.system.basic.range}}</span>
+              {{/if}}
+              {{#if item.system.basic.hands}}
+              <span><strong>Hands:</strong> {{item.system.basic.hands}}</span>
+              {{/if}}
+              {{#if item.system.basic.properties}}
+              <span><strong>Traits:</strong> {{item.system.basic.properties.join ", "}}</span>
+              {{/if}}
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+        <button type="button" class="item-create" data-type="weapon">Add Weapon</button>
+        <button type="button" class="buy-weapon">Buy Weapon from Compendium</button>
+      </div>
+
+      <div class="armor">
+        <h3>Armor</h3>
+        <ol class="item-list">
+          {{#each armor as |item id|}}
+          <li class="item {{#if item.system.basic.equipped}}equipped{{/if}}" data-item-id="{{item._id}}">
+            <div class="item-name">
+              <h4>
+                {{item.name}}
+                {{#if item.system.basic.equipped}}
+                <span class="equipped-badge" title="Currently Equipped">✓ Equipped</span>
+                {{/if}}
+              </h4>
+            </div>
+            <div class="item-controls">
+              {{#if item.system.basic.equipped}}
+              <a class="armor-unequip" data-item-id="{{item._id}}" title="Unequip"><i class="fas fa-tshirt"></i></a>
+              {{else}}
+              <a class="armor-equip" data-item-id="{{item._id}}" title="Equip"><i class="fas fa-tshirt"></i></a>
+              {{/if}}
+              <a class="item-edit" title="Edit"><i class="fas fa-edit"></i></a>
+              <a class="item-delete" title="Delete"><i class="fas fa-trash"></i></a>
+            </div>
+            <div class="item-details">
+              <span><strong>Base AC:</strong> {{item.system.basic.baseAC}}</span>
+              <span><strong>Type:</strong> {{item.system.basic.type}}</span>
+              {{#if item.system.basic.agilityCap}}
+              <span><strong>Agility Cap:</strong> {{item.system.basic.agilityCap}}</span>
+              {{else}}
+              <span><strong>Agility Cap:</strong> No cap</span>
+              {{/if}}
+              {{#if item.system.basic.mightRequirement}}
+              <span><strong>Might Requirement:</strong> {{item.system.basic.mightRequirement}}</span>
+              {{else}}
+              <span><strong>Might Requirement:</strong> None</span>
+              {{/if}}
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+        <button type="button" class="item-create" data-type="armor">Add Armor</button>
+        <button type="button" class="buy-armor">Buy Armor from Compendium</button>
+      </div>
+
+      <div class="equipment-items">
+      <h3>Equipment</h3>
+      <ol class="item-list">
+        {{#each equipment as |item id|}}
+        <li class="item" data-item-id="{{item._id}}">
+          <div class="item-name">
+            <h4>{{item.name}}</h4>
+              {{#if item.system.basic.quantity}}
+              <span class="item-quantity">({{item.system.basic.quantity}})</span>
+              {{/if}}
+          </div>
+          <div class="item-controls">
+            <a class="item-edit" title="Edit"><i class="fas fa-edit"></i></a>
+            <a class="item-delete" title="Delete"><i class="fas fa-trash"></i></a>
+          </div>
+            {{#if item.system.description}}
+          <div class="item-description">
+              {{{item.system.description}}}
+          </div>
+            {{/if}}
+        </li>
+        {{/each}}
+      </ol>
+      <button class="item-create" data-type="equipment">Add Equipment</button>
+      </div>
+    </div>
+
+    {{!-- Notes Tab --}}
+    <div class="tab notes" data-group="primary" data-tab="notes">
+      <h3>Notes</h3>
+      {{editor system.notes target="system.notes" button=true owner=owner editable=editable}}
+    </div>
+  </section>
+</form>

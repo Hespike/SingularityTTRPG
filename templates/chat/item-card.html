@@ -1,0 +1,62 @@
+<div class="singularity chat-card item-card" data-item-id="{{item._id}}" data-actor-id="{{actor._id}}">
+  <header class="card-header flexrow">
+    <img src="{{item.img}}" alt="{{item.name}}" title="{{item.name}}" />
+    <h3>{{item.name}}</h3>
+  </header>
+  {{#if item.system.description}}
+  <div class="card-content">
+    {{{item.system.description}}}
+  </div>
+  {{/if}}
+</div>
+
+<style>
+.singularity.chat-card {
+  border: 1px solid rgba(189, 95, 255, 0.3);
+  border-radius: 5px;
+  background: rgba(30, 33, 45, 0.95);
+  padding: 10px;
+  margin: 5px 0;
+}
+
+.singularity.chat-card .card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(189, 95, 255, 0.3);
+}
+
+.singularity.chat-card .card-header img {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(189, 95, 255, 0.3);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.singularity.chat-card .card-header h3 {
+  color: #BD5FFF;
+  margin: 0;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.singularity.chat-card .card-content {
+  color: #d1d1d1;
+  line-height: 1.6;
+}
+
+.singularity.chat-card .card-content h2,
+.singularity.chat-card .card-content h3,
+.singularity.chat-card .card-content h4 {
+  color: #BD5FFF;
+  margin-top: 10px;
+  margin-bottom: 5px;
+}
+
+.singularity.chat-card .card-content p {
+  margin: 5px 0;
+}
+</style>

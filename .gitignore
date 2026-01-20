@@ -1,0 +1,56 @@
+# Foundry VTT System .gitignore
+
+# Foundry VTT specific files
+packs/**/*.db
+packs/**/*.log
+packs/**/LOCK
+packs/**/CURRENT
+packs/**/MANIFEST-*
+packs/**/LOG
+packs/**/LOG.old
+
+# Node modules (if you use npm)
+node_modules/
+package-lock.json
+yarn.lock
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Reference systems (if you don't want to commit them)
+# Uncomment these if you want to exclude reference systems:
+# cyphersystem/
+# pf2e/
+
+# Build files
+dist/
+build/
+*.map
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Log files
+*.log
+
+# Environment files
+.env
+.env.local

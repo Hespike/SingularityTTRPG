@@ -1,0 +1,1703 @@
+<form class="{{cssClass}} flexcol" autocomplete="off">
+  {{!-- Sheet Header --}}
+  <header class="sheet-header">
+    <div class="profile-section">
+      <img class="profile-img" src="{{actor.img}}" data-action="change-image" title="Click to change portrait or token image" height="100" width="100"/>
+    </div>
+    <div class="header-fields">
+      <h1 class="charname"><input name="name" type="text" value="{{actor.name}}" placeholder="Character Name" required/></h1>
+      <div class="header-grid">
+        <div class="resource">
+          <label>Prime Level</label>
+          <div class="prime-level-controls">
+            {{#if (gt actor.system.basic.primeLevel 1)}}
+            <button type="button" class="prime-level-btn prime-level-down" data-action="decrease-level" title="Decrease Level">
+              <i class="fas fa-chevron-down"></i>
+            </button>
+            {{/if}}
+            <span class="prime-level-value">{{actor.system.basic.primeLevel}}</span>
+            <button type="button" class="prime-level-btn prime-level-up" data-action="increase-level" title="Increase Level">
+              <i class="fas fa-chevron-up"></i>
+            </button>
+          </div>
+        </div>
+        <div class="resource">
+          <label>Phenotype</label>
+          <input type="text" name="system.basic.phenotype" value="{{actor.system.basic.phenotype}}"/>
+        </div>
+        <div class="resource">
+          <label>Subtype</label>
+          <input type="text" name="system.basic.subtype" value="{{actor.system.basic.subtype}}"/>
+        </div>
+        <div class="resource">
+          <label>Size</label>
+          <input type="text" name="system.basic.size" value="{{actor.system.basic.size}}"/>
+        </div>
+        <div class="resource">
+          <label>Background</label>
+          <input type="text" name="system.basic.background" value="{{actor.system.basic.background}}"/>
+        </div>
+        <div class="resource">
+          <label>Powerset</label>
+          <input type="text" name="system.basic.powerset" value="{{actor.system.basic.powerset}}"/>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  {{!-- Sheet Tab Navigation --}}
+  <nav class="sheet-tabs tabs" data-group="primary">
+    <a class="item" data-tab="main">Main</a>
+    <a class="item" data-tab="skills">Skills</a>
+    <a class="item" data-tab="equipment">Equipment</a>
+    {{#if hasGadgeteer}}
+    <a class="item" data-tab="gadgets">Gadgets</a>
+    {{/if}}
+    <a class="item" data-tab="progression">Progression</a>
+    <a class="item" data-tab="wounds">Wounds</a>
+    <a class="item" data-tab="notes">Notes</a>
+  </nav>
+
+  {{!-- Sheet Body --}}
+  <section class="sheet-body">
+    {{!-- Main Tab --}}
+    <div class="tab main" data-group="primary" data-tab="main">
+      <div class="combat">
+        <h3>Combat</h3>
+        <div class="combat-stats">
+          <div class="stat combat-combined-stat">
+            <div class="combat-combined-content">
+              <div class="hp-section">
+                <label>Hit Points</label>
+                <div class="hp-inputs">
+                  <div class="hp-current">
+                    <label class="hp-label">Current</label>
+                    <input type="number" name="system.combat.hp.value" value="{{actor.system.combat.hp.value}}" min="0"/>
+                  </div>
+                  <span class="hp-separator">/</span>
+                  <div class="hp-max">
+                    <label class="hp-label">Max</label>
+                    <div class="hp-max-value clickable" data-action="show-hp-breakdown" title="Click to see breakdown">{{calculatedMaxHp}}</div>
+                  </div>
+                </div>
+                <button type="button" class="long-rest-button" title="Long Rest: Restore HP to max, remove wounds (not extreme wounds), and refresh used gadgets">
+                  <i class="fas fa-moon"></i> Long Rest
+                </button>
+              </div>
+              <div class="ac-section">
+                <label>Armor Class</label>
+                <div class="ac-display">
+                  {{#if calculatedAc}}
+                  <div class="ac-value clickable" data-action="show-ac-breakdown" title="Click to see breakdown">{{calculatedAc}}</div>
+                  {{else}}
+                  <div class="ac-value">10</div>
+                  {{/if}}
+                </div>
+              </div>
+              <div class="initiative-section">
+                <label>Initiative</label>
+                <div class="initiative-display">
+                  {{#if calculatedInitiative}}
+                  <div class="initiative-value clickable" data-action="show-initiative-breakdown" title="Click to see breakdown">{{calculatedInitiative}}</div>
+                  {{else}}
+                  <div class="initiative-value clickable" data-action="show-initiative-breakdown" title="Click to see breakdown">0</div>
+                  {{/if}}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="attacks">
+        <h3>Attacks</h3>
+        <ol class="attack-list">
+          {{#each attacks as |attack id|}}
+          <li class="attack" data-attack-id="{{id}}">
+            {{#if attack.weaponImg}}
+            <img class="attack-icon weapon-icon" src="{{attack.weaponImg}}" alt="{{attack.name}}" onerror="this.src='icons/svg/sword.svg'">
+            {{/if}}
+            <div class="attack-content">
+              <div class="attack-header">
+                <h4>
+                  {{#unless attack.weaponImg}}
+                  {{#if attack.icon}}<i class="fas {{attack.icon}}"></i>{{/if}}
+                  {{/unless}}
+                  {{attack.name}}
+                </h4>
+                <div class="attack-controls">
+                  <button type="button" class="attack-roll" data-attack-id="{{id}}" title="Roll Attack">Roll Attack</button>
+                  <button type="button" class="damage-roll" data-attack-id="{{id}}" title="Roll Damage">Roll Damage</button>
+                  <a class="attack-edit" data-attack-id="{{id}}" title="Edit"><i class="fas fa-edit"></i></a>
+                  <a class="attack-delete" data-attack-id="{{id}}" title="Delete"><i class="fas fa-trash"></i></a>
+                </div>
+              </div>
+              <div class="attack-details">
+              <span>Attack Bonus: {{calculatedAttackBonus}} {{#if attackBonusBreakdown}}<span class="attack-breakdown" title="{{attackBonusBreakdown}}">({{attackBonusBreakdown}})</span>{{/if}}</span>
+              <span>Damage: {{calculatedDamage}}</span>
+              <span>Type: {{attack.damageType}}</span>
+              </div>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+        <button type="button" class="add-attack">Add Attack</button>
+      </div>
+
+      {{#if hasSupersonicMoment}}
+      <div class="supersonic-moment-section">
+        <h3>Supersonic Moment</h3>
+        <div class="supersonic-controls">
+          <label class="supersonic-toggle-label">
+            <input type="checkbox" name="system.combat.supersonicMoment.active" {{checked actor.system.combat.supersonicMoment.active}} class="supersonic-toggle"/>
+            <span>Active</span>
+          </label>
+          {{#if actor.system.combat.supersonicMoment.active}}
+          <div class="supersonic-distance">
+            <label>Distance Flown (feet):</label>
+            <input type="number" name="system.combat.supersonicMoment.distance" value="{{actor.system.combat.supersonicMoment.distance}}" min="0" step="15" class="supersonic-distance-input"/>
+            <span class="supersonic-bonus-display">+{{supersonicDamageBonus}} damage bonus</span>
+          </div>
+          {{/if}}
+        </div>
+        <p class="supersonic-help-text">For every 15 feet you fly before making a melee attack, gain +2 damage bonus.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasDeadeye}}
+      <div class="deadeye-section">
+        <h3>Deadeye</h3>
+        <div class="deadeye-controls">
+          <label class="deadeye-toggle-label">
+            <input type="checkbox" name="system.combat.deadeye.active" {{checked actor.system.combat.deadeye.active}} class="deadeye-toggle"/>
+            <span>Active</span>
+          </label>
+          {{#if actor.system.combat.deadeye.active}}
+          <span class="deadeye-bonus-display">+5 attack bonus</span>
+          {{/if}}
+        </div>
+        <p class="deadeye-help-text">Spend an action to carefully aim. Your next attack with a ranged weapon gains a +5 bonus to the attack roll. If you or your target moves before the attack is made, you lose this bonus.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasEnoughPrepTime}}
+      <div class="enough-prep-time-section">
+        <h3>Enough Prep Time</h3>
+        <div class="enough-prep-time-controls">
+          <label class="enough-prep-time-toggle-label">
+            <input type="checkbox" name="system.combat.enoughPrepTime.active" {{checked actor.system.combat.enoughPrepTime.active}} class="enough-prep-time-toggle"/>
+            <span>Active</span>
+          </label>
+          {{#if actor.system.combat.enoughPrepTime.active}}
+          <div class="enough-prep-time-enemy">
+            <label>Enemy Name:</label>
+            <input type="text" name="system.combat.enoughPrepTime.enemyName" value="{{actor.system.combat.enoughPrepTime.enemyName}}" placeholder="Enter enemy name" class="enough-prep-time-enemy-input"/>
+            {{#if enoughPrepTimeAttackBonus}}
+            <div class="enough-prep-time-bonuses">
+              <span class="enough-prep-time-bonus-display">+{{enoughPrepTimeAttackBonus}} attack bonus, +{{enoughPrepTimeDCBonus}} Gadget Tuning DC</span>
+            </div>
+            {{/if}}
+          </div>
+          {{/if}}
+        </div>
+        <p class="enough-prep-time-help-text">After 1 hour of preparation for a known enemy, gain +1 per Gadgeteer level to Gadget Tuning DC and attack rolls with gadgets against that enemy.</p>
+      </div>
+      {{/if}}
+
+      <div class="abilities">
+        <h3>Ability Scores</h3>
+        <div class="ability-grid">
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="might" data-action="roll-ability">Might</label>
+            <div class="ability-value clickable" data-ability="might" data-action="show-ability-breakdown">{{calculatedAbilityScores.might}}</div>
+          </div>
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="agility" data-action="roll-ability">Agility</label>
+            <div class="ability-value clickable" data-ability="agility" data-action="show-ability-breakdown">{{calculatedAbilityScores.agility}}</div>
+          </div>
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="endurance" data-action="roll-ability">Endurance</label>
+            <div class="ability-value clickable" data-ability="endurance" data-action="show-ability-breakdown">{{calculatedAbilityScores.endurance}}</div>
+          </div>
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="wits" data-action="roll-ability">Wits</label>
+            <div class="ability-value clickable" data-ability="wits" data-action="show-ability-breakdown">{{calculatedAbilityScores.wits}}</div>
+          </div>
+          <div class="ability">
+            <label class="ability-name-clickable" data-ability="charm" data-action="roll-ability">Charm</label>
+            <div class="ability-value clickable" data-ability="charm" data-action="show-ability-breakdown">{{calculatedAbilityScores.charm}}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="saving-throws">
+        <h3>Saving Throws</h3>
+        <div class="saving-throw-grid">
+          <div class="saving-throw">
+            <label class="saving-throw-name-clickable" data-saving-throw="might" data-action="roll-saving-throw" title="Click to roll saving throw">Might</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank locked clickable" data-ability="might" data-action="show-saving-throw-breakdown" title="Click to see breakdown">
+                {{#if savingThrows.might.rank}}{{savingThrows.might.rank}}{{else}}Novice{{/if}}
+              </div>
+            </div>
+          </div>
+          <div class="saving-throw">
+            <label class="saving-throw-name-clickable" data-saving-throw="agility" data-action="roll-saving-throw" title="Click to roll saving throw">Agility</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank locked clickable" data-ability="agility" data-action="show-saving-throw-breakdown" title="Click to see breakdown">
+                {{#if savingThrows.agility.rank}}{{savingThrows.agility.rank}}{{else}}Novice{{/if}}
+              </div>
+            </div>
+          </div>
+          <div class="saving-throw">
+            <label class="saving-throw-name-clickable" data-saving-throw="endurance" data-action="roll-saving-throw" title="Click to roll saving throw">Endurance</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank locked clickable" data-ability="endurance" data-action="show-saving-throw-breakdown" title="Click to see breakdown">
+                {{#if savingThrows.endurance.rank}}{{savingThrows.endurance.rank}}{{else}}Novice{{/if}}
+              </div>
+            </div>
+          </div>
+          <div class="saving-throw">
+            <label class="saving-throw-name-clickable" data-saving-throw="wits" data-action="roll-saving-throw" title="Click to roll saving throw">Wits</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank locked clickable" data-ability="wits" data-action="show-saving-throw-breakdown" title="Click to see breakdown">
+                {{#if savingThrows.wits.rank}}{{savingThrows.wits.rank}}{{else}}Novice{{/if}}
+              </div>
+            </div>
+          </div>
+          <div class="saving-throw">
+            <label class="saving-throw-name-clickable" data-saving-throw="charm" data-action="roll-saving-throw" title="Click to roll saving throw">Charm</label>
+            <div class="saving-throw-controls">
+              <div class="saving-throw-rank locked clickable" data-ability="charm" data-action="show-saving-throw-breakdown" title="Click to see breakdown">
+                {{#if savingThrows.charm.rank}}{{savingThrows.charm.rank}}{{else}}Novice{{/if}}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rwi-section">
+        <h3>Resistances, Weaknesses & Immunities</h3>
+        <div class="rwi-container">
+          <div class="rwi-category">
+            <div class="rwi-header">
+              <h4>Resistances</h4>
+              <button type="button" class="add-rwi" data-type="resistance" title="Add Resistance"><i class="fas fa-plus"></i></button>
+            </div>
+            <ol class="rwi-list">
+              {{#each resistances as |resistance id|}}
+              <li class="rwi-item" data-id="{{id}}">
+                <span class="rwi-name">{{resistance.type}}</span>
+                {{#if resistance.calculatedValue}}
+                <span class="rwi-value">({{resistance.calculatedValue}})</span>
+                {{else if resistance.value}}
+                <span class="rwi-value">({{resistance.value}})</span>
+                {{/if}}
+                {{#if resistance.source}}
+                <span class="rwi-source" title="From {{resistance.source}}">🔒</span>
+                {{else}}
+                <a class="rwi-delete" data-type="resistance" data-id="{{id}}" title="Remove"><i class="fas fa-times"></i></a>
+                {{/if}}
+              </li>
+              {{else}}
+              <li class="rwi-empty">None</li>
+              {{/each}}
+            </ol>
+          </div>
+          <div class="rwi-category">
+            <div class="rwi-header">
+              <h4>Weaknesses</h4>
+              <button type="button" class="add-rwi" data-type="weakness" title="Add Weakness"><i class="fas fa-plus"></i></button>
+            </div>
+            <ol class="rwi-list">
+              {{#each weaknesses as |weakness id|}}
+              <li class="rwi-item" data-id="{{id}}">
+                <span class="rwi-name">{{weakness.type}}</span>
+                {{#if weakness.value}}
+                <span class="rwi-value">({{weakness.value}})</span>
+                {{/if}}
+                <a class="rwi-delete" data-type="weakness" data-id="{{id}}" title="Remove"><i class="fas fa-times"></i></a>
+              </li>
+              {{else}}
+              <li class="rwi-empty">None</li>
+              {{/each}}
+            </ol>
+          </div>
+          <div class="rwi-category">
+            <div class="rwi-header">
+              <h4>Immunities</h4>
+              <button type="button" class="add-rwi" data-type="immunity" title="Add Immunity"><i class="fas fa-plus"></i></button>
+            </div>
+            <ol class="rwi-list">
+              {{#each immunities as |immunity id|}}
+              <li class="rwi-item" data-id="{{id}}">
+                <span class="rwi-name">{{immunity.type}}</span>
+                <a class="rwi-delete" data-type="immunity" data-id="{{id}}" title="Remove"><i class="fas fa-times"></i></a>
+              </li>
+              {{else}}
+              <li class="rwi-empty">None</li>
+              {{/each}}
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="speed-section">
+        <label>Speed</label>
+        <div class="speed-list">
+          <div class="speed-item">
+            <label class="speed-label">Land</label>
+            <div class="speed-value">{{speeds.land}}</div>
+            <span class="speed-unit">ft.</span>
+            {{#if armorSpeedPenalty}}
+            {{#if (eq armorSpeedPenalty "immobile")}}
+            <span class="speed-penalty-badge immobile" title="Armor Might requirement not met (4+ deficit) - Immobile">⚠ Immobile</span>
+            {{else if (eq armorSpeedPenalty "halved")}}
+            <span class="speed-penalty-badge halved" title="Armor Might requirement not met (1-3 deficit) - Speed halved">⚠ Halved</span>
+            {{/if}}
+            {{/if}}
+          </div>
+          {{#if (eq calculatedSwimmingSpeed 25)}}
+          <div class="speed-item">
+            <label class="speed-label">Swimming</label>
+            <div class="speed-value">{{calculatedSwimmingSpeed}}</div>
+            <span class="speed-unit">ft.</span>
+          </div>
+          {{/if}}
+          {{#if calculatedFlyingSpeed}}
+          <div class="speed-item">
+            <label class="speed-label">Flying</label>
+            <div class="speed-value">{{calculatedFlyingSpeed}}</div>
+            <span class="speed-unit">ft.</span>
+          </div>
+          {{/if}}
+          {{#each speeds as |speedValue speedType|}}
+          {{#unless (eq speedType "land")}}
+          {{#unless (and (eq speedType "swimming") (eq ../calculatedSwimmingSpeed 25))}}
+          {{#unless (and (eq speedType "flying") ../calculatedFlyingSpeed)}}
+          <div class="speed-item">
+            <label class="speed-label">{{capitalize speedType}}</label>
+            <input type="number" name="system.combat.speeds.{{speedType}}" value="{{speedValue}}" min="0" class="speed-input"/>
+            <span class="speed-unit">ft.</span>
+            <a class="speed-delete" data-speed-type="{{speedType}}" title="Remove"><i class="fas fa-times"></i></a>
+          </div>
+          {{/unless}}
+          {{/unless}}
+          {{/unless}}
+          {{/each}}
+        </div>
+      </div>
+    </div>
+
+    {{!-- Skills Tab --}}
+    <div class="tab skills" data-group="primary" data-tab="skills">
+      <h3>Skills</h3>
+      <div class="skill-list-container">
+        <div class="skill-header">
+          <span class="skill-header-name">Name</span>
+          <span class="skill-header-rank">Training Rank</span>
+          <span class="skill-header-ability">Associated Ability</span>
+          <span class="skill-header-other">Other Bonuses</span>
+          <span class="skill-header-total">Total Bonus</span>
+        </div>
+        <ol class="skill-list">
+          {{#each skills as |skill skillName|}}
+          <li class="skill">
+            <span class="skill-name-text"><strong>{{skillName}}</strong></span>
+            <span class="skill-rank">{{skill.rank}}</span>
+            <span class="skill-ability">({{skill.ability}})</span>
+            {{#if skill.lockedOtherBonuses}}
+            <span class="skill-other-bonus-locked" title="Other bonus from {{skill.lockedSource}} (locked)">{{skill.otherBonuses}}</span>
+            {{else}}
+            <input type="number" class="skill-other-bonus" data-skill="{{skillName}}" value="{{#if skill.otherBonuses}}{{skill.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
+            {{/if}}
+            <span class="skill-bonus">{{skill.bonusDisplay}}</span>
+            <div class="skill-controls">
+              <a class="edit-skill" data-skill="{{skillName}}" title="Edit"><i class="fas fa-pencil-alt"></i></a>
+              <button type="button" class="skill-roll" data-skill="{{skillName}}" title="Roll">Roll</button>
+              <a class="delete-skill" data-skill="{{skillName}}" title="Delete"><i class="fas fa-trash"></i></a>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+      </div>
+      <button type="button" class="add-skill">Add Skill</button>
+      
+      {{#if (or armorTrainingList weaponTrainingTalents)}}
+      <div class="locked-training-section">
+        <h4>Training from Talents</h4>
+        <ul class="locked-training-list">
+          {{#each armorTrainingList as |armorTraining|}}
+          <li class="locked-training-item">
+            <span class="locked-training-name"><strong>{{armorTraining.name}}</strong></span>
+            {{#if armorTraining.includes}}
+            <span class="locked-training-includes">(includes {{armorTraining.includes}})</span>
+            {{/if}}
+          </li>
+          {{/each}}
+          {{#each weaponTrainingTalents as |weaponTraining|}}
+          {{#if weaponTraining.category}}
+          <li class="locked-training-item">
+            <span class="locked-training-name"><strong>{{weaponTraining.name}}</strong></span>
+            <span class="locked-training-details">- {{weaponTraining.category}} ({{weaponTraining.rank}})</span>
+          </li>
+          {{/if}}
+          {{/each}}
+        </ul>
+      </div>
+      {{/if}}
+    </div>
+
+    {{!-- Equipment Tab --}}
+    <div class="tab equipment" data-group="primary" data-tab="equipment">
+      <div class="credits-section">
+        <label>Credits:</label>
+        <input type="number" name="system.equipment.credits" value="{{actor.system.equipment.credits}}" min="0" class="credits-input"/>
+      </div>
+
+      <div class="weapons">
+        <h3>Weapons</h3>
+        <ol class="item-list">
+          {{#each weapons as |item id|}}
+          <li class="item {{#if item.system.basic.equipped}}equipped{{/if}}" data-item-id="{{item._id}}">
+            <img class="item-icon weapon-icon clickable-item-icon" src="{{item.img}}" alt="{{item.name}}" data-item-id="{{item._id}}" title="Click to view details" onerror="this.src='icons/svg/sword.svg'">
+            <div class="item-content">
+              <div class="item-name">
+                <h4>{{item.name}}</h4>
+                {{#if item.system.basic.equipped}}
+                <span class="equipped-badge">Equipped</span>
+                {{/if}}
+              </div>
+              <div class="item-controls">
+                {{#if item.system.basic.equipped}}
+                <a class="weapon-unequip" data-item-id="{{item._id}}" title="Unequip"><i class="fas fa-hand-paper"></i></a>
+                {{else}}
+                <a class="weapon-equip" data-item-id="{{item._id}}" title="Equip"><i class="fas fa-hand-rock"></i></a>
+                {{/if}}
+                <a class="item-edit" title="Edit"><i class="fas fa-edit"></i></a>
+                <a class="item-delete" title="Delete"><i class="fas fa-trash"></i></a>
+              </div>
+              <div class="item-details">
+              <span><strong>Type:</strong> {{capitalize item.system.basic.type}}</span>
+              {{#if item.weaponCompetenceRank}}
+              <span><strong>Competence:</strong> {{item.weaponCompetenceRank}}{{#if item.weaponCompetenceBonus}} (+{{item.weaponCompetenceBonus}}){{/if}}</span>
+              {{/if}}
+              <span><strong>Attack:</strong> {{item.system.basic.attackBonus}}</span>
+              <span><strong>Damage:</strong> {{item.system.basic.damage}}</span>
+              {{#if item.system.basic.range}}
+              <span><strong>Range:</strong> {{item.system.basic.range}}</span>
+              {{/if}}
+              {{#if item.system.basic.hands}}
+              <span><strong>Hands:</strong> {{item.system.basic.hands}}</span>
+              {{/if}}
+              {{#if item.system.basic.propertiesDisplay}}
+              <span class="item-traits"><strong>Traits:</strong> {{item.system.basic.propertiesDisplay}}</span>
+              {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+        <button type="button" class="item-create" data-type="weapon">Add Weapon</button>
+        <button type="button" class="item-create buy-weapon">Buy Weapon</button>
+      </div>
+
+      <div class="armor">
+        <h3>Armor</h3>
+        <ol class="item-list">
+          {{#each armor as |item id|}}
+          <li class="item {{#if item.system.basic.equipped}}equipped{{/if}}" data-item-id="{{item._id}}">
+            <img class="item-icon weapon-icon" src="{{item.img}}" alt="{{item.name}}" onerror="this.src='icons/svg/shield.svg'">
+            <div class="item-content">
+              <div class="item-name">
+                <h4>
+                  {{item.name}}
+                  {{#if item.system.basic.equipped}}
+                  <span class="equipped-badge" title="Currently Equipped">✓ Equipped</span>
+                  {{/if}}
+                </h4>
+              </div>
+              <div class="item-controls">
+                {{#if item.system.basic.equipped}}
+                <a class="armor-unequip" data-item-id="{{item._id}}" title="Unequip"><i class="fas fa-tshirt"></i></a>
+                {{else}}
+                <a class="armor-equip" data-item-id="{{item._id}}" title="Equip"><i class="fas fa-tshirt"></i></a>
+                {{/if}}
+                <a class="item-edit" title="Edit"><i class="fas fa-edit"></i></a>
+                <a class="item-delete" title="Delete"><i class="fas fa-trash"></i></a>
+              </div>
+              <div class="item-details">
+                <span><strong>Base AC:</strong> {{item.system.basic.baseAC}}</span>
+                <span><strong>Type:</strong> {{item.system.basic.type}}</span>
+                {{#if item.system.basic.agilityCap}}
+                <span><strong>Agility Cap:</strong> {{item.system.basic.agilityCap}}</span>
+                {{else}}
+                <span><strong>Agility Cap:</strong> No cap</span>
+                {{/if}}
+                {{#if item.system.basic.mightRequirement}}
+                <span><strong>Might Requirement:</strong> {{item.system.basic.mightRequirement}}</span>
+                {{else}}
+                <span><strong>Might Requirement:</strong> None</span>
+                {{/if}}
+                {{#if item.system.basic.traitsDisplay}}
+                <span><strong>Traits:</strong> {{item.system.basic.traitsDisplay}}</span>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+        <button type="button" class="item-create" data-type="armor">Add Armor</button>
+        <button type="button" class="item-create buy-armor">Buy Armor</button>
+      </div>
+
+      <div class="equipment-items">
+        <h3>Equipment</h3>
+        <ol class="item-list">
+          {{#each equipment as |item id|}}
+          <li class="item" data-item-id="{{item._id}}">
+            <div class="item-name">
+              <h4>{{item.name}}</h4>
+              {{#if item.system.basic.quantity}}
+              <span class="item-quantity">({{item.system.basic.quantity}})</span>
+              {{/if}}
+            </div>
+            <div class="item-controls">
+              <a class="item-edit" title="Edit"><i class="fas fa-edit"></i></a>
+              <a class="item-delete" title="Delete"><i class="fas fa-trash"></i></a>
+            </div>
+            {{#if item.system.description}}
+            <div class="item-description">
+              {{{item.system.description}}}
+            </div>
+            {{/if}}
+          </li>
+          {{/each}}
+        </ol>
+        <button class="item-create" data-type="equipment">Add Equipment</button>
+      </div>
+    </div>
+
+    {{!-- Gadgets Tab --}}
+    {{#if hasGadgeteer}}
+    <div class="tab gadgets" data-group="primary" data-tab="gadgets">
+      <h3>Prepared Gadgets</h3>
+      <p class="gadgets-help-text">After a <strong>long rest</strong>, you may change which gadgets you have prepared, choosing from any gadgets for which you have blueprints.</p>
+      
+      <div class="gadget-slots">
+        <h4>Gadget Slots</h4>
+        <div class="gadget-slot-summary">
+          <p>Level 0 slots: <strong>{{gadgetSlots.level0.available}}/{{gadgetSlots.level0.total}}</strong> available</p>
+          <p>Level 1 slots: <strong>{{gadgetSlots.level1.available}}/{{gadgetSlots.level1.total}}</strong> available</p>
+        </div>
+        
+        {{#if (gt gadgetSlots.level0.total 0)}}
+        <div class="gadget-level-section">
+          <h5>Level 0 Gadgets</h5>
+          <ol class="gadget-list">
+            {{#each gadgetSlotsArray.level0 as |slot slotIndex|}}
+              {{#if slot.gadget}}
+                <li class="gadget-item gadget-item-clickable" data-gadget-level="0" data-gadget-index="{{slotIndex}}" data-gadget-id="{{slot.gadget.id}}">
+                  <img class="gadget-icon item-icon" src="{{slot.gadget.img}}" alt="{{slot.gadget.name}}" onerror="this.src='icons/svg/mystery-man.svg'"/>
+                  <div class="gadget-name item-name">{{slot.gadget.name}}</div>
+                  <div class="gadget-controls">
+                    <button type="button" class="gadget-use" data-gadget-level="0" data-gadget-index="{{slotIndex}}" {{#if slot.gadget.used}}disabled{{/if}}>Use</button>
+                    <a class="gadget-remove" data-gadget-level="0" data-gadget-index="{{slotIndex}}" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                  {{#if slot.gadget.used}}<span class="gadget-used-badge">Used</span>{{/if}}
+                </li>
+              {{else}}
+                <li class="gadget-slot-empty">
+                  <button type="button" class="add-gadget" data-gadget-level="0" data-slot-index="{{slotIndex}}">+ Add Level 0 Gadget (Slot {{slot.slotNumber}}/{{../gadgetSlots.level0.total}})</button>
+                </li>
+              {{/if}}
+            {{/each}}
+          </ol>
+        </div>
+        {{/if}}
+        
+        {{#if (gt gadgetSlots.level1.total 0)}}
+        <div class="gadget-level-section">
+          <h5>Level 1 Gadgets</h5>
+          <ol class="gadget-list">
+            {{#each gadgetSlotsArray.level1 as |slot slotIndex|}}
+              {{#if slot.gadget}}
+                <li class="gadget-item gadget-item-clickable" data-gadget-level="1" data-gadget-index="{{slotIndex}}" data-gadget-id="{{slot.gadget.id}}">
+                  <img class="gadget-icon item-icon" src="{{slot.gadget.img}}" alt="{{slot.gadget.name}}" onerror="this.src='icons/svg/mystery-man.svg'"/>
+                  <div class="gadget-name item-name">{{slot.gadget.name}}</div>
+                  <div class="gadget-controls">
+                    <button type="button" class="gadget-use" data-gadget-level="1" data-gadget-index="{{slotIndex}}" {{#if slot.gadget.used}}disabled{{/if}}>Use</button>
+                    <a class="gadget-remove" data-gadget-level="1" data-gadget-index="{{slotIndex}}" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                  {{#if slot.gadget.used}}<span class="gadget-used-badge">Used</span>{{/if}}
+                </li>
+              {{else}}
+                <li class="gadget-slot-empty">
+                  <button type="button" class="add-gadget" data-gadget-level="1" data-slot-index="{{slotIndex}}">+ Add Level 1 Gadget (Slot {{slot.slotNumber}}/{{../gadgetSlots.level1.total}})</button>
+                </li>
+              {{/if}}
+            {{/each}}
+          </ol>
+        </div>
+        {{/if}}
+      </div>
+      
+      <div class="gadget-tuning-section">
+        <h4>Gadget Tuning</h4>
+        <p>Rank: <strong>{{gadgetTuningRank}}</strong></p>
+        {{#if gadgetTuningDC}}
+        <p>DC: <strong>{{gadgetTuningDC}}</strong>
+          {{#if enoughPrepTimeDCBonus}}
+            <span class="enough-prep-time-dc-bonus">(+{{enoughPrepTimeDCBonus}} from Enough Prep Time)</span>
+          {{/if}}
+        </p>
+        {{/if}}
+        <p class="gadgets-help-text">This special ability is used for all checks made with your gadgets.</p>
+      </div>
+    </div>
+    {{/if}}
+
+    {{!-- Progression Tab --}}
+    <div class="tab progression" data-group="primary" data-tab="progression">
+      <div class="progression-section">
+        <h3>Progression Table</h3>
+        <p>Drag and drop items to fill progression slots. Each level shows what can be gained.</p>
+        <ol class="progression-list">
+          {{!-- Level 1 --}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 1</h4>
+            </div>
+            <div class="progression-rows">
+              <div class="progression-row">
+                <div class="progression-slot clickable-slot" data-level="1" data-slot-type="powerset" data-drop-zone="progression">
+                  {{#if actor.system.progression.level1.powerset}}
+                    <div class="slot-item" data-item-id="{{actor.system.progression.level1.powerset}}">
+                      {{#if actor.system.progression.level1.powersetImg}}
+                        <img class="item-icon slot-item-icon" src="{{actor.system.progression.level1.powersetImg}}" alt="{{actor.system.progression.level1.powersetName}}">
+                      {{else}}
+                        <img class="item-icon slot-item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.powersetName}}">
+                      {{/if}}
+                      <span class="item-name slot-item-name">{{actor.system.progression.level1.powersetName}}</span>
+                      <a class="slot-delete" data-level="1" data-slot-type="powerset" title="Remove"><i class="fas fa-times"></i></a>
+                    </div>
+                  {{else}}
+                    <div class="slot-placeholder">Click to choose Powerset</div>
+                  {{/if}}
+                </div>
+                {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                  <div class="progression-slots level1-bastion-bonuses">
+                    {{!-- Bastion-specific slots --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="bastionAbilityBoost1">
+                      <label>+1 Ability Boost (Bastion):</label>
+                      <select name="system.progression.level1.bastionAbilityBoost1" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.bastionAbilityBoost1 "might")}}selected{{/if}}>Might</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.bastionAbilityBoost1 "agility")}}selected{{/if}}>Agility</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.bastionAbilityBoost1 "wits")}}selected{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.bastionAbilityBoost1 "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="bastionAbilityBoost2">
+                      <label>+1 Ability Boost (Bastion):</label>
+                      <select name="system.progression.level1.bastionAbilityBoost2" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.bastionAbilityBoost2 "might")}}selected{{/if}}>Might</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.bastionAbilityBoost2 "agility")}}selected{{/if}}>Agility</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.bastionAbilityBoost2 "wits")}}selected{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.bastionAbilityBoost2 "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    {{!-- Endurance boost --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="bastionEnduranceBoost">
+                      <label>Endurance Boost (Bastion):</label>
+                      <div class="bastion-bonus-display">+1 to your <strong>Endurance</strong> ability.</div>
+                    </div>
+                    {{!-- Armor Training --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="bastionArmorTraining">
+                      <label>Armor Training:</label>
+                      <div class="bastion-bonus-display">You are trained in <strong>Heavy Armor</strong>.</div>
+                    </div>
+                    {{!-- Defensive Bonus --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="bastionDefensiveBonus">
+                      <label>Defensive Bonus:</label>
+                      <div class="bastion-bonus-display">You gain a <strong>+{{powersetAcBonus}} bonus to AC</strong>.</div>
+                    </div>
+                    {{!-- Saving Throw Training --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="bastionSavingThrow">
+                      <label>Saving Throw Training:</label>
+                      <select name="system.progression.level1.bastionSavingThrow" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.bastionSavingThrow "might")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.bastionSavingThrow "might") (or (eq savingThrows.might.rank "Apprentice") (eq savingThrows.might.rank "Competent") (eq savingThrows.might.rank "Masterful") (eq savingThrows.might.rank "Legendary") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "might") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "might") (eq actor.system.progression.level1.genericTalentSavingThrow "might")))}}disabled{{/if}}>Might</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.bastionSavingThrow "agility")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.bastionSavingThrow "agility") (or (eq savingThrows.agility.rank "Apprentice") (eq savingThrows.agility.rank "Competent") (eq savingThrows.agility.rank "Masterful") (eq savingThrows.agility.rank "Legendary") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "agility") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "agility") (eq actor.system.progression.level1.genericTalentSavingThrow "agility")))}}disabled{{/if}}>Agility</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.bastionSavingThrow "endurance")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.bastionSavingThrow "endurance") (or (eq savingThrows.endurance.rank "Apprentice") (eq savingThrows.endurance.rank "Competent") (eq savingThrows.endurance.rank "Masterful") (eq savingThrows.endurance.rank "Legendary") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "endurance") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "endurance") (eq actor.system.progression.level1.genericTalentSavingThrow "endurance")))}}disabled{{/if}}>Endurance</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.bastionSavingThrow "wits")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.bastionSavingThrow "wits") (or (eq savingThrows.wits.rank "Apprentice") (eq savingThrows.wits.rank "Competent") (eq savingThrows.wits.rank "Masterful") (eq savingThrows.wits.rank "Legendary") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "wits") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "wits") (eq actor.system.progression.level1.genericTalentSavingThrow "wits")))}}disabled{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.bastionSavingThrow "charm")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.bastionSavingThrow "charm") (or (eq savingThrows.charm.rank "Apprentice") (eq savingThrows.charm.rank "Competent") (eq savingThrows.charm.rank "Masterful") (eq savingThrows.charm.rank "Legendary") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "charm") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "charm") (eq actor.system.progression.level1.genericTalentSavingThrow "charm")))}}disabled{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    {{!-- Bastion Talent selection --}}
+                    <div class="progression-slot talent-slot clickable-slot" data-level="1" data-slot-type="bastionTalent" data-drop-zone="progression">
+                      {{#if actor.system.progression.level1.bastionTalent}}
+                        <div class="slot-item" data-item-id="{{actor.system.progression.level1.bastionTalent}}">
+                          {{#if actor.system.progression.level1.bastionTalentImg}}
+                            <img class="item-icon slot-item-icon" src="{{actor.system.progression.level1.bastionTalentImg}}" alt="{{actor.system.progression.level1.bastionTalentName}}">
+                          {{else}}
+                            <img class="item-icon slot-item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.bastionTalentName}}">
+                          {{/if}}
+                          <span class="item-name slot-item-name">{{actor.system.progression.level1.bastionTalentName}}</span>
+                          {{#if (and (or (eq actor.system.progression.level1.bastionTalentName "Bastion's Resistance") (eq actor.system.progression.level1.bastionTalentName "Bastions Resistance")) actor.system.progression.level1.bastionTalentResistanceType)}}
+                            <span class="talent-detail">({{actor.system.progression.level1.bastionTalentResistanceType}})</span>
+                          {{/if}}
+                          <a class="slot-delete" data-level="1" data-slot-type="bastionTalent" title="Remove"><i class="fas fa-times"></i></a>
+                        </div>
+                      {{else}}
+                        <div class="slot-placeholder">Bastion Talent: Click to choose</div>
+                      {{/if}}
+                    </div>
+                  </div>
+                {{/if}}
+                {{#if (or (eq actor.system.progression.level1.powersetName "Paragon") (eq actor.system.basic.powerset "Paragon"))}}
+                  <div class="progression-slots level1-paragon-bonuses">
+                    {{!-- Paragon-specific slots --}}
+                    {{!-- Might Boost --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="paragonMightBoost">
+                      <label>Might Boost (Paragon):</label>
+                      <div class="paragon-bonus-display">+1 to your <strong>Might</strong> ability.</div>
+                    </div>
+                    {{!-- Ability Boost Distribution --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="paragonAbilityBoost1">
+                      <label>+1 Ability Boost (Paragon):</label>
+                      <select name="system.progression.level1.paragonAbilityBoost1" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.paragonAbilityBoost1 "agility")}}selected{{/if}}>Agility</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.paragonAbilityBoost1 "endurance")}}selected{{/if}}>Endurance</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.paragonAbilityBoost1 "wits")}}selected{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.paragonAbilityBoost1 "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="paragonAbilityBoost2">
+                      <label>+1 Ability Boost (Paragon):</label>
+                      <select name="system.progression.level1.paragonAbilityBoost2" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.paragonAbilityBoost2 "agility")}}selected{{/if}}>Agility</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.paragonAbilityBoost2 "endurance")}}selected{{/if}}>Endurance</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.paragonAbilityBoost2 "wits")}}selected{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.paragonAbilityBoost2 "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    {{!-- Skill Training --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="paragonSkillTraining">
+                      <label>Skill Training (Paragon):</label>
+                      <select name="system.progression.level1.paragonSkillTraining" class="ability-boost-select">
+                        <option value="">Choose Skill...</option>
+                        <option value="Athletics (Might)" {{#if (eq actor.system.progression.level1.paragonSkillTraining "Athletics (Might)")}}selected{{/if}}>Athletics (Might)</option>
+                        <option value="Intimidation (Charm)" {{#if (eq actor.system.progression.level1.paragonSkillTraining "Intimidation (Charm)")}}selected{{/if}}>Intimidation (Charm)</option>
+                        <option value="Persuasion (Charm)" {{#if (eq actor.system.progression.level1.paragonSkillTraining "Persuasion (Charm)")}}selected{{/if}}>Persuasion (Charm)</option>
+                      </select>
+                    </div>
+                    {{!-- Flight --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="paragonFlight">
+                      <label>Flight (Paragon):</label>
+                      <div class="paragon-bonus-display">You gain a <strong>flying speed of 15 feet</strong>.</div>
+                    </div>
+                    {{!-- Enhanced Unarmed Strikes --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="paragonUnarmedStrikes">
+                      <label>Enhanced Unarmed Strikes (Paragon):</label>
+                      <div class="paragon-bonus-display">Your <strong>unarmed attack damage die increases by one step</strong>.</div>
+                    </div>
+                    {{!-- Unarmed Weapon Competence --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="paragonUnarmedCompetence">
+                      <label>Unarmed Weapon Competence (Paragon):</label>
+                      <div class="paragon-bonus-display">You are <strong>Apprentice</strong> with unarmed attacks.</div>
+                    </div>
+                    {{!-- Paragon Talent selection --}}
+                    <div class="progression-slot talent-slot clickable-slot" data-level="1" data-slot-type="paragonTalent" data-drop-zone="progression">
+                      {{#if actor.system.progression.level1.paragonTalent}}
+                        <div class="slot-item" data-item-id="{{actor.system.progression.level1.paragonTalent}}">
+                          {{#if actor.system.progression.level1.paragonTalentImg}}
+                            <img class="item-icon slot-item-icon" src="{{actor.system.progression.level1.paragonTalentImg}}" alt="{{actor.system.progression.level1.paragonTalentName}}">
+                          {{else}}
+                            <img class="item-icon slot-item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.paragonTalentName}}">
+                          {{/if}}
+                          <span class="item-name slot-item-name">{{actor.system.progression.level1.paragonTalentName}}</span>
+                          <a class="slot-delete" data-level="1" data-slot-type="paragonTalent" title="Remove"><i class="fas fa-times"></i></a>
+                        </div>
+                      {{else}}
+                        <div class="slot-placeholder">Paragon Talent: Click to choose</div>
+                      {{/if}}
+                    </div>
+                  </div>
+                {{/if}}
+                {{#if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                  <div class="progression-slots level1-gadgeteer-bonuses">
+                    {{!-- Gadgeteer-specific slots --}}
+                    {{!-- Wits Boost --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="gadgeteerWitsBoost">
+                      <label>Wits Boost (Gadgeteer):</label>
+                      <div class="gadgeteer-bonus-display">+1 to your <strong>Wits</strong> ability.</div>
+                    </div>
+                    {{!-- Ability Boost Distribution --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="gadgeteerAbilityBoost1">
+                      <label>+1 Ability Boost (Gadgeteer):</label>
+                      <select name="system.progression.level1.gadgeteerAbilityBoost1" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.gadgeteerAbilityBoost1 "might")}}selected{{/if}}>Might</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.gadgeteerAbilityBoost1 "agility")}}selected{{/if}}>Agility</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.gadgeteerAbilityBoost1 "endurance")}}selected{{/if}}>Endurance</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.gadgeteerAbilityBoost1 "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="gadgeteerAbilityBoost2">
+                      <label>+1 Ability Boost (Gadgeteer):</label>
+                      <select name="system.progression.level1.gadgeteerAbilityBoost2" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.gadgeteerAbilityBoost2 "might")}}selected{{/if}}>Might</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.gadgeteerAbilityBoost2 "agility")}}selected{{/if}}>Agility</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.gadgeteerAbilityBoost2 "endurance")}}selected{{/if}}>Endurance</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.gadgeteerAbilityBoost2 "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    {{!-- Skill Training --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="gadgeteerSkillTraining">
+                      <label>Skill Training (Gadgeteer):</label>
+                      <select name="system.progression.level1.gadgeteerSkillTraining" class="ability-boost-select">
+                        <option value="">Choose Skill...</option>
+                        <option value="Electricity (Wits)" {{#if (eq actor.system.progression.level1.gadgeteerSkillTraining "Electricity (Wits)")}}selected{{/if}}>Electricity (Wits)</option>
+                        <option value="Hacking (Wits)" {{#if (eq actor.system.progression.level1.gadgeteerSkillTraining "Hacking (Wits)")}}selected{{/if}}>Hacking (Wits)</option>
+                      </select>
+                    </div>
+                    {{!-- Gadget Tuning --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="gadgeteerGadgetTuning">
+                      <label>Gadget Tuning:</label>
+                      <div class="gadgeteer-bonus-display">You gain <strong>Apprentice</strong> competence in <strong>Gadget Tuning (Wits)</strong>.</div>
+                    </div>
+                    {{!-- Gadgeteer Talent selection --}}
+                    <div class="progression-slot talent-slot clickable-slot" data-level="1" data-slot-type="gadgeteerTalent" data-drop-zone="progression">
+                      {{#if actor.system.progression.level1.gadgeteerTalent}}
+                        <div class="slot-item" data-item-id="{{actor.system.progression.level1.gadgeteerTalent}}">
+                          {{#if actor.system.progression.level1.gadgeteerTalentImg}}
+                            <img class="item-icon slot-item-icon" src="{{actor.system.progression.level1.gadgeteerTalentImg}}" alt="{{actor.system.progression.level1.gadgeteerTalentName}}">
+                          {{else}}
+                            <img class="item-icon slot-item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.gadgeteerTalentName}}">
+                          {{/if}}
+                          <span class="item-name slot-item-name">{{actor.system.progression.level1.gadgeteerTalentName}}</span>
+                          <a class="slot-delete" data-level="1" data-slot-type="gadgeteerTalent" title="Remove"><i class="fas fa-times"></i></a>
+                        </div>
+                      {{else}}
+                        <div class="slot-placeholder">Gadgeteer Talent: Click to choose</div>
+                      {{/if}}
+                    </div>
+                  </div>
+                {{/if}}
+                {{#if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                  <div class="progression-slots level1-marksman-bonuses">
+                    {{!-- Marksman-specific slots --}}
+                    {{!-- Agility Boost --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="marksmanAgilityBoost">
+                      <label>Agility Boost (Marksman):</label>
+                      <div class="marksman-bonus-display">+1 to your <strong>Agility</strong> ability.</div>
+                    </div>
+                    {{!-- Ability Boost Distribution --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="marksmanAbilityBoost1">
+                      <label>+1 Ability Boost (Marksman):</label>
+                      <select name="system.progression.level1.marksmanAbilityBoost1" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.marksmanAbilityBoost1 "might")}}selected{{/if}}>Might</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.marksmanAbilityBoost1 "endurance")}}selected{{/if}}>Endurance</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.marksmanAbilityBoost1 "wits")}}selected{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.marksmanAbilityBoost1 "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="marksmanAbilityBoost2">
+                      <label>+1 Ability Boost (Marksman):</label>
+                      <select name="system.progression.level1.marksmanAbilityBoost2" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.marksmanAbilityBoost2 "might")}}selected{{/if}}>Might</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.marksmanAbilityBoost2 "endurance")}}selected{{/if}}>Endurance</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.marksmanAbilityBoost2 "wits")}}selected{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.marksmanAbilityBoost2 "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    {{!-- Skill Training (Perception) --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="marksmanPerceptionTraining">
+                      <label>Skill Training (Perception):</label>
+                      <div class="marksman-bonus-display">You gain <strong>Apprentice</strong> competence in <strong>Perception (Wits)</strong>.</div>
+                    </div>
+                    {{!-- Skill Training (Bonus) --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="marksmanSkillTraining">
+                      <label>Skill Training (Bonus - Marksman):</label>
+                      <select name="system.progression.level1.marksmanSkillTraining" class="ability-boost-select">
+                        <option value="">Choose Skill...</option>
+                        <option value="Athletics" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Athletics")}}selected{{/if}}>Athletics (Might)</option>
+                        <option value="Acrobatics" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Acrobatics")}}selected{{/if}}>Acrobatics (Agility)</option>
+                        <option value="Stealth" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Stealth")}}selected{{/if}}>Stealth (Agility)</option>
+                        <option value="Investigation" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Investigation")}}selected{{/if}}>Investigation (Wits)</option>
+                        <option value="Survival" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Survival")}}selected{{/if}}>Survival (Wits)</option>
+                        <option value="Deception" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Deception")}}selected{{/if}}>Deception (Charm)</option>
+                        <option value="Intimidation" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Intimidation")}}selected{{/if}}>Intimidation (Charm)</option>
+                        <option value="Persuasion" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Persuasion")}}selected{{/if}}>Persuasion (Charm)</option>
+                      </select>
+                    </div>
+                    {{!-- Ranged Weapon Competence --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="marksmanRangedCompetence">
+                      <label>Ranged Weapon Competence (Marksman):</label>
+                      <div class="marksman-bonus-display">You are <strong>Apprentice</strong> with all ranged weapons.</div>
+                    </div>
+                    {{!-- Marksman Talent selection --}}
+                    <div class="progression-slot talent-slot clickable-slot" data-level="1" data-slot-type="marksmanTalent" data-drop-zone="progression">
+                      {{#if actor.system.progression.level1.marksmanTalent}}
+                        <div class="slot-item" data-item-id="{{actor.system.progression.level1.marksmanTalent}}">
+                          {{#if actor.system.progression.level1.marksmanTalentImg}}
+                            <img class="item-icon slot-item-icon" src="{{actor.system.progression.level1.marksmanTalentImg}}" alt="{{actor.system.progression.level1.marksmanTalentName}}">
+                          {{else}}
+                            <img class="item-icon slot-item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.marksmanTalentName}}">
+                          {{/if}}
+                          <span class="item-name slot-item-name">{{actor.system.progression.level1.marksmanTalentName}}</span>
+                          <a class="slot-delete" data-level="1" data-slot-type="marksmanTalent" title="Remove"><i class="fas fa-times"></i></a>
+                        </div>
+                      {{else}}
+                        <div class="slot-placeholder">Marksman Talent: Click to choose</div>
+                      {{/if}}
+                    </div>
+                  </div>
+                {{/if}}
+              </div>
+              <div class="progression-row">
+                <div class="progression-slot clickable-slot" data-level="1" data-slot-type="phenotype" data-drop-zone="progression">
+                  {{#if actor.system.progression.level1.phenotype}}
+                    <div class="slot-item" data-item-id="{{actor.system.progression.level1.phenotype}}">
+                      {{#if actor.system.progression.level1.phenotypeImg}}
+                        <img class="item-icon" src="{{actor.system.progression.level1.phenotypeImg}}" alt="{{actor.system.progression.level1.phenotypeName}}">
+                      {{else}}
+                        <img class="item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.phenotypeName}}">
+                      {{/if}}
+                      <span class="item-name">{{actor.system.progression.level1.phenotypeName}}</span>
+                      <a class="slot-delete" data-level="1" data-slot-type="phenotype" title="Remove"><i class="fas fa-times"></i></a>
+                    </div>
+                  {{else}}
+                    <div class="slot-placeholder">Click to choose Phenotype</div>
+                  {{/if}}
+                </div>
+                {{#if (or (eq actor.system.progression.level1.phenotypeName "Human") (eq actor.system.basic.phenotype "Human"))}}
+                  <div class="progression-slots level1-human-bonuses">
+                    {{!-- Human-specific slots --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="humanAbilityBoost">
+                      <label>+1 Ability Boost (Human):</label>
+                      <select name="system.progression.level1.humanAbilityBoost" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.humanAbilityBoost "might")}}selected{{/if}}>Might</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.humanAbilityBoost "agility")}}selected{{/if}}>Agility</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.humanAbilityBoost "endurance")}}selected{{/if}}>Endurance</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.humanAbilityBoost "wits")}}selected{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.humanAbilityBoost "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    <div class="progression-slot talent-slot" data-level="1" data-slot-type="humanGenericTalent" data-drop-zone="progression">
+                      {{#if actor.system.progression.level1.humanGenericTalent}}
+                        <div class="slot-item" data-item-id="{{actor.system.progression.level1.humanGenericTalent}}">
+                          {{#if actor.system.progression.level1.humanGenericTalentImg}}
+                            <img class="item-icon" src="{{actor.system.progression.level1.humanGenericTalentImg}}" alt="{{actor.system.progression.level1.humanGenericTalentName}}">
+                          {{else}}
+                            <img class="item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.humanGenericTalentName}}">
+                          {{/if}}
+                          <span class="item-name">{{actor.system.progression.level1.humanGenericTalentName}}</span>
+                          {{#if (or (eq actor.system.progression.level1.humanGenericTalentName "Saving Throw Training (Apprentice)") (eq actor.system.progression.level1.humanGenericTalentName "Saving Throw Training"))}}
+                            <span class="talent-detail">
+                              <select name="system.progression.level1.humanGenericTalentSavingThrow" class="talent-detail-select" data-level="1" data-slot-type="humanGenericTalentSavingThrow">
+                                <option value="">Choose...</option>
+                                <option value="might" {{#if (eq actor.system.progression.level1.humanGenericTalentSavingThrow "might")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentSavingThrow "might") (or (eq savingThrows.might.rank "Apprentice") (eq savingThrows.might.rank "Competent") (eq savingThrows.might.rank "Masterful") (eq savingThrows.might.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "might") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "might") (eq actor.system.progression.level1.genericTalentSavingThrow "might")))}}disabled{{/if}}>Might</option>
+                                <option value="agility" {{#if (eq actor.system.progression.level1.humanGenericTalentSavingThrow "agility")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentSavingThrow "agility") (or (eq savingThrows.agility.rank "Apprentice") (eq savingThrows.agility.rank "Competent") (eq savingThrows.agility.rank "Masterful") (eq savingThrows.agility.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "agility") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "agility") (eq actor.system.progression.level1.genericTalentSavingThrow "agility")))}}disabled{{/if}}>Agility</option>
+                                <option value="endurance" {{#if (eq actor.system.progression.level1.humanGenericTalentSavingThrow "endurance")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentSavingThrow "endurance") (or (eq savingThrows.endurance.rank "Apprentice") (eq savingThrows.endurance.rank "Competent") (eq savingThrows.endurance.rank "Masterful") (eq savingThrows.endurance.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "endurance") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "endurance") (eq actor.system.progression.level1.genericTalentSavingThrow "endurance")))}}disabled{{/if}}>Endurance</option>
+                                <option value="wits" {{#if (eq actor.system.progression.level1.humanGenericTalentSavingThrow "wits")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentSavingThrow "wits") (or (eq savingThrows.wits.rank "Apprentice") (eq savingThrows.wits.rank "Competent") (eq savingThrows.wits.rank "Masterful") (eq savingThrows.wits.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "wits") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "wits") (eq actor.system.progression.level1.genericTalentSavingThrow "wits")))}}disabled{{/if}}>Wits</option>
+                                <option value="charm" {{#if (eq actor.system.progression.level1.humanGenericTalentSavingThrow "charm")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentSavingThrow "charm") (or (eq savingThrows.charm.rank "Apprentice") (eq savingThrows.charm.rank "Competent") (eq savingThrows.charm.rank "Masterful") (eq savingThrows.charm.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "charm") (eq actor.system.progression.level1.terranGenericTalentSavingThrow "charm") (eq actor.system.progression.level1.genericTalentSavingThrow "charm")))}}disabled{{/if}}>Charm</option>
+                              </select>
+                            </span>
+                          {{/if}}
+                          {{#if (or (eq actor.system.progression.level1.humanGenericTalentName "Weapon Training (Apprentice)") (eq actor.system.progression.level1.humanGenericTalentName "Weapon Training"))}}
+                            <span class="talent-detail">
+                              <select name="system.progression.level1.humanGenericTalentWeaponCategory" class="talent-detail-select" data-level="1" data-slot-type="humanGenericTalentWeaponCategory">
+                                <option value="">Choose...</option>
+                                <option value="Unarmed Strikes" {{#if (eq actor.system.progression.level1.humanGenericTalentWeaponCategory "Unarmed Strikes")}}selected{{/if}}{{#if (or (and (ne actor.system.progression.level1.humanGenericTalentWeaponCategory "Unarmed Strikes") (contains selectedWeaponCategoriesExcludingHuman "Unarmed Strikes")) (eq actor.system.progression.level1.powersetName "Paragon") (eq actor.system.basic.powerset "Paragon"))}}disabled{{/if}}>Unarmed Strikes</option>
+                                <option value="Light Melee Weapons" {{#if (eq actor.system.progression.level1.humanGenericTalentWeaponCategory "Light Melee Weapons")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentWeaponCategory "Light Melee Weapons") (contains selectedWeaponCategoriesExcludingHuman "Light Melee Weapons"))}}disabled{{/if}}>Light Melee Weapons</option>
+                                <option value="Heavy Melee Weapons" {{#if (eq actor.system.progression.level1.humanGenericTalentWeaponCategory "Heavy Melee Weapons")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentWeaponCategory "Heavy Melee Weapons") (contains selectedWeaponCategoriesExcludingHuman "Heavy Melee Weapons"))}}disabled{{/if}}>Heavy Melee Weapons</option>
+                                <option value="Thrown Weapons" {{#if (eq actor.system.progression.level1.humanGenericTalentWeaponCategory "Thrown Weapons")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentWeaponCategory "Thrown Weapons") (contains selectedWeaponCategoriesExcludingHuman "Thrown Weapons"))}}disabled{{/if}}>Thrown Weapons</option>
+                                <option value="Bows" {{#if (eq actor.system.progression.level1.humanGenericTalentWeaponCategory "Bows")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentWeaponCategory "Bows") (contains selectedWeaponCategoriesExcludingHuman "Bows"))}}disabled{{/if}}>Bows</option>
+                                <option value="Firearms" {{#if (eq actor.system.progression.level1.humanGenericTalentWeaponCategory "Firearms")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentWeaponCategory "Firearms") (contains selectedWeaponCategoriesExcludingHuman "Firearms"))}}disabled{{/if}}>Firearms</option>
+                                <option value="Improvised Weapons" {{#if (eq actor.system.progression.level1.humanGenericTalentWeaponCategory "Improvised Weapons")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.humanGenericTalentWeaponCategory "Improvised Weapons") (contains selectedWeaponCategoriesExcludingHuman "Improvised Weapons"))}}disabled{{/if}}>Improvised Weapons</option>
+                              </select>
+                            </span>
+                          {{/if}}
+                          <a class="slot-delete" data-level="1" data-slot-type="humanGenericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                        </div>
+                      {{else}}
+                        <div class="slot-placeholder">Click to choose Talent</div>
+                      {{/if}}
+                    </div>
+                  </div>
+                {{/if}}
+              </div>
+              <div class="progression-row">
+                <div class="progression-slot clickable-slot" data-level="1" data-slot-type="subtype" data-drop-zone="progression">
+                  {{#if actor.system.progression.level1.subtype}}
+                    <div class="slot-item" data-item-id="{{actor.system.progression.level1.subtype}}">
+                      {{#if actor.system.progression.level1.subtypeImg}}
+                        <img class="item-icon" src="{{actor.system.progression.level1.subtypeImg}}" alt="{{actor.system.progression.level1.subtypeName}}">
+                      {{else}}
+                        <img class="item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.subtypeName}}">
+                      {{/if}}
+                      <span class="item-name">{{actor.system.progression.level1.subtypeName}}</span>
+                      <a class="slot-delete" data-level="1" data-slot-type="subtype" title="Remove"><i class="fas fa-times"></i></a>
+                    </div>
+                  {{else}}
+                    <div class="slot-placeholder">Click to choose Subtype</div>
+                  {{/if}}
+                </div>
+                {{#if (or (eq actor.system.progression.level1.subtypeName "Terran") (eq actor.system.basic.subtype "Terran"))}}
+                  <div class="progression-slots level1-terran-bonuses">
+                    {{!-- Terran-specific slots --}}
+                    <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="terranAbilityBoost">
+                      <label>+1 Ability Boost (Terran):</label>
+                      <select name="system.progression.level1.terranAbilityBoost" class="ability-boost-select">
+                        <option value="">Choose Ability...</option>
+                        <option value="might" {{#if (eq actor.system.progression.level1.terranAbilityBoost "might")}}selected{{/if}}>Might</option>
+                        <option value="agility" {{#if (eq actor.system.progression.level1.terranAbilityBoost "agility")}}selected{{/if}}>Agility</option>
+                        <option value="endurance" {{#if (eq actor.system.progression.level1.terranAbilityBoost "endurance")}}selected{{/if}}>Endurance</option>
+                        <option value="wits" {{#if (eq actor.system.progression.level1.terranAbilityBoost "wits")}}selected{{/if}}>Wits</option>
+                        <option value="charm" {{#if (eq actor.system.progression.level1.terranAbilityBoost "charm")}}selected{{/if}}>Charm</option>
+                      </select>
+                    </div>
+                    <div class="progression-slot talent-slot" data-level="1" data-slot-type="terranGenericTalent" data-drop-zone="progression">
+                      {{#if actor.system.progression.level1.terranGenericTalent}}
+                        <div class="slot-item" data-item-id="{{actor.system.progression.level1.terranGenericTalent}}">
+                          {{#if actor.system.progression.level1.terranGenericTalentImg}}
+                            <img class="item-icon" src="{{actor.system.progression.level1.terranGenericTalentImg}}" alt="{{actor.system.progression.level1.terranGenericTalentName}}">
+                          {{else}}
+                            <img class="item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.terranGenericTalentName}}">
+                          {{/if}}
+                          <span class="item-name">{{actor.system.progression.level1.terranGenericTalentName}}</span>
+                          {{#if (or (eq actor.system.progression.level1.terranGenericTalentName "Saving Throw Training (Apprentice)") (eq actor.system.progression.level1.terranGenericTalentName "Saving Throw Training"))}}
+                            <span class="talent-detail">
+                              <select name="system.progression.level1.terranGenericTalentSavingThrow" class="talent-detail-select" data-level="1" data-slot-type="terranGenericTalentSavingThrow">
+                                <option value="">Choose...</option>
+                                <option value="might" {{#if (eq actor.system.progression.level1.terranGenericTalentSavingThrow "might")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentSavingThrow "might") (or (eq savingThrows.might.rank "Apprentice") (eq savingThrows.might.rank "Competent") (eq savingThrows.might.rank "Masterful") (eq savingThrows.might.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "might") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "might") (eq actor.system.progression.level1.genericTalentSavingThrow "might")))}}disabled{{/if}}>Might</option>
+                                <option value="agility" {{#if (eq actor.system.progression.level1.terranGenericTalentSavingThrow "agility")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentSavingThrow "agility") (or (eq savingThrows.agility.rank "Apprentice") (eq savingThrows.agility.rank "Competent") (eq savingThrows.agility.rank "Masterful") (eq savingThrows.agility.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "agility") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "agility") (eq actor.system.progression.level1.genericTalentSavingThrow "agility")))}}disabled{{/if}}>Agility</option>
+                                <option value="endurance" {{#if (eq actor.system.progression.level1.terranGenericTalentSavingThrow "endurance")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentSavingThrow "endurance") (or (eq savingThrows.endurance.rank "Apprentice") (eq savingThrows.endurance.rank "Competent") (eq savingThrows.endurance.rank "Masterful") (eq savingThrows.endurance.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "endurance") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "endurance") (eq actor.system.progression.level1.genericTalentSavingThrow "endurance")))}}disabled{{/if}}>Endurance</option>
+                                <option value="wits" {{#if (eq actor.system.progression.level1.terranGenericTalentSavingThrow "wits")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentSavingThrow "wits") (or (eq savingThrows.wits.rank "Apprentice") (eq savingThrows.wits.rank "Competent") (eq savingThrows.wits.rank "Masterful") (eq savingThrows.wits.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "wits") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "wits") (eq actor.system.progression.level1.genericTalentSavingThrow "wits")))}}disabled{{/if}}>Wits</option>
+                                <option value="charm" {{#if (eq actor.system.progression.level1.terranGenericTalentSavingThrow "charm")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentSavingThrow "charm") (or (eq savingThrows.charm.rank "Apprentice") (eq savingThrows.charm.rank "Competent") (eq savingThrows.charm.rank "Masterful") (eq savingThrows.charm.rank "Legendary") (eq actor.system.progression.level1.bastionSavingThrow "charm") (eq actor.system.progression.level1.humanGenericTalentSavingThrow "charm") (eq actor.system.progression.level1.genericTalentSavingThrow "charm")))}}disabled{{/if}}>Charm</option>
+                              </select>
+                            </span>
+                          {{/if}}
+                          {{#if (or (eq actor.system.progression.level1.terranGenericTalentName "Weapon Training (Apprentice)") (eq actor.system.progression.level1.terranGenericTalentName "Weapon Training"))}}
+                            <span class="talent-detail">
+                              <select name="system.progression.level1.terranGenericTalentWeaponCategory" class="talent-detail-select" data-level="1" data-slot-type="terranGenericTalentWeaponCategory">
+                                <option value="">Choose...</option>
+                                <option value="Unarmed Strikes" {{#if (eq actor.system.progression.level1.terranGenericTalentWeaponCategory "Unarmed Strikes")}}selected{{/if}}{{#if (or (and (ne actor.system.progression.level1.terranGenericTalentWeaponCategory "Unarmed Strikes") (contains selectedWeaponCategoriesExcludingTerran "Unarmed Strikes")) (eq actor.system.progression.level1.powersetName "Paragon") (eq actor.system.basic.powerset "Paragon"))}}disabled{{/if}}>Unarmed Strikes</option>
+                                <option value="Light Melee Weapons" {{#if (eq actor.system.progression.level1.terranGenericTalentWeaponCategory "Light Melee Weapons")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentWeaponCategory "Light Melee Weapons") (contains selectedWeaponCategoriesExcludingTerran "Light Melee Weapons"))}}disabled{{/if}}>Light Melee Weapons</option>
+                                <option value="Heavy Melee Weapons" {{#if (eq actor.system.progression.level1.terranGenericTalentWeaponCategory "Heavy Melee Weapons")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentWeaponCategory "Heavy Melee Weapons") (contains selectedWeaponCategoriesExcludingTerran "Heavy Melee Weapons"))}}disabled{{/if}}>Heavy Melee Weapons</option>
+                                <option value="Thrown Weapons" {{#if (eq actor.system.progression.level1.terranGenericTalentWeaponCategory "Thrown Weapons")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentWeaponCategory "Thrown Weapons") (contains selectedWeaponCategoriesExcludingTerran "Thrown Weapons"))}}disabled{{/if}}>Thrown Weapons</option>
+                                <option value="Bows" {{#if (eq actor.system.progression.level1.terranGenericTalentWeaponCategory "Bows")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentWeaponCategory "Bows") (contains selectedWeaponCategoriesExcludingTerran "Bows"))}}disabled{{/if}}>Bows</option>
+                                <option value="Firearms" {{#if (eq actor.system.progression.level1.terranGenericTalentWeaponCategory "Firearms")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentWeaponCategory "Firearms") (contains selectedWeaponCategoriesExcludingTerran "Firearms"))}}disabled{{/if}}>Firearms</option>
+                                <option value="Improvised Weapons" {{#if (eq actor.system.progression.level1.terranGenericTalentWeaponCategory "Improvised Weapons")}}selected{{/if}}{{#if (and (ne actor.system.progression.level1.terranGenericTalentWeaponCategory "Improvised Weapons") (contains selectedWeaponCategoriesExcludingTerran "Improvised Weapons"))}}disabled{{/if}}>Improvised Weapons</option>
+                              </select>
+                            </span>
+                          {{/if}}
+                          <a class="slot-delete" data-level="1" data-slot-type="terranGenericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                        </div>
+                      {{else}}
+                        <div class="slot-placeholder">Click to choose Talent</div>
+                      {{/if}}
+                    </div>
+                  </div>
+                {{/if}}
+              </div>
+              <div class="progression-row">
+                <div class="progression-slot clickable-slot" data-level="1" data-slot-type="background" data-drop-zone="progression">
+                  {{#if actor.system.progression.level1.background}}
+                    <div class="slot-item" data-item-id="{{actor.system.progression.level1.background}}">
+                      {{#if actor.system.progression.level1.backgroundImg}}
+                        <img class="item-icon" src="{{actor.system.progression.level1.backgroundImg}}" alt="{{actor.system.progression.level1.backgroundName}}">
+                      {{else}}
+                        <img class="item-icon" src="icons/svg/mystery-man.svg" alt="{{actor.system.progression.level1.backgroundName}}">
+                      {{/if}}
+                      <span class="item-name">{{actor.system.progression.level1.backgroundName}}</span>
+                      <a class="slot-delete" data-level="1" data-slot-type="background" title="Remove"><i class="fas fa-times"></i></a>
+                    </div>
+                  {{else}}
+                    <div class="slot-placeholder">Click to choose Background</div>
+                  {{/if}}
+                </div>
+                {{#if backgroundBonuses}}
+                  <div class="progression-slots level1-background-bonuses">
+                    {{!-- Background-specific slots --}}
+                    {{#if backgroundBonuses.abilityBoostOptions}}
+                      <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="backgroundAbilityBoost">
+                        <label>+1 Ability Boost ({{actor.system.progression.level1.backgroundName}}):</label>
+                        <select name="system.progression.level1.backgroundAbilityBoost" class="ability-boost-select">
+                          <option value="">Choose Ability...</option>
+                          {{#each backgroundBonuses.abilityBoostOptions}}
+                            <option value="{{this}}" {{#if (eq ../actor.system.progression.level1.backgroundAbilityBoost this)}}selected{{/if}}>{{this}}</option>
+                          {{/each}}
+                        </select>
+                      </div>
+                    {{/if}}
+                    {{#if backgroundBonuses.skillTrainingOptions}}
+                      <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="backgroundSkillTraining">
+                        <label>Skill Training ({{actor.system.progression.level1.backgroundName}}):</label>
+                        <select name="system.progression.level1.backgroundSkillTraining" class="ability-boost-select">
+                          <option value="">Choose Skill...</option>
+                          {{#each backgroundBonuses.skillTrainingOptions}}
+                            <option value="{{this}}" {{#if (eq ../actor.system.progression.level1.backgroundSkillTraining this)}}selected{{/if}}>{{this}}</option>
+                          {{/each}}
+                        </select>
+                      </div>
+                    {{/if}}
+                  </div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          
+          {{!-- Level 2 --}}
+          {{#if (lte 2 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 2</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot talent-slot" data-level="2" data-slot-type="genericTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level2.genericTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level2.genericTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level2.genericTalentImg}}" alt="{{actor.system.progression.level2.genericTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level2.genericTalentName}}</span>
+                    <a class="slot-delete" data-level="2" data-slot-type="genericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Click to choose Talent</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 3 --}}
+          {{#if (lte 3 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 3</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot asi-slot" data-level="3" data-slot-type="abilityScoreImprovement">
+                <input type="checkbox" name="system.progression.level3.abilityScoreImprovement" {{checked actor.system.progression.level3.abilityScoreImprovement}}/>
+                <label>Ability Score Improvement</label>
+              </div>
+              <div class="progression-slot" data-level="3" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level3.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level3.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level3.powersetTalentImg}}" alt="{{actor.system.progression.level3.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level3.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="3" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 4 --}}
+          {{#if (lte 4 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 4</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot talent-slot" data-level="4" data-slot-type="genericTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level4.genericTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level4.genericTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level4.genericTalentImg}}" alt="{{actor.system.progression.level4.genericTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level4.genericTalentName}}</span>
+                    <a class="slot-delete" data-level="4" data-slot-type="genericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Click to choose Talent</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 5 --}}
+          {{#if (lte 5 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 5</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot asi-slot" data-level="5" data-slot-type="abilityScoreImprovement">
+                <input type="checkbox" name="system.progression.level5.abilityScoreImprovement" {{checked actor.system.progression.level5.abilityScoreImprovement}}/>
+                <label>Ability Score Improvement</label>
+              </div>
+              <div class="progression-slot" data-level="5" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level5.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level5.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level5.powersetTalentImg}}" alt="{{actor.system.progression.level5.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level5.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="5" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 6 --}}
+          {{#if (lte 6 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 6</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot talent-slot" data-level="6" data-slot-type="genericTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level6.genericTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level6.genericTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level6.genericTalentImg}}" alt="{{actor.system.progression.level6.genericTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level6.genericTalentName}}</span>
+                    <a class="slot-delete" data-level="6" data-slot-type="genericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Click to choose Talent</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 7 --}}
+          {{#if (lte 7 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 7</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot" data-level="7" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level7.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level7.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level7.powersetTalentImg}}" alt="{{actor.system.progression.level7.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level7.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="7" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 8 --}}
+          {{#if (lte 8 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 8</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot asi-slot" data-level="8" data-slot-type="abilityScoreImprovement">
+                <input type="checkbox" name="system.progression.level8.abilityScoreImprovement" {{checked actor.system.progression.level8.abilityScoreImprovement}}/>
+                <label>Ability Score Improvement</label>
+              </div>
+              <div class="progression-slot talent-slot" data-level="8" data-slot-type="genericTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level8.genericTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level8.genericTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level8.genericTalentImg}}" alt="{{actor.system.progression.level8.genericTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level8.genericTalentName}}</span>
+                    <a class="slot-delete" data-level="8" data-slot-type="genericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Click to choose Talent</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 9 --}}
+          {{#if (lte 9 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 9</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot" data-level="9" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level9.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level9.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level9.powersetTalentImg}}" alt="{{actor.system.progression.level9.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level9.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="9" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 10 --}}
+          {{#if (lte 10 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 10</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot asi-slot" data-level="10" data-slot-type="abilityScoreImprovement">
+                <input type="checkbox" name="system.progression.level10.abilityScoreImprovement" {{checked actor.system.progression.level10.abilityScoreImprovement}}/>
+                <label>Ability Score Improvement</label>
+              </div>
+              <div class="progression-slot" data-level="10" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level10.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level10.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level10.powersetTalentImg}}" alt="{{actor.system.progression.level10.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level10.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="10" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 11 --}}
+          {{#if (lte 11 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 11</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot talent-slot" data-level="11" data-slot-type="genericTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level11.genericTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level11.genericTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level11.genericTalentImg}}" alt="{{actor.system.progression.level11.genericTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level11.genericTalentName}}</span>
+                    <a class="slot-delete" data-level="11" data-slot-type="genericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Click to choose Talent</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 12 --}}
+          {{#if (lte 12 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 12</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot" data-level="12" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level12.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level12.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level12.powersetTalentImg}}" alt="{{actor.system.progression.level12.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level12.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="12" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 13 --}}
+          {{#if (lte 13 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 13</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot asi-slot" data-level="13" data-slot-type="abilityScoreImprovement">
+                <input type="checkbox" name="system.progression.level13.abilityScoreImprovement" {{checked actor.system.progression.level13.abilityScoreImprovement}}/>
+                <label>Ability Score Improvement</label>
+              </div>
+              <div class="progression-slot talent-slot" data-level="13" data-slot-type="genericTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level13.genericTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level13.genericTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level13.genericTalentImg}}" alt="{{actor.system.progression.level13.genericTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level13.genericTalentName}}</span>
+                    <a class="slot-delete" data-level="13" data-slot-type="genericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Click to choose Talent</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 14 --}}
+          {{#if (lte 14 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 14</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot" data-level="14" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level14.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level14.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level14.powersetTalentImg}}" alt="{{actor.system.progression.level14.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level14.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="14" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 15 --}}
+          {{#if (lte 15 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 15</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot asi-slot" data-level="15" data-slot-type="abilityScoreImprovement">
+                <input type="checkbox" name="system.progression.level15.abilityScoreImprovement" {{checked actor.system.progression.level15.abilityScoreImprovement}}/>
+                <label>Ability Score Improvement</label>
+              </div>
+              <div class="progression-slot" data-level="15" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level15.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level15.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level15.powersetTalentImg}}" alt="{{actor.system.progression.level15.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level15.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="15" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 16 --}}
+          {{#if (lte 16 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 16</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot talent-slot" data-level="16" data-slot-type="genericTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level16.genericTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level16.genericTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level16.genericTalentImg}}" alt="{{actor.system.progression.level16.genericTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level16.genericTalentName}}</span>
+                    <a class="slot-delete" data-level="16" data-slot-type="genericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Click to choose Talent</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 17 --}}
+          {{#if (lte 17 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 17</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot" data-level="17" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level17.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level17.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level17.powersetTalentImg}}" alt="{{actor.system.progression.level17.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level17.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="17" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 18 --}}
+          {{#if (lte 18 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 18</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot asi-slot" data-level="18" data-slot-type="abilityScoreImprovement">
+                <input type="checkbox" name="system.progression.level18.abilityScoreImprovement" {{checked actor.system.progression.level18.abilityScoreImprovement}}/>
+                <label>Ability Score Improvement</label>
+              </div>
+              <div class="progression-slot talent-slot" data-level="18" data-slot-type="genericTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level18.genericTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level18.genericTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level18.genericTalentImg}}" alt="{{actor.system.progression.level18.genericTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level18.genericTalentName}}</span>
+                    <a class="slot-delete" data-level="18" data-slot-type="genericTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Click to choose Talent</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 19 --}}
+          {{#if (lte 19 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 19</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot" data-level="19" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level19.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level19.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level19.powersetTalentImg}}" alt="{{actor.system.progression.level19.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level19.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="19" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+          
+          {{!-- Level 20 --}}
+          {{#if (lte 20 actor.system.basic.primeLevel)}}
+          <li class="progression-level">
+            <div class="level-header">
+              <h4>Level 20</h4>
+            </div>
+            <div class="progression-slots">
+              <div class="progression-slot asi-slot" data-level="20" data-slot-type="abilityScoreImprovement">
+                <input type="checkbox" name="system.progression.level20.abilityScoreImprovement" {{checked actor.system.progression.level20.abilityScoreImprovement}}/>
+                <label>Ability Score Improvement</label>
+              </div>
+              <div class="progression-slot" data-level="20" data-slot-type="powersetTalent" data-drop-zone="progression">
+                {{#if actor.system.progression.level20.powersetTalent}}
+                  <div class="slot-item" data-item-id="{{actor.system.progression.level20.powersetTalent}}">
+                    <img class="item-icon" src="{{actor.system.progression.level20.powersetTalentImg}}" alt="{{actor.system.progression.level20.powersetTalentName}}">
+                    <span class="item-name">{{actor.system.progression.level20.powersetTalentName}}</span>
+                    <a class="slot-delete" data-level="20" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                {{else}}
+                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                {{/if}}
+              </div>
+            </div>
+          </li>
+          {{/if}}
+        </ol>
+      </div>
+    </div>
+
+    {{!-- Wounds Tab --}}
+    <div class="tab wounds" data-group="primary" data-tab="wounds">
+      <div class="wounds-section">
+        <h3>Wounds & Dying</h3>
+        
+        <div class="wound-limit-section">
+          <div class="wound-limit-display">
+            <label>Wound Limit (Death Threshold):</label>
+            <div class="wound-limit-value">
+              <span class="wound-count">{{woundValue}}</span>
+              <span class="wound-separator">/</span>
+              <span class="wound-max">{{calculatedWoundLimit}}</span>
+            </div>
+          </div>
+          <p class="wound-limit-description">
+            You die if your total Wound Value equals or exceeds <strong>3 + your Endurance{{#if hasHardToKill}} + 2 (Hard to Kill){{/if}}</strong>.
+          </p>
+        </div>
+        
+        <div class="wound-actions">
+          <button type="button" class="roll-wound" title="Roll 1d20 on the Wound Table (Standard Wound, or Extreme if location already exists)">
+            <i class="fas fa-dice-d20"></i> Roll Wound
+          </button>
+          <button type="button" class="roll-extreme-wound" title="Roll 1d20 on the Wound Table (Always Extreme Wound - for Critical Trauma)">
+            <i class="fas fa-dice-d20"></i> Roll Extreme Wound
+          </button>
+        </div>
+        
+        <div class="wounds-list-section">
+          <h4>Current Wounds</h4>
+          {{#if wounds}}
+          <ol class="wounds-list">
+            {{#each wounds as |wound id|}}
+            <li class="wound-item {{#if wound.isExtreme}}extreme-wound{{/if}}" data-wound-id="{{id}}">
+              <div class="wound-header">
+                <span class="wound-location">{{wound.location}}</span>
+                <span class="wound-type-badge">
+                  {{#if wound.isExtreme}}
+                  <span class="badge extreme">Extreme Wound (3)</span>
+                  {{else}}
+                  <span class="badge standard">Standard Wound (1)</span>
+                  {{/if}}
+                </span>
+                <a class="wound-delete" data-wound-id="{{id}}" title="Remove"><i class="fas fa-times"></i></a>
+              </div>
+              {{#if wound.isExtreme}}
+              <div class="wound-extreme-effect">
+                <strong>Extreme Effect:</strong> {{wound.extremeEffect}}
+              </div>
+              {{else}}
+              <div class="wound-effect">
+                <strong>Effect:</strong> {{wound.effect}}
+              </div>
+              {{/if}}
+            </li>
+            {{/each}}
+          </ol>
+          {{else}}
+          <p class="no-wounds">No wounds currently. Roll a wound when your HP reaches 0.</p>
+          {{/if}}
+        </div>
+        
+        <div class="wound-info-section">
+          <h4>Wound Information</h4>
+          <ul class="wound-info-list">
+            <li><strong>Standard Wound:</strong> Counts as 1 toward your Wound Limit.</li>
+            <li><strong>Extreme Wound:</strong> Counts as 3 toward your Wound Limit.</li>
+            <li><strong>Extreme Wound triggers:</strong> Critical Trauma (reduced to 0 HP by Extreme Success/Extreme Failure) or Aggravated Injury (rolling a location you already have).</li>
+            <li><strong>Healing:</strong> Standard wounds heal after a Long Rest. Extreme wounds require advanced medical intervention.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    {{!-- Notes Tab --}}
+    <div class="tab notes" data-group="primary" data-tab="notes">
+      <div class="notes-section">
+        <h3>Notes</h3>
+        {{editor enrichedNotes target="system.notes" button=true owner=owner editable=editable}}
+      </div>
+      <div class="notes-section">
+        <h3>Backstory</h3>
+        {{editor enrichedBackstory target="system.backstory" button=true owner=owner editable=editable}}
+      </div>
+      <div class="notes-section">
+        <h3>Appearance</h3>
+        {{editor enrichedAppearance target="system.appearance" button=true owner=owner editable=editable}}
+      </div>
+    </div>
+  </section>
+</form>

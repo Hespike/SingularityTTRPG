@@ -1,0 +1,166 @@
+{
+  "id": "singularity",
+  "title": "Singularity",
+  "description": "A futuristic superhero tabletop roleplaying system for Foundry VTT",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13.350"
+  },
+  "url": "",
+  "manifest": "",
+  "download": "",
+  "authors": [
+    {
+"name": "Hespi",
+    "url": "https://hespike.github.io/singularity/",
+    "email": "singularityroleplaying@gmail.com",
+    "discord": "Hespi",
+      "flags": {}
+    }
+  ],
+  "esmodules": ["module/singularity.js"],
+  "styles": [
+    "css/singularity.css"
+  ],
+  "flags": {
+    "hotReload": {
+      "extensions": ["css", "json", "js", "html"]
+    }
+  },
+  "packs": [
+    {
+      "name": "enemies",
+      "label": "Enemies",
+      "system": "singularity",
+      "path": "packs/enemies",
+      "type": "Actor",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "pregens",
+      "label": "Pregenerated Heroes",
+      "system": "singularity",
+      "path": "packs/pregens",
+      "type": "Actor",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "phenotypes",
+      "label": "Phenotypes",
+      "system": "singularity",
+      "path": "packs/phenotypes",
+      "type": "Item",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "subtypes",
+      "label": "Subtypes",
+      "system": "singularity",
+      "path": "packs/subtypes",
+      "type": "Item",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "talents",
+      "label": "Talents",
+      "system": "singularity",
+      "path": "packs/talents",
+      "type": "Item",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "powersets",
+      "label": "Powersets",
+      "system": "singularity",
+      "path": "packs/powersets",
+      "type": "Item",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "armor",
+      "label": "Armor",
+      "system": "singularity",
+      "path": "packs/armor",
+      "type": "Item",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "backgrounds",
+      "label": "Backgrounds",
+      "system": "singularity",
+      "path": "packs/backgrounds",
+      "type": "Item",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "gadgets",
+      "label": "Gadgets",
+      "system": "singularity",
+      "path": "packs/gadgets",
+      "type": "Item",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "weapons",
+      "label": "Weapons",
+      "system": "singularity",
+      "path": "packs/weapons",
+      "type": "Item",
+      "flags": {},
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    }
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json",
+      "flags": {}
+    }
+  ],
+  "socket": true,
+  "grid": {
+    "distance": 5,
+    "units": "ft"
+  }
+}

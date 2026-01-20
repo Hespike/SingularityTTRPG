@@ -1,0 +1,192 @@
+<div class="talent-selection-dialog">
+  <div class="talent-dialog-container">
+    <div class="talent-filter-sidebar">
+      <h3 class="filter-title">Filter by Level</h3>
+      <div class="level-filter-list">
+        {{#each availableLevels as |levelData|}}
+        <label class="level-filter-item">
+          <input type="radio" name="levelFilter" value="{{levelData.level}}" {{#if levelData.selected}}checked{{/if}}>
+          <span class="level-filter-label">Level {{levelData.level}}</span>
+          <span class="level-filter-count">({{levelData.count}})</span>
+        </label>
+        {{/each}}
+      </div>
+    </div>
+    <div class="talent-content-area">
+      <p class="dialog-description">Select a talent:</p>
+      <div class="talent-list">
+        {{#each talents as |talent|}}
+        <div class="talent-item" data-talent-id="{{talent._id}}" data-talent-level="{{talent.level}}">
+          <img class="talent-icon" src="{{talent.img}}" alt="{{talent.name}}" onerror="this.src='icons/svg/mystery-man.svg'">
+          <div class="talent-info">
+            <div class="talent-name">{{talent.name}}</div>
+            {{#if talent.description}}
+            <div class="talent-description">{{{talent.description}}}</div>
+            {{/if}}
+          </div>
+        </div>
+        {{/each}}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.talent-selection-dialog {
+  padding: 0;
+}
+
+.talent-dialog-container {
+  display: flex;
+  gap: 15px;
+  min-height: 500px;
+  max-height: 600px;
+  width: 1200px;
+  min-width: 1200px;
+}
+
+.talent-filter-sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  background: rgba(30, 33, 45, 0.5);
+  border-right: 1px solid rgba(189, 95, 255, 0.3);
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.filter-title {
+  color: #BD5FFF;
+  font-size: 14px;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin: 0 0 15px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(189, 95, 255, 0.3);
+}
+
+.level-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.level-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #d1d1d1;
+}
+
+.level-filter-item:hover {
+  background: rgba(189, 95, 255, 0.1);
+}
+
+.level-filter-item input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+  accent-color: #BD5FFF;
+}
+
+.level-filter-item input[type="radio"]:checked + .level-filter-label {
+  color: #BD5FFF;
+  font-weight: bold;
+}
+
+.level-filter-label {
+  flex: 1;
+  font-size: 13px;
+}
+
+.level-filter-count {
+  font-size: 11px;
+  color: #a0aec0;
+  font-style: italic;
+}
+
+.talent-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  min-width: 0;
+}
+
+.dialog-description {
+  color: #d1d1d1;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.talent-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.talent-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(189, 95, 255, 0.3);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.talent-item:hover {
+  background: rgba(189, 95, 255, 0.15);
+  border-color: #BD5FFF;
+  transform: translateX(5px);
+}
+
+.talent-item.hidden {
+  display: none;
+}
+
+.talent-icon {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(189, 95, 255, 0.3);
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.talent-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.talent-name {
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.talent-description {
+  color: #a0aec0;
+  font-size: 12px;
+  line-height: 1.4;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.talent-description h2,
+.talent-description h3,
+.talent-description h4 {
+  display: none;
+}
+
+.talent-description p {
+  margin: 0;
+}
+</style>

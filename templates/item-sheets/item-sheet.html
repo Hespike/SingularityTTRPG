@@ -1,0 +1,94 @@
+<form class="{{cssClass}} flexcol" autocomplete="off">
+  <header class="sheet-header">
+    <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" height="64" width="64"/>
+    <div class="header-fields">
+      <h1 class="charname"><input name="name" type="text" value="{{item.name}}" placeholder="Item Name"/></h1>
+      <div class="form-group">
+        <label>Image Path</label>
+        <input type="text" name="img" value="{{item.img}}" placeholder="e.g., icons/svg/sword.svg" style="width: 100%;"/>
+      </div>
+    </div>
+  </header>
+
+  <section class="sheet-body">
+    {{#if (eq item.type "weapon")}}
+      <div class="form-group">
+        <label>Type</label>
+        <select name="system.basic.type">
+          <option value="melee" {{#if (eq system.basic.type "melee")}}selected{{/if}}>Melee</option>
+          <option value="ranged" {{#if (eq system.basic.type "ranged")}}selected{{/if}}>Ranged</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Attack Bonus</label>
+        <input type="number" name="system.basic.attackBonus" value="{{system.basic.attackBonus}}" data-dtype="Number"/>
+      </div>
+      <div class="form-group">
+        <label>Damage</label>
+        <input type="text" name="system.basic.damage" value="{{system.basic.damage}}" placeholder="e.g., 1d4+1"/>
+      </div>
+      <div class="form-group">
+        <label>Damage Type</label>
+        <input type="text" name="system.basic.damageType" value="{{system.basic.damageType}}" placeholder="kinetic"/>
+      </div>
+      <div class="form-group">
+        <label>Range</label>
+        <input type="text" name="system.basic.range" value="{{system.basic.range}}" placeholder="Melee or range"/>
+      </div>
+      <div class="form-group">
+        <label>Hands</label>
+        <input type="number" name="system.basic.hands" value="{{system.basic.hands}}" data-dtype="Number" min="1" max="2"/>
+      </div>
+      <div class="form-group">
+        <label>Energy Cost</label>
+        <input type="number" name="system.basic.energyCost" value="{{system.basic.energyCost}}" data-dtype="Number" min="1"/>
+      </div>
+      <div class="form-group">
+        <label>Weapon Categories (comma-separated)</label>
+        <input type="text" name="system.basic.categories" value="{{system.basic.categories}}" placeholder="e.g., Light Melee Weapons, Thrown Weapons"/>
+        <p style="font-size: 11px; color: #a0aec0; margin-top: 5px;">Used for competence matching. Separate multiple categories with commas.</p>
+      </div>
+    {{/if}}
+
+    {{#if (eq item.type "armor")}}
+      <div class="form-group">
+        <label>AC Bonus</label>
+        <input type="number" name="system.basic.acBonus" value="{{system.basic.acBonus}}" data-dtype="Number"/>
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select name="system.basic.type">
+          <option value="light" {{#if (eq system.basic.type "light")}}selected{{/if}}>Light</option>
+          <option value="medium" {{#if (eq system.basic.type "medium")}}selected{{/if}}>Medium</option>
+          <option value="heavy" {{#if (eq system.basic.type "heavy")}}selected{{/if}}>Heavy</option>
+        </select>
+      </div>
+    {{/if}}
+
+    {{#if (eq item.type "talent")}}
+      <div class="form-group">
+        <label>Type</label>
+        <select name="system.basic.type">
+          <option value="generic" {{#if (eq system.basic.type "generic")}}selected{{/if}}>Generic</option>
+          <option value="powerset" {{#if (eq system.basic.type "powerset")}}selected{{/if}}>Powerset</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Prerequisites</label>
+        <input type="text" name="system.basic.prerequisites" value="{{system.basic.prerequisites}}" placeholder="Prerequisites"/>
+      </div>
+    {{/if}}
+
+    {{#if (eq item.type "equipment")}}
+      <div class="form-group">
+        <label>Quantity</label>
+        <input type="number" name="system.basic.quantity" value="{{system.basic.quantity}}" data-dtype="Number"/>
+      </div>
+    {{/if}}
+
+    <div class="form-group">
+      <label>Description</label>
+      {{editor system.description target="system.description" button=true owner=owner editable=editable}}
+    </div>
+  </section>
+</form>
