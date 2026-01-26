@@ -120,6 +120,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         background: basic.background || "",
         powerset: basic.powerset || ""
       };
+      const primeLevel = safeBasic.primeLevel || 1;
       
       // Store safe defaults in context (don't modify actor data)
       context.speeds = safeCombat.speeds;
@@ -846,7 +847,6 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     // Add Marksman powerset's Ranged Weapon training (for display purposes)
     if (powersetName === "Marksman") {
       // Calculate rank based on prime level: Apprentice at 1, Competent at 5, Masterful at 10, Legendary at 15
-      const primeLevel = safeBasic.primeLevel || 1;
       let marksmanRank = "Apprentice";
       if (primeLevel >= 15) {
         marksmanRank = "Legendary";
@@ -1098,7 +1098,6 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     );
 
     // Check if Enhanced Vitality talent is selected
-    const primeLevel = safeBasic.primeLevel || 1;
     let hasEnhancedVitality = false;
     
     // Check all progression slots for Enhanced Vitality
@@ -1767,26 +1766,29 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         // Helper function to get item details (modifies levelData copy, not original)
         const getItemDetails = (itemId, prefix) => {
           if (!itemId) return;
-          // Try to get from actor's items first
           let item = this.actor.items.get(itemId);
-          // If not found, try to find in world items
           if (!item) {
             item = game.items.get(itemId);
           }
-          // If still not found and it looks like a UUID, try to get from compendium
-          if (!item && itemId.includes(".")) {
-            // For compendium items, we'll need to store the UUID and handle it in the template
-            levelData[`${prefix}Uuid`] = itemId;
-            // Try to find in any pack
-            for (const pack of game.packs.values()) {
-              if (pack.index.has(itemId.split(".")[2])) {
-                const packItem = pack.index.get(itemId.split(".")[2]);
-                if (packItem) {
-                  levelData[`${prefix}Name`] = packItem.name;
-                  levelData[`${prefix}Img`] = packItem.img || "icons/svg/mystery-man.svg";
-                  return;
+          if (!item) {
+            if (itemId.includes(".")) {
+              levelData[`${prefix}Uuid`] = itemId;
+              for (const pack of game.packs.values()) {
+                if (pack.index.has(itemId.split(".")[2])) {
+                  const packItem = pack.index.get(itemId.split(".")[2]);
+                  if (packItem) {
+                    levelData[`${prefix}Name`] = packItem.name;
+                    levelData[`${prefix}Img`] = packItem.img || "icons/svg/mystery-man.svg";
+                    return;
+                  }
                 }
               }
+            } else {
+              levelData[`${prefix}`] = itemId;
+              levelData[`${prefix}Name`] = itemId;
+              levelData[`${prefix}Img`] = "icons/svg/mystery-man.svg";
+              levelData[`${prefix}Uuid`] = "";
+              return;
             }
           }
           if (item) {
@@ -1794,7 +1796,6 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             levelData[`${prefix}Img`] = item.img;
             levelData[`${prefix}Uuid`] = item.uuid;
           } else {
-            // Fallback: use stored name/img if available, or defaults
             if (!levelData[`${prefix}Name`]) {
               levelData[`${prefix}Name`] = "Unknown Item";
               levelData[`${prefix}Img`] = "icons/svg/mystery-man.svg";
@@ -1825,6 +1826,21 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         context.actor.system = {};
       }
       context.actor.system.progression = progressionCopy;
+      const level1Copy = context.actor.system.progression.level1;
+      const basicPowers = actorData.system.basic || {};
+      const fillField = (fieldName, fallbackValue) => {
+        if (!level1Copy[fieldName] && fallbackValue) {
+          level1Copy[fieldName] = fallbackValue;
+        }
+        const nameField = `${fieldName}Name`;
+        if (!level1Copy[nameField] && level1Copy[fieldName]) {
+          level1Copy[nameField] = level1Copy[fieldName];
+        }
+      };
+      fillField("phenotype", basicPowers.phenotype);
+      fillField("subtype", basicPowers.subtype);
+      fillField("background", basicPowers.background);
+      fillField("powerset", basicPowers.powerset);
       
       // Parse background bonuses if background is selected
       const backgroundName = progressionCopy.level1?.backgroundName;

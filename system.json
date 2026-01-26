@@ -42,18 +42,6 @@
       }
     },
     {
-      "name": "pregens",
-      "label": "Pregenerated Heroes",
-      "system": "singularity",
-      "path": "packs/pregens",
-      "type": "Actor",
-      "flags": {},
-      "ownership": {
-        "PLAYER": "OBSERVER",
-        "ASSISTANT": "OWNER"
-      }
-    },
-    {
       "name": "phenotypes",
       "label": "Phenotypes",
       "system": "singularity",

@@ -32,12 +32,9 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-<<<<<<< HEAD
 
 singularityold/
 
-=======
->>>>>>> 7ace03466e43e0ea1d3679ffd672003dd7a66bc0
 # Build files
 dist/
 build/

@@ -873,7 +873,7 @@
                     </div>
                     {{!-- Gadgeteer Talent selection --}}
                     <div class="progression-slot talent-slot clickable-slot" data-level="1" data-slot-type="gadgeteerTalent" data-drop-zone="progression">
-                      {{#if actor.system.progression.level1.gadgeteerTalent}}
+                      {{#if (or actor.system.progression.level1.gadgeteerTalent actor.system.progression.level1.gadgeteerTalentName)}}
                         <div class="slot-item" data-item-id="{{actor.system.progression.level1.gadgeteerTalent}}">
                           {{#if actor.system.progression.level1.gadgeteerTalentImg}}
                             <img class="item-icon slot-item-icon" src="{{actor.system.progression.level1.gadgeteerTalentImg}}" alt="{{actor.system.progression.level1.gadgeteerTalentName}}">
@@ -945,7 +945,7 @@
                     </div>
                     {{!-- Marksman Talent selection --}}
                     <div class="progression-slot talent-slot clickable-slot" data-level="1" data-slot-type="marksmanTalent" data-drop-zone="progression">
-                      {{#if actor.system.progression.level1.marksmanTalent}}
+                      {{#if (or actor.system.progression.level1.marksmanTalent actor.system.progression.level1.marksmanTalentName)}}
                         <div class="slot-item" data-item-id="{{actor.system.progression.level1.marksmanTalent}}">
                           {{#if actor.system.progression.level1.marksmanTalentImg}}
                             <img class="item-icon slot-item-icon" src="{{actor.system.progression.level1.marksmanTalentImg}}" alt="{{actor.system.progression.level1.marksmanTalentName}}">
@@ -993,7 +993,7 @@
                       </select>
                     </div>
                     <div class="progression-slot talent-slot" data-level="1" data-slot-type="humanGenericTalent" data-drop-zone="progression">
-                      {{#if actor.system.progression.level1.humanGenericTalent}}
+                      {{#if (or actor.system.progression.level1.humanGenericTalent actor.system.progression.level1.humanGenericTalentName)}}
                         <div class="slot-item" data-item-id="{{actor.system.progression.level1.humanGenericTalent}}">
                           {{#if actor.system.progression.level1.humanGenericTalentImg}}
                             <img class="item-icon" src="{{actor.system.progression.level1.humanGenericTalentImg}}" alt="{{actor.system.progression.level1.humanGenericTalentName}}">
@@ -1067,7 +1067,7 @@
                       </select>
                     </div>
                     <div class="progression-slot talent-slot" data-level="1" data-slot-type="terranGenericTalent" data-drop-zone="progression">
-                      {{#if actor.system.progression.level1.terranGenericTalent}}
+                      {{#if (or actor.system.progression.level1.terranGenericTalent actor.system.progression.level1.terranGenericTalentName)}}
                         <div class="slot-item" data-item-id="{{actor.system.progression.level1.terranGenericTalent}}">
                           {{#if actor.system.progression.level1.terranGenericTalentImg}}
                             <img class="item-icon" src="{{actor.system.progression.level1.terranGenericTalentImg}}" alt="{{actor.system.progression.level1.terranGenericTalentName}}">

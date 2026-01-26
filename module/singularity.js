@@ -394,10 +394,13 @@ Hooks.on("renderDialog", function(dialog, html, data) {
 
 Hooks.once("ready", async function() {
   console.log("Singularity | System Ready");
+  return;
   
   // Auto-create pregenerated heroes in pregens compendium if they don't exist
   // Wait a bit for compendiums to fully initialize
   setTimeout(async () => {
+    console.log("Singularity | Pregenerated heroes auto-creation has been disabled.");
+    return;
     try {
       const pack = game.packs.find(p => p.metadata.name === "pregens" && p.metadata.packageName === "singularity");
       if (!pack) {
