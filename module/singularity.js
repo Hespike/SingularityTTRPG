@@ -1419,7 +1419,7 @@ Hooks.once("ready", async function() {
             },
             archived: false
           },
-          img: "icons/svg/cog.svg"
+          img: "icons/svg/item-bag.svg"
         };
         
         try {
@@ -2652,7 +2652,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
             },
             archived: false
           },
-          img: "icons/svg/cog.svg"
+          img: "icons/svg/item-bag.svg"
         };
         itemsToCreate.push(itemData);
       }
@@ -2831,7 +2831,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
             },
             archived: false
           },
-          img: "icons/svg/cog.svg"
+          img: "icons/svg/item-bag.svg"
         };
         itemsToCreate.push(itemData);
       }
@@ -2999,7 +2999,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
             },
             archived: false
           },
-          img: "icons/svg/cog.svg"
+          img: "icons/svg/item-bag.svg"
         };
         itemsToCreate.push(itemData);
       }
@@ -3173,7 +3173,7 @@ Improvised Gadget talent</p>
             },
             archived: false
           },
-          img: "icons/svg/cog.svg"
+          img: "icons/svg/item-bag.svg"
         });
       }
 
@@ -3379,17 +3379,16 @@ Improvised Gadget talent</p>
       }
 
       await pack.getIndex({ force: true });
+      console.log("Singularity | Gadgets compendium index loaded, size:", pack.index.size);
       
+      // Level 0 and Level 1 gadgets from handbook
       const gadgetNames = {
         level0: [
           "Liquid Foam Spray",
           "Magnetic Grapnel",
           "Micro-Missile Launcher",
-          "Motion Tracker",
           "Photon Projector",
-          "Smoke Canister",
-          "Support Drone",
-          "Utility Multi-Tool"
+          "Support Drone"
         ],
         level1: [
           "Remote Med-Siphon",
@@ -3399,35 +3398,80 @@ Improvised Gadget talent</p>
       };
       
       const allGadgetNames = [...gadgetNames.level0, ...gadgetNames.level1];
-      const allExist = allGadgetNames.every(name => 
-        pack.index.find(i => i.name === name)
-      );
       
-      if (allExist) {
+      // Check which gadgets exist
+      const existingGadgets = [];
+      const missingGadgets = [];
+      for (const name of allGadgetNames) {
+        const exists = pack.index.find(i => i.name === name);
+        if (exists) {
+          existingGadgets.push(name);
+        } else {
+          missingGadgets.push(name);
+        }
+      }
+      
+      console.log("Singularity | Existing gadgets:", existingGadgets.length, existingGadgets);
+      console.log("Singularity | Missing gadgets:", missingGadgets.length, missingGadgets);
+      
+      if (missingGadgets.length === 0) {
         console.log("Singularity | All Level 0 and Level 1 gadgets already exist in compendium");
+        // Still check and update icons even if all gadgets exist
+        // Always ensure the compendium is unlocked for updates
+        if (pack.locked) {
+          console.log("Singularity | Unlocking gadgets compendium for icon updates...");
+          await pack.configure({ locked: false });
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        // Update existing gadgets that have the old cog.svg icon
+        for (const gadgetIndex of pack.index) {
+          if (allGadgetNames.includes(gadgetIndex.name)) {
+            try {
+              const gadgetDoc = await pack.getDocument(gadgetIndex._id);
+              if (gadgetDoc && gadgetDoc.img === "icons/svg/cog.svg") {
+                await gadgetDoc.update({ img: "icons/svg/item-bag.svg" });
+                console.log(`Singularity | Updated ${gadgetIndex.name} icon from cog.svg to item-bag.svg`);
+              }
+            } catch (err) {
+              console.error(`Singularity | Error updating ${gadgetIndex.name} icon:`, err);
+            }
+          }
+        }
         return;
       }
 
-      const wasLocked = pack.locked;
-      if (wasLocked) {
-        try {
-          await pack.configure({ locked: false });
-          await new Promise(resolve => setTimeout(resolve, 200));
-          // Verify the unlock actually worked
-          if (pack.locked) {
-            // Compendium is still locked, skip auto-creation silently
-            console.log("Singularity | Gadgets compendium is locked, skipping auto-creation.");
-            return;
+      // Always ensure the compendium is unlocked for auto-creation
+      if (pack.locked) {
+        console.log("Singularity | Unlocking gadgets compendium for auto-creation...");
+        await pack.configure({ locked: false });
+        // Wait longer to ensure unlock takes effect
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Verify unlock worked
+        if (pack.locked) {
+          console.warn("Singularity | Warning: Gadgets compendium is still locked after unlock attempt");
+        } else {
+          console.log("Singularity | Gadgets compendium unlocked successfully");
+        }
+      }
+      
+      // Update existing gadgets that have the old cog.svg icon before creating new ones
+      for (const gadgetIndex of pack.index) {
+        if (allGadgetNames.includes(gadgetIndex.name)) {
+          try {
+            const gadgetDoc = await pack.getDocument(gadgetIndex._id);
+            if (gadgetDoc && gadgetDoc.img === "icons/svg/cog.svg") {
+              await gadgetDoc.update({ img: "icons/svg/item-bag.svg" });
+              console.log(`Singularity | Updated ${gadgetIndex.name} icon from cog.svg to item-bag.svg`);
+            }
+          } catch (err) {
+            console.error(`Singularity | Error updating ${gadgetIndex.name} icon:`, err);
           }
-        } catch (unlockError) {
-          // Could not unlock, skip auto-creation silently
-          console.log("Singularity | Could not unlock gadgets compendium, skipping auto-creation.");
-          return;
         }
       }
 
+      // Level 0 and Level 1 gadgets from handbook (matching gadgets.html exactly)
       const gadgets = [
-        // Level 0 gadgets
+        // Level 0 gadgets (from handbook)
         {
           name: "Liquid Foam Spray",
           level: 0,
@@ -3485,25 +3529,6 @@ Improvised Gadget talent</p>
 <p>You use your <strong>Gadget Tuning</strong> skill for the attack roll.</p>`
         },
         {
-          name: "Motion Tracker",
-          level: 0,
-          description: `<h2>Description</h2>
-<p>You deploy a small disc or handheld device that uses passive motion sensors and vibration detection to track movement within a designated area, alerting you to any creatures passing through.</p>
-
-<h2>Motion Tracker</h2>
-<p><strong>Type:</strong> Action<br>
-<strong>Range:</strong> Touch<br>
-<strong>Cost:</strong> 1 energy<br>
-<strong>Hands:</strong> 1<br>
-<strong>Duration:</strong> 1 hour</p>
-
-<h3>Effect</h3>
-<p>You place the tracker on a surface. For the duration, you are aware of any creature of Small size or larger that moves within a <strong>30-foot radius</strong> of the tracker. You learn the direction and approximate distance of each detected creature, but not their identity or exact number if multiple creatures are present.</p>
-<div class="alert alert-info mt-3">
-  <strong>Note:</strong> The tracker cannot detect stationary creatures. You can have a number of trackers active at once equal to your <strong>Wits</strong> ability maximum.
-</div>`
-        },
-        {
           name: "Photon Projector",
           level: 0,
           description: `<h2>Description</h2>
@@ -3518,23 +3543,6 @@ Improvised Gadget talent</p>
 
 <h3>Effect</h3>
 <p>The projector emits bright light in a <strong>20-foot radius</strong> and dim light for an additional <strong>20 feet</strong>.</p>`
-        },
-        {
-          name: "Smoke Canister",
-          level: 0,
-          description: `<h2>Description</h2>
-<p>You activate a compact chemical canister that rapidly emits a thick cloud of smoke, providing cover for movement and obscuring vision from ranged attacks.</p>
-
-<h2>Smoke Canister</h2>
-<p><strong>Type:</strong> Action<br>
-<strong>Range:</strong> 20 feet<br>
-<strong>Cost:</strong> 2 energy<br>
-<strong>Hands:</strong> 1<br>
-<strong>Duration:</strong> 1 minute</p>
-
-<h3>Effect</h3>
-<p>You create a cloud of thick smoke in a <strong>10-foot radius burst</strong> centered on a point within range. The area is heavily obscured. Creatures inside the smoke have standard cover. Additionally, any attack made through the smoke provides standard cover to the target.</p>
-<p>A moderate wind (at least 10 miles per hour) disperses the smoke in 3 rounds. A strong wind (at least 20 miles per hour) disperses it immediately.</p>`
         },
         {
           name: "Support Drone",
@@ -3553,24 +3561,7 @@ Improvised Gadget talent</p>
 <p>The target gains a <strong>+1 bonus</strong> to one attack roll, saving throw, or skill check they attempt before the duration ends. The target chooses which roll to use the bonus on before rolling. If the target uses the bonus, the effect ends.</p>
 <p>Once a creature has benefited from the Support Drone, they become <strong>temporarily immune</strong> to this gadget for 10 minutes.</p>`
         },
-        {
-          name: "Utility Multi-Tool",
-          level: 0,
-          description: `<h2>Description</h2>
-<p>A compact device that can morph into various tools—lockpicks, wire cutters, screwdrivers, and more—allowing you to overcome mechanical obstacles with precision and efficiency.</p>
-
-<h2>Utility Multi-Tool</h2>
-<p><strong>Type:</strong> Action<br>
-<strong>Range:</strong> Touch<br>
-<strong>Cost:</strong> 1 energy<br>
-<strong>Hands:</strong> 1<br>
-<strong>Duration:</strong> 1 minute</p>
-
-<h3>Effect</h3>
-<p>While the multi-tool is active, you gain a <strong>+2 bonus</strong> to skill checks involving mechanical devices, locks, traps, or similar technical challenges. This includes attempts to pick locks, disable traps, repair equipment, or interact with complex machinery.</p>
-<p>The multi-tool can function as any standard tool for the duration, automatically adjusting its form as needed.</p>`
-        },
-        // Level 1 gadgets
+        // Level 1 gadgets (from handbook)
         {
           name: "Remote Med-Siphon",
           level: 1,
@@ -3646,31 +3637,31 @@ Improvised Gadget talent</p>
             },
             archived: false
           },
-          img: "icons/svg/cog.svg"
+          img: "icons/svg/item-bag.svg"
         });
       }
 
       if (itemsToCreate.length === 0) {
         console.log("Singularity | All Level 0 and Level 1 gadgets already exist");
-        if (wasLocked) {
-          try {
-            await pack.configure({ locked: true });
-          } catch (lockError) {
-            console.warn("Singularity | Could not re-lock gadgets compendium:", lockError);
-          }
-        }
         return;
       }
 
       console.log(`Singularity | Creating ${itemsToCreate.length} gadgets...`);
-      const createdItems = await Item.createDocuments(itemsToCreate, { render: false });
       
+      // Create items in world first, then import into compendium (compendium is unlocked)
+      const createdItems = await Item.createDocuments(itemsToCreate, { render: false });
+      console.log(`Singularity | Created ${createdItems.length} gadgets in world`);
+      
+      // Import into compendium
+      let successCount = 0;
       for (const item of createdItems) {
         try {
           await pack.importDocument(item);
           await item.delete();
-        } catch (err) {
-          console.error(`Singularity | Error importing ${item.name}:`, err);
+          successCount++;
+          console.log(`Singularity | Imported ${item.name} into compendium`);
+        } catch (importErr) {
+          console.error(`Singularity | Error importing ${item.name}:`, importErr);
           try {
             await item.delete();
           } catch (cleanupErr) {
@@ -3678,20 +3669,14 @@ Improvised Gadget talent</p>
           }
         }
       }
-
+      
       await new Promise(resolve => setTimeout(resolve, 1000));
       await pack.getIndex({ force: true });
       
-      if (wasLocked) {
-        try {
-          await pack.configure({ locked: true });
-        } catch (lockError) {
-          console.warn("Singularity | Could not re-lock gadgets compendium:", lockError);
-          // Non-critical error, just log it
-        }
+      // Don't re-lock - leave it unlocked for future auto-creation
+      if (successCount > 0) {
+        ui.notifications.info(`Created ${successCount} gadgets in Gadgets compendium!`);
       }
-      
-      ui.notifications.info(`Created ${itemsToCreate.length} gadgets in Gadgets compendium!`);
     } catch (error) {
       console.error("Singularity | Could not auto-create gadgets:", error);
       ui.notifications.error(`Failed to create gadgets: ${error.message}`);

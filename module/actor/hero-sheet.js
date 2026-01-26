@@ -1362,20 +1362,24 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       context.gadgetSlots = gadgetSlots;
       
       // Pad prepared gadgets arrays to match total slots (fill with null for empty slots)
-      // Ensure gadgets have images (default to mystery-man if missing)
+      // Ensure gadgets have images (default to mystery-man if missing, fix old cog.svg references)
       const paddedLevel0 = Array(level0Slots || 0).fill(null).map((_, index) => {
         const gadget = (preparedGadgetsData.level0 || [])[index] || null;
-        if (gadget && !gadget.img) {
-          // Set default image if missing (will be updated when gadget is clicked or re-added)
-          gadget.img = "icons/svg/mystery-man.svg";
+        if (gadget) {
+          if (!gadget.img || gadget.img === "icons/svg/cog.svg") {
+            // Fix old cog.svg icon or set default image if missing
+            gadget.img = "icons/svg/item-bag.svg";
+          }
         }
         return gadget;
       });
       const paddedLevel1 = Array(slots.level1 || 0).fill(null).map((_, index) => {
         const gadget = (preparedGadgetsData.level1 || [])[index] || null;
-        if (gadget && !gadget.img) {
-          // Set default image if missing (will be updated when gadget is clicked or re-added)
-          gadget.img = "icons/svg/mystery-man.svg";
+        if (gadget) {
+          if (!gadget.img || gadget.img === "icons/svg/cog.svg") {
+            // Fix old cog.svg icon or set default image if missing
+            gadget.img = "icons/svg/item-bag.svg";
+          }
         }
         return gadget;
       });
@@ -6122,15 +6126,41 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           icon: '<i class="fas fa-times"></i>',
           label: "Cancel"
         }
-      }
+      },
+      default: "cancel"
     });
     
     dialog.render(true);
     
+    // Set dialog size after rendering - make it much taller to show more gadgets
+    setTimeout(() => {
+      const windowElement = dialog.element.closest(".window-app");
+      if (windowElement) {
+        windowElement.css({
+          "width": "650px",
+          "min-width": "650px",
+          "max-width": "650px",
+          "height": "700px",
+          "min-height": "700px",
+          "max-height": "700px"
+        });
+        // Also set the content area height
+        const contentElement = dialog.element.find(".window-content");
+        if (contentElement) {
+          contentElement.css({
+            "height": "600px",
+            "min-height": "600px",
+            "max-height": "600px",
+            "overflow-y": "auto"
+          });
+        }
+      }
+    }, 100);
+    
     // Get current prepared gadgets to check for duplicates (Level 0 only)
     const currentGadgets = this.actor.system.gadgets?.prepared || { level0: [], level1: [] };
     const levelKey = `level${gadgetLevel}`;
-    const alreadyPrepared = (currentGadgets[levelKey] || []).map(g => g.name.toLowerCase());
+    const alreadyPrepared = (currentGadgets[levelKey] || []).filter(g => g && g.name).map(g => g.name.toLowerCase());
     
     // Get the slot index from the button if specified
     const slotIndex = parseInt(event.currentTarget.dataset.slotIndex);
@@ -6164,12 +6194,15 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       return;
     }
     
+    // Sort gadgets alphabetically by name
+    gadgetItems.sort((a, b) => a.name.localeCompare(b.name));
+    
     const updatedContent = `
-      <div class="gadget-selection-dialog">
-        <p>Select a Level ${gadgetLevel} gadget to prepare:</p>
-        <div class="gadget-list" style="max-height: 400px; overflow-y: auto;">
+      <div class="gadget-selection-dialog" style="height: 100%; display: flex; flex-direction: column;">
+        <p style="margin-bottom: 15px; font-weight: bold; flex-shrink: 0;">Select a Level ${gadgetLevel} gadget to prepare:</p>
+        <div class="gadget-list" style="flex: 1; overflow-y: auto; min-height: 550px; max-height: 550px;">
           ${gadgetItems.map(g => `
-            <div class="gadget-item-selectable ${g.isDuplicate ? 'gadget-duplicate' : ''}" data-gadget-id="${g.id}" data-gadget-name="${g.name}" style="padding: 10px; margin: 5px 0; border: 1px solid rgba(189, 95, 255, 0.3); border-radius: 3px; cursor: ${g.isDuplicate ? 'not-allowed' : 'pointer'}; background: rgba(30, 33, 45, ${g.isDuplicate ? '0.3' : '0.5'}); opacity: ${g.isDuplicate ? '0.5' : '1'};">
+            <div class="gadget-item-selectable ${g.isDuplicate ? 'gadget-duplicate' : ''}" data-gadget-id="${g.id}" data-gadget-name="${g.name}" style="padding: 12px; margin: 8px 0; border: 1px solid rgba(189, 95, 255, 0.3); border-radius: 3px; cursor: ${g.isDuplicate ? 'not-allowed' : 'pointer'}; background: rgba(30, 33, 45, ${g.isDuplicate ? '0.3' : '0.5'}); opacity: ${g.isDuplicate ? '0.5' : '1'};">
               <strong>${g.name}</strong>
               ${g.isDuplicate ? '<span style="color: #dc3545; font-size: 11px; margin-left: 10px;">(Already prepared)</span>' : ''}
             </div>
@@ -6179,6 +6212,30 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     `;
     
     dialog.element.find(".gadget-selection-dialog").replaceWith(updatedContent);
+    
+    // Re-apply sizing after content update to ensure dialog is tall enough
+    setTimeout(() => {
+      const windowElement = dialog.element.closest(".window-app");
+      if (windowElement) {
+        windowElement.css({
+          "width": "650px",
+          "min-width": "650px",
+          "max-width": "650px",
+          "height": "700px",
+          "min-height": "700px",
+          "max-height": "700px"
+        });
+        const contentElement = dialog.element.find(".window-content");
+        if (contentElement) {
+          contentElement.css({
+            "height": "600px",
+            "min-height": "600px",
+            "max-height": "600px",
+            "overflow-y": "auto"
+          });
+        }
+      }
+    }, 50);
     
     // Add click handlers
     dialog.element.find(".gadget-item-selectable").click(async (event) => {
