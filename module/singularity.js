@@ -394,7 +394,6 @@ Hooks.on("renderDialog", function(dialog, html, data) {
 
 Hooks.once("ready", async function() {
   console.log("Singularity | System Ready");
-  return;
   
   // Auto-create pregenerated heroes in pregens compendium if they don't exist
   // Wait a bit for compendiums to fully initialize
@@ -1243,7 +1242,7 @@ Hooks.once("ready", async function() {
   // Auto-create all backgrounds in backgrounds compendium if they don't exist
   setTimeout(async () => {
     try {
-      const pack = game.packs.find(p => p.metadata.name === "backgrounds" && p.metadata.packageName === "singularity");
+      let pack = game.packs.find(p => p.metadata.name === "backgrounds" && p.metadata.packageName === "singularity");
       if (!pack) {
         console.warn("Singularity | Backgrounds compendium not found");
         return;
@@ -1254,22 +1253,9 @@ Hooks.once("ready", async function() {
         await pack.getIndex();
       }
       
-      const wasLocked = pack.locked;
-      if (wasLocked) {
-        try {
-          await pack.configure({ locked: false });
-          await new Promise(resolve => setTimeout(resolve, 200));
-          // Verify the unlock actually worked
-          if (pack.locked) {
-            // Compendium is still locked, skip auto-creation silently
-            console.log("Singularity | Backgrounds compendium is locked, skipping auto-creation.");
-            return;
-          }
-        } catch (unlockError) {
-          // Could not unlock, skip auto-creation silently
-          console.log("Singularity | Could not unlock backgrounds compendium, skipping auto-creation.");
-          return;
-        }
+      if (pack.locked) {
+        console.log("Singularity | Backgrounds compendium is locked, skipping auto-creation.");
+        return;
       }
       
       // Define all backgrounds
@@ -3420,11 +3406,10 @@ Improvised Gadget talent</p>
       if (missingGadgets.length === 0) {
         console.log("Singularity | All Level 0 and Level 1 gadgets already exist in compendium");
         // Still check and update icons even if all gadgets exist
-        // Always ensure the compendium is unlocked for updates
+        // Skip refresh if pack is still locked
         if (pack.locked) {
-          console.log("Singularity | Unlocking gadgets compendium for icon updates...");
-          await pack.configure({ locked: false });
-          await new Promise(resolve => setTimeout(resolve, 500));
+          console.warn("Singularity | Gadgets compendium is locked, skipping icon refresh.");
+          return;
         }
         // Update existing gadgets that have the old cog.svg icon
         for (const gadgetIndex of pack.index) {
@@ -3443,18 +3428,9 @@ Improvised Gadget talent</p>
         return;
       }
 
-      // Always ensure the compendium is unlocked for auto-creation
       if (pack.locked) {
-        console.log("Singularity | Unlocking gadgets compendium for auto-creation...");
-        await pack.configure({ locked: false });
-        // Wait longer to ensure unlock takes effect
-        await new Promise(resolve => setTimeout(resolve, 500));
-        // Verify unlock worked
-        if (pack.locked) {
-          console.warn("Singularity | Warning: Gadgets compendium is still locked after unlock attempt");
-        } else {
-          console.log("Singularity | Gadgets compendium unlocked successfully");
-        }
+        console.warn("Singularity | Gadgets compendium is locked, skipping gadget creation.");
+        return;
       }
       
       // Update existing gadgets that have the old cog.svg icon before creating new ones
