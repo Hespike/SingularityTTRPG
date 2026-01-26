@@ -1478,6 +1478,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         if (matchingWeapon && matchingWeapon.img) {
           attackCopy.weaponImg = matchingWeapon.img;
         }
+        const isWeaponAttack = Boolean(attack.weaponId) || Boolean(matchingWeapon);
+        const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
+        attackCopy.canDelete = !isWeaponAttack && !isUnarmed;
         
         // Determine weapon competence rank and bonus
         let weaponCompetenceRank = "Novice"; // Default
@@ -4720,12 +4723,22 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     event.preventDefault();
     const attackId = parseInt(event.currentTarget.dataset.attackId);
     const attacks = foundry.utils.deepClone(this.actor.system.attacks || []);
+    const attack = attacks[attackId];
+    if (!attack) return;
+    const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
+    const equippedWeapons = this.actor.items.filter(item => item.type === "weapon" && item.system?.basic?.equipped === true);
+    const baseAttackName = attack.name?.replace(/\s*\(Melee\)$/i, "").replace(/\s*\(Thrown\)$/i, "");
+    const matchingWeapon = equippedWeapons.find(w => w.name && baseAttackName && w.name.toLowerCase() === baseAttackName.toLowerCase());
+    if (isUnarmed || attack.weaponId || matchingWeapon) {
+      return;
+    }
     attacks.splice(attackId, 1);
     this.actor.update({ "system.attacks": attacks });
   }
 
   _showAttackDialog(attackId = null, attackData = null) {
     const isEdit = attackId !== null;
+    const equippedWeapons = this.actor.items.filter(item => item.type === "weapon" && item.system?.basic?.equipped === true);
     const attack = attackData || { 
       name: "", 
       attackBonus: 0,
@@ -4879,6 +4892,11 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             }
 
             const attacks = foundry.utils.deepClone(this.actor.system.attacks || []);
+            const baseAttackName = attackData?.name?.replace(/\s*\(Melee\)$/i, "").replace(/\s*\(Thrown\)$/i, "");
+            const matchingWeapon = equippedWeapons.find(w => w.name && baseAttackName && w.name.toLowerCase() === baseAttackName.toLowerCase());
+            const isUnarmed = attackData?.name && attackData.name.toLowerCase() === "unarmed strike";
+            const isWeaponAttack = Boolean(attackData?.weaponId) || Boolean(matchingWeapon);
+            const isCustom = attackData?.isCustom ?? !(isWeaponAttack || isUnarmed);
             const newAttack = {
               name: name,
               icon: icon,
@@ -4888,7 +4906,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               range: range,
               ability: ability, // Store which ability this attack uses
               cost: cost,
-              type: type
+              type: type,
+              isCustom: isCustom
             };
             
             // Remove legacy fields if they exist
@@ -5165,7 +5184,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               damageType: damageType,
               range: range,
               cost: 2, // Blast costs 2 energy
-              type: "ranged"
+              type: "ranged",
+              isCustom: true
             };
 
             attacks.push(newAttack);

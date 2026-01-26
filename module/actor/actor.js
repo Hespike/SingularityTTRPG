@@ -355,7 +355,8 @@ export class SingularityActor extends Actor {
         cost: 1, // Energy cost to attack
         traits: ["Natural"],
         hands: 0, // Does not require a weapon
-        weaponImg: "systems/singularity/img/weapons/punch.jpg" // Image for unarmed strike
+        weaponImg: "systems/singularity/img/weapons/punch.jpg", // Image for unarmed strike
+        isCustom: false
       });
     } else {
       // If Unarmed Strike exists, check if we need to update it for Paragon
@@ -392,6 +393,7 @@ export class SingularityActor extends Actor {
             unarmedStrike.baseAttackBonus = 0;
           }
         }
+        unarmedStrike.isCustom = false;
       }
     }
     
@@ -468,7 +470,8 @@ export class SingularityActor extends Actor {
           type: "melee",
           traits: weapon.system?.basic?.properties || [],
           weaponMode: "melee",
-          weaponId: weapon.id || weapon._id
+          weaponId: weapon.id || weapon._id,
+          isCustom: false
         };
         
         if (existingMeleeIndex === -1) {
@@ -494,7 +497,8 @@ export class SingularityActor extends Actor {
           type: "ranged",
           traits: weapon.system?.basic?.properties || [],
           weaponMode: "thrown",
-          weaponId: weapon.id || weapon._id
+          weaponId: weapon.id || weapon._id,
+          isCustom: false
         };
         
         if (existingThrownIndex === -1) {
@@ -522,7 +526,8 @@ export class SingularityActor extends Actor {
           cost: weapon.system?.basic?.energyCost || 1,
           type: weaponType,
           traits: weapon.system?.basic?.properties || [],
-          weaponId: weapon.id || weapon._id
+          weaponId: weapon.id || weapon._id,
+          isCustom: false
         };
         
         if (existingAttackIndex === -1) {
@@ -535,6 +540,9 @@ export class SingularityActor extends Actor {
     
     // Remove attacks for weapons that are no longer equipped or don't exist
     systemData.attacks = systemData.attacks.filter(attack => {
+      if (attack?.isCustom) {
+        return true;
+      }
       // Keep Unarmed Strike
       if (attack.name && attack.name.toLowerCase() === "unarmed strike") {
         return true;

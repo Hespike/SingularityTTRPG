@@ -176,6 +176,12 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
           attack.weaponImg = matchingWeapon.img;
         }
       }
+      const baseAttackName = attack.name?.replace(/\s*\(Melee\)$/i, "").replace(/\s*\(Thrown\)$/i, "");
+      const matchingWeapon = equippedWeapons.find(w => 
+        w.name && baseAttackName && w.name.toLowerCase() === baseAttackName.toLowerCase()
+      );
+      const isWeaponAttack = Boolean(attack.weaponId) || Boolean(matchingWeapon);
+      const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
       
       const abilityScore = calculatedAbilityScores[attack.ability] || 0;
       const attackBonus = (attack.baseAttackBonus || 0) + abilityScore;
@@ -198,7 +204,8 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
         ...attack,
         calculatedAttackBonus: attackBonus,
         calculatedDamage: damageFormula,
-        attackBonusBreakdown: `${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})`
+        attackBonusBreakdown: `${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})`,
+        canDelete: !isWeaponAttack && !isUnarmed
       };
     }).filter(a => a !== null); // Filter out null entries
     
