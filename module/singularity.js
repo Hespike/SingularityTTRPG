@@ -1252,10 +1252,29 @@ Hooks.once("ready", async function() {
       if (!pack.index.size) {
         await pack.getIndex();
       }
-      
-      if (pack.locked) {
-        console.log("Singularity | Backgrounds compendium is locked, skipping auto-creation.");
-        return;
+
+      const wasLocked = pack.locked;
+      if (wasLocked) {
+        if (!game.user?.isGM) {
+          return;
+        }
+        try {
+          const packKey = pack.collection ?? `${pack.metadata.packageName}.${pack.metadata.name}`;
+          const config = game.settings.get("core", "compendiumConfiguration") ?? {};
+          const updated = foundry.utils.duplicate(config);
+          updated[packKey] = { ...(updated[packKey] ?? {}), locked: false };
+          await game.settings.set("core", "compendiumConfiguration", updated);
+        } catch (unlockSettingError) {
+          // Ignore - we'll still attempt to unlock via configure below.
+        }
+        try {
+          await pack.configure({ locked: false });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          const packKey = pack.collection ?? `${pack.metadata.packageName}.${pack.metadata.name}`;
+          pack = game.packs.get(packKey) ?? pack;
+        } catch (unlockError) {
+          return;
+        }
       }
       
       // Define all backgrounds
@@ -3369,6 +3388,30 @@ Improvised Gadget talent</p>
 
       await pack.getIndex({ force: true });
       console.log("Singularity | Gadgets compendium index loaded, size:", pack.index.size);
+
+      const wasLocked = pack.locked;
+      if (wasLocked) {
+        if (!game.user?.isGM) {
+          return;
+        }
+        try {
+          const packKey = pack.collection ?? `${pack.metadata.packageName}.${pack.metadata.name}`;
+          const config = game.settings.get("core", "compendiumConfiguration") ?? {};
+          const updated = foundry.utils.duplicate(config);
+          updated[packKey] = { ...(updated[packKey] ?? {}), locked: false };
+          await game.settings.set("core", "compendiumConfiguration", updated);
+        } catch (unlockSettingError) {
+          // Ignore - we'll still attempt to unlock via configure below.
+        }
+        try {
+          await pack.configure({ locked: false });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          const packKey = pack.collection ?? `${pack.metadata.packageName}.${pack.metadata.name}`;
+          pack = game.packs.get(packKey) ?? pack;
+        } catch (unlockError) {
+          return;
+        }
+      }
       
       // Level 0 and Level 1 gadgets from handbook
       const gadgetNames = {
@@ -3406,11 +3449,6 @@ Improvised Gadget talent</p>
       if (missingGadgets.length === 0) {
         console.log("Singularity | All Level 0 and Level 1 gadgets already exist in compendium");
         // Still check and update icons even if all gadgets exist
-        // Skip refresh if pack is still locked
-        if (pack.locked) {
-          console.warn("Singularity | Gadgets compendium is locked, skipping icon refresh.");
-          return;
-        }
         // Update existing gadgets that have the old cog.svg icon
         for (const gadgetIndex of pack.index) {
           if (allGadgetNames.includes(gadgetIndex.name)) {
@@ -3425,11 +3463,9 @@ Improvised Gadget talent</p>
             }
           }
         }
-        return;
-      }
-
-      if (pack.locked) {
-        console.warn("Singularity | Gadgets compendium is locked, skipping gadget creation.");
+        if (wasLocked && !pack.locked) {
+          await pack.configure({ locked: true });
+        }
         return;
       }
       
@@ -3651,8 +3687,10 @@ Improvised Gadget talent</p>
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       await pack.getIndex({ force: true });
-      
-      // Don't re-lock - leave it unlocked for future auto-creation
+      if (wasLocked && !pack.locked) {
+        await pack.configure({ locked: true });
+      }
+
       if (successCount > 0) {
         ui.notifications.info(`Created ${successCount} gadgets in Gadgets compendium!`);
       }
