@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "compatibility": {
     "minimum": "13",
-    "verified": "13.350"
+    "verified": "13.351"
   },
   "url": "https://github.com/Hespike/SingularityTTRPG",
   "manifest": "https://raw.githubusercontent.com/Hespike/SingularityTTRPG/main/system.json",
