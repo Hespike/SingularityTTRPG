@@ -1,13 +1,7 @@
 # Foundry VTT System .gitignore
 
 # Foundry VTT specific files
-packs/**/*.db
-packs/**/*.log
-packs/**/LOCK
-packs/**/CURRENT
-packs/**/MANIFEST-*
-packs/**/LOG
-packs/**/LOG.old
+# Keep compendium pack data under version control (LevelDB files)
 
 # Node modules (if you use npm)
 node_modules/
@@ -48,6 +42,14 @@ build/
 
 # Log files
 *.log
+# But keep compendium pack logs/metadata tracked
+!packs/**/*.log
+!packs/**/LOG
+!packs/**/LOG.old
+!packs/**/MANIFEST-*
+!packs/**/CURRENT
+!packs/**/LOCK
+!packs/**/*.ldb
 
 # Environment files
 .env
