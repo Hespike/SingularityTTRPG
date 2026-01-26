@@ -32,11 +32,6 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Reference systems (if you don't want to commit them)
-# Uncomment these if you want to exclude reference systems:
-# cyphersystem/
-# pf2e/
-
 # Build files
 dist/
 build/
