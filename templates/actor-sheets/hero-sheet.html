@@ -1135,7 +1135,7 @@
                         <select name="system.progression.level1.backgroundAbilityBoost" class="ability-boost-select">
                           <option value="">Choose Ability...</option>
                           {{#each backgroundBonuses.abilityBoostOptions}}
-                            <option value="{{this}}" {{#if (eq ../actor.system.progression.level1.backgroundAbilityBoost this)}}selected{{/if}}>{{this}}</option>
+                            <option value="{{this}}" {{#if (eq ../actor.system.progression.level1.backgroundAbilityBoost this)}}selected{{/if}}>{{capitalize this}}</option>
                           {{/each}}
                         </select>
                       </div>

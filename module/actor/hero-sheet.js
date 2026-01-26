@@ -89,6 +89,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       const combat = actorData.system.combat || {};
       const basic = actorData.system.basic || {};
       
+      // Get powersetName early since it's used in multiple places
+      const powersetName = actorData.system.progression?.level1?.powersetName || actorData.system.basic?.powerset;
+      
       // Use safe defaults without modifying actor data
       const safeAbilities = {
         might: abilities.might ?? 0,
@@ -370,7 +373,6 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     }
     
     // Check Bastion powerset benefits
-    const powersetName = actorData.system.progression?.level1?.powersetName || actorData.system.basic?.powerset;
     if (powersetName === "Bastion") {
       // +1 Endurance boost at level 1
       abilityBonuses.endurance += 1;
@@ -1898,7 +1900,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               const ability = abilityMatch[1].trim();
               // Only include valid abilities
               if (["Might", "Agility", "Endurance", "Wits", "Charm"].includes(ability)) {
-                foundAbilities.push(ability.toLowerCase());
+                foundAbilities.push(ability.toLowerCase()); // Store lowercase for consistency with system
               }
             }
             if (foundAbilities.length > 0) {
@@ -3699,19 +3701,31 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           // Create a copy of the weapon item
           const weaponData = weapon.toObject();
           
-          // Add the weapon to the actor's inventory
-          await this.actor.createEmbeddedDocuments("Item", [weaponData]);
-          
-          // Deduct credits
-          const newCredits = currentCredits - weaponPrice;
-          await this.actor.update({ "system.equipment.credits": newCredits });
-          
-          ui.notifications.info(`Purchased ${weapon.name} for ${weaponPrice} credits. Remaining credits: ${newCredits}.`);
-          
-          this.render();
-          
-          // Close the dialog
-          dialog.close();
+          try {
+            // Add the weapon to the actor's inventory
+            await this.actor.createEmbeddedDocuments("Item", [weaponData]);
+            
+            // Deduct credits
+            const newCredits = currentCredits - weaponPrice;
+            await this.actor.update({ "system.equipment.credits": newCredits });
+            
+            ui.notifications.info(`Purchased ${weapon.name} for ${weaponPrice} credits. Remaining credits: ${newCredits}.`);
+            
+            // Close the dialog first
+            dialog.close();
+            
+            // Then render (wrap in try-catch to prevent errors from affecting the purchase)
+            try {
+              this.render();
+            } catch (renderError) {
+              console.error("Error rendering sheet after purchase:", renderError);
+              // Purchase was successful, just the render failed - show a warning but don't fail the transaction
+              ui.notifications.warn("Purchase completed, but there was an error updating the display. Please refresh the sheet.");
+            }
+          } catch (purchaseError) {
+            console.error("Error purchasing weapon:", purchaseError);
+            ui.notifications.error(`Failed to purchase ${weapon.name}: ${purchaseError.message}`);
+          }
         });
       }
     });

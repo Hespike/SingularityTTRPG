@@ -1253,8 +1253,20 @@ Hooks.once("ready", async function() {
       
       const wasLocked = pack.locked;
       if (wasLocked) {
-        await pack.configure({ locked: false });
-        await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+          await pack.configure({ locked: false });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          // Verify the unlock actually worked
+          if (pack.locked) {
+            // Compendium is still locked, skip auto-creation silently
+            console.log("Singularity | Backgrounds compendium is locked, skipping auto-creation.");
+            return;
+          }
+        } catch (unlockError) {
+          // Could not unlock, skip auto-creation silently
+          console.log("Singularity | Could not unlock backgrounds compendium, skipping auto-creation.");
+          return;
+        }
       }
       
       // Define all backgrounds
@@ -1371,6 +1383,9 @@ Hooks.once("ready", async function() {
         }
       ];
       
+      // Track if any backgrounds were actually created
+      let backgroundsCreated = 0;
+      
       // Create each background if it doesn't exist
       for (const bg of backgrounds) {
         let item = null; // Declare outside try block for cleanup
@@ -1418,11 +1433,19 @@ Hooks.once("ready", async function() {
           
           console.log(`Singularity | ${bg.name} created in world, ID:`, item.id);
           
-          // Ensure pack is unlocked before importing
+          // Ensure pack is unlocked before importing (should already be unlocked, but check just in case)
           if (pack.locked) {
-            console.log(`Singularity | Unlocking pack to import ${bg.name}...`);
-            await pack.configure({ locked: false });
-            await new Promise(resolve => setTimeout(resolve, 100));
+            console.log(`Singularity | Pack became locked, attempting to unlock for ${bg.name}...`);
+            try {
+              await pack.configure({ locked: false });
+              await new Promise(resolve => setTimeout(resolve, 200));
+              if (pack.locked) {
+                throw new Error("Could not unlock compendium");
+              }
+            } catch (unlockError) {
+              console.error(`Singularity | Could not unlock pack for ${bg.name}, skipping`);
+              throw unlockError;
+            }
           }
           
           // Import the item into the compendium
@@ -1433,6 +1456,9 @@ Hooks.once("ready", async function() {
           await item.delete();
           item = null; // Clear reference after deletion
           console.log(`Singularity | ${bg.name} world item deleted`);
+          
+          // Track that a background was created
+          backgroundsCreated++;
           
           // Small delay between creations
           await new Promise(resolve => setTimeout(resolve, 200));
@@ -1467,7 +1493,10 @@ Hooks.once("ready", async function() {
         }
       }
       
-      ui.notifications.info("Backgrounds created in Backgrounds compendium!");
+      // Only show notification if backgrounds were actually created
+      if (backgroundsCreated > 0) {
+        ui.notifications.info(`Created ${backgroundsCreated} background${backgroundsCreated > 1 ? 's' : ''} in Backgrounds compendium!`);
+      }
     } catch (error) {
       console.error("Singularity | Could not auto-create backgrounds:", error);
       ui.notifications.error(`Failed to create backgrounds: ${error.message}`);
@@ -3381,8 +3410,20 @@ Improvised Gadget talent</p>
 
       const wasLocked = pack.locked;
       if (wasLocked) {
-        await pack.configure({ locked: false });
-        await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+          await pack.configure({ locked: false });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          // Verify the unlock actually worked
+          if (pack.locked) {
+            // Compendium is still locked, skip auto-creation silently
+            console.log("Singularity | Gadgets compendium is locked, skipping auto-creation.");
+            return;
+          }
+        } catch (unlockError) {
+          // Could not unlock, skip auto-creation silently
+          console.log("Singularity | Could not unlock gadgets compendium, skipping auto-creation.");
+          return;
+        }
       }
 
       const gadgets = [
@@ -3611,7 +3652,13 @@ Improvised Gadget talent</p>
 
       if (itemsToCreate.length === 0) {
         console.log("Singularity | All Level 0 and Level 1 gadgets already exist");
-        if (wasLocked) await pack.configure({ locked: true });
+        if (wasLocked) {
+          try {
+            await pack.configure({ locked: true });
+          } catch (lockError) {
+            console.warn("Singularity | Could not re-lock gadgets compendium:", lockError);
+          }
+        }
         return;
       }
 
@@ -3635,7 +3682,14 @@ Improvised Gadget talent</p>
       await new Promise(resolve => setTimeout(resolve, 1000));
       await pack.getIndex({ force: true });
       
-      if (wasLocked) await pack.configure({ locked: true });
+      if (wasLocked) {
+        try {
+          await pack.configure({ locked: true });
+        } catch (lockError) {
+          console.warn("Singularity | Could not re-lock gadgets compendium:", lockError);
+          // Non-critical error, just log it
+        }
+      }
       
       ui.notifications.info(`Created ${itemsToCreate.length} gadgets in Gadgets compendium!`);
     } catch (error) {
@@ -3673,8 +3727,20 @@ Improvised Gadget talent</p>
 
       const wasLocked = pack.locked;
       if (wasLocked) {
-        await pack.configure({ locked: false });
-        await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+          await pack.configure({ locked: false });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          // Verify the unlock actually worked
+          if (pack.locked) {
+            // Compendium is still locked, skip auto-creation silently
+            console.log("Singularity | Armor compendium is locked, skipping auto-creation.");
+            return;
+          }
+        } catch (unlockError) {
+          // Could not unlock, skip auto-creation silently
+          console.log("Singularity | Could not unlock armor compendium, skipping auto-creation.");
+          return;
+        }
       }
 
       // Define all armor items
@@ -3782,7 +3848,13 @@ Improvised Gadget talent</p>
 
       if (itemsToCreate.length === 0) {
         console.log("Singularity | All armor items already exist");
-        if (wasLocked) await pack.configure({ locked: true });
+        if (wasLocked) {
+          try {
+            await pack.configure({ locked: true });
+          } catch (lockError) {
+            console.warn("Singularity | Could not re-lock armor compendium:", lockError);
+          }
+        }
         return;
       }
 
@@ -3815,8 +3887,15 @@ Improvised Gadget talent</p>
       // Refresh index
       await pack.getIndex({ force: true });
       
-      if (wasLocked) await pack.configure({ locked: true });
-
+      if (wasLocked) {
+        try {
+          await pack.configure({ locked: true });
+        } catch (lockError) {
+          console.warn("Singularity | Could not re-lock armor compendium:", lockError);
+          // Non-critical error, just log it
+        }
+      }
+      
       ui.notifications.info(`Created ${itemsToCreate.length} armor items in Armor compendium!`);
     } catch (error) {
       console.error("Singularity | Could not auto-create armor items:", error);
