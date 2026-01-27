@@ -203,6 +203,460 @@ Hooks.once("init", function() {
     default: ""
   });
 
+  const singularityStatusEffects = [
+    {
+      id: "scared",
+      label: "Scared",
+      icon: "icons/svg/terror.svg",
+      flags: {
+        core: { statusId: "scared" },
+        singularity: {
+          hasValue: true,
+          description: "Penalty to attack rolls and ability checks equal to Scared value while you can see the source. Scared reduces by 1 at end of turn."
+        }
+      }
+    },
+    {
+      id: "stunned",
+      label: "Stunned",
+      icon: "icons/svg/daze.svg",
+      flags: {
+        core: { statusId: "stunned" },
+        singularity: {
+          hasValue: false,
+          description: "Cannot take actions or reactions. Cannot add Agility modifier to AC."
+        }
+      }
+    },
+    {
+      id: "incorporeal",
+      label: "Incorporeal",
+      icon: "icons/svg/invisible.svg",
+      flags: {
+        core: { statusId: "incorporeal" },
+        singularity: {
+          hasValue: false,
+          description: "Move through solid objects and creatures. Immune to all damage except Chaos. Deal half damage to corporeal creatures and cannot affect objects."
+        }
+      }
+    },
+    {
+      id: "immobilized",
+      label: "Immobilized",
+      icon: "icons/svg/net.svg",
+      flags: {
+        core: { statusId: "immobilized" },
+        singularity: {
+          hasValue: false,
+          description: "Cannot Move or Step and cannot move in any way, but can take other actions normally."
+        }
+      }
+    },
+    {
+      id: "fatigued",
+      label: "Fatigued",
+      icon: "icons/svg/eye.svg",
+      flags: {
+        core: { statusId: "fatigued" },
+        singularity: {
+          hasValue: true,
+          description: "Penalty to attack rolls, saving throws, and skill checks equal to Fatigued value."
+        }
+      }
+    },
+    {
+      id: "paralyzed",
+      label: "Paralyzed",
+      icon: "icons/svg/paralysis.svg",
+      flags: {
+        core: { statusId: "paralyzed" },
+        singularity: {
+          hasValue: false,
+          description: "Cannot take actions or reactions or move. Cannot add Agility modifier to AC. Enemies have advantage; Might and Agility saves are Extreme Failures."
+        }
+      }
+    },
+    {
+      id: "staggered",
+      label: "Staggered",
+      icon: "icons/svg/clockwork.svg",
+      flags: {
+        core: { statusId: "staggered" },
+        singularity: {
+          hasValue: true,
+          description: "At the start of your turn, reduce recovered Energy by the Staggered value."
+        }
+      }
+    },
+    {
+      id: "prone",
+      label: "Prone",
+      icon: "icons/svg/falling.svg",
+      flags: {
+        core: { statusId: "prone" },
+        singularity: {
+          hasValue: false,
+          description: "Cannot Move or Step; crawl at half Speed. -2 AC vs melee, +2 AC vs ranged, -2 to attack checks."
+        }
+      }
+    },
+    {
+      id: "deafened",
+      label: "Deafened",
+      icon: "icons/svg/deaf.svg",
+      flags: {
+        core: { statusId: "deafened" },
+        singularity: {
+          hasValue: false,
+          description: "Automatically fail hearing-based Perception checks. Immune to auditory effects."
+        }
+      }
+    },
+    {
+      id: "dazed",
+      label: "Dazed",
+      icon: "icons/svg/daze.svg",
+      flags: {
+        core: { statusId: "dazed" },
+        singularity: {
+          hasValue: false,
+          description: "Cannot take reactions."
+        }
+      }
+    },
+    {
+      id: "blinded",
+      label: "Blinded",
+      icon: "icons/svg/blind.svg",
+      flags: {
+        core: { statusId: "blinded" },
+        singularity: {
+          hasValue: false,
+          description: "Cannot see. -10 to attack rolls and Perception. Ranged attacks impossible. All terrain is Difficult. Immune to Visual effects."
+        }
+      }
+    },
+    {
+      id: "offbalance",
+      label: "Off-balance",
+      icon: "icons/svg/target.svg",
+      flags: {
+        core: { statusId: "offbalance" },
+        singularity: {
+          hasValue: false,
+          description: "-2 penalty to AC while threatened from opposite sides."
+        }
+      }
+    }
+  ];
+
+  const sortedStatusEffects = [...singularityStatusEffects].sort((a, b) =>
+    a.label.localeCompare(b.label)
+  );
+
+  CONFIG.singularity = CONFIG.singularity || {};
+  CONFIG.singularity.statusEffects = sortedStatusEffects;
+  CONFIG.singularity.statusEffectsMap = Object.fromEntries(
+    sortedStatusEffects.map(effect => [effect.id, effect])
+  );
+  CONFIG.statusEffects = sortedStatusEffects.map(effect => ({
+    id: effect.id,
+    label: effect.label,
+    icon: effect.icon,
+    flags: effect.flags
+  }));
+
+  const ensureStatusSummary = () => {
+    let el = document.getElementById("singularity-status-summary");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "singularity-status-summary";
+      el.classList.add("singularity-status-summary");
+      document.body.appendChild(el);
+      el.addEventListener("click", async (event) => {
+        const target = event.target.closest(".status-item");
+        if (!target) return;
+        const statusId = target.dataset.statusId;
+        const hasValue = target.dataset.hasValue === "true";
+        if (!statusId || !hasValue) return;
+        const active = canvas?.tokens?.controlled?.[0];
+        const actor = active?.actor;
+        if (!actor) return;
+        const effect = actor.effects.find(e => e.getFlag("core", "statusId") === statusId);
+        if (!effect) return;
+        const currentValue = Number(effect.getFlag("singularity", "value") ?? 1);
+        const nextValue = currentValue + 1;
+        await effect.update({ "flags.singularity.value": nextValue });
+        updateStatusSummary(active);
+      });
+      el.addEventListener("contextmenu", async (event) => {
+        const target = event.target.closest(".status-item");
+        if (!target) return;
+        const statusId = target.dataset.statusId;
+        const hasValue = target.dataset.hasValue === "true";
+        if (!statusId) return;
+        event.preventDefault();
+        const active = canvas?.tokens?.controlled?.[0];
+        const actor = active?.actor;
+        if (!actor) return;
+        const effect = actor.effects.find(e => e.getFlag("core", "statusId") === statusId);
+        if (!effect) return;
+        if (!hasValue) {
+          await effect.delete();
+          updateStatusSummary(active);
+          return;
+        }
+        const currentValue = Number(effect.getFlag("singularity", "value") ?? 1);
+        const nextValue = currentValue - 1;
+        if (nextValue <= 0) {
+          await effect.delete();
+          updateStatusSummary(active);
+          return;
+        }
+        await effect.update({ "flags.singularity.value": nextValue });
+        updateStatusSummary(active);
+      });
+    }
+    return el;
+  };
+
+  const updateStatusSummary = (token) => {
+    const el = ensureStatusSummary();
+    const actor = token?.actor;
+    const statusMap = CONFIG.singularity?.statusEffectsMap || {};
+    const sidebar = document.getElementById("sidebar");
+    const isCollapsed = document.body?.classList.contains("sidebar-collapsed") || sidebar?.classList.contains("collapsed");
+    if (sidebar && !isCollapsed) {
+      const rect = sidebar.getBoundingClientRect();
+      const rightOffset = Math.max(10, window.innerWidth - rect.left + 10);
+      el.style.right = `${rightOffset}px`;
+    } else {
+      el.style.right = "10px";
+    }
+    if (!actor) {
+      el.classList.add("hidden");
+      el.innerHTML = "";
+      return;
+    }
+    const effects = actor.effects.filter(e => e.getFlag("core", "statusId"));
+    if (!effects.length) {
+      el.classList.add("hidden");
+      el.innerHTML = "";
+      return;
+    }
+    const items = effects.map(effect => {
+      const statusId = effect.getFlag("core", "statusId");
+      const statusDef = statusMap[statusId];
+      if (!statusDef) return "";
+      const value = Number(effect.getFlag("singularity", "value"));
+      const hasValue = statusDef.flags?.singularity?.hasValue === true;
+      const label = statusDef.label;
+      const title = statusDef.flags?.singularity?.description || label;
+      const valueBadge = hasValue && Number.isFinite(value) ? `<span class="status-value">${value}</span>` : "";
+      return `
+        <div class="status-item" title="${title}" data-status-id="${statusId}" data-has-value="${hasValue}">
+          <img src="${statusDef.icon}" alt="${label}">
+          ${valueBadge}
+        </div>
+      `;
+    }).join("");
+    el.innerHTML = items;
+    el.classList.remove("hidden");
+  };
+
+  Hooks.on("controlToken", (token, controlled) => {
+    if (controlled) {
+      updateStatusSummary(token);
+    } else {
+      const active = canvas?.tokens?.controlled?.[0];
+      updateStatusSummary(active);
+    }
+  });
+
+  Hooks.on("createActiveEffect", (effect) => {
+    const active = canvas?.tokens?.controlled?.[0];
+    if (active?.actor?.id === effect.parent?.id) {
+      updateStatusSummary(active);
+    }
+  });
+
+  Hooks.on("updateActiveEffect", (effect) => {
+    const active = canvas?.tokens?.controlled?.[0];
+    if (active?.actor?.id === effect.parent?.id) {
+      updateStatusSummary(active);
+    }
+  });
+
+  Hooks.on("updateCombat", async (combat, changed) => {
+    if (!("turn" in changed) && !("round" in changed)) return;
+    const prevId = combat?.previous?.combatantId;
+    if (!prevId) return;
+    const prevCombatant = combat.combatants.get(prevId);
+    const actor = prevCombatant?.actor;
+    if (!actor) return;
+    const scaredEffect = actor.effects.find(effect => effect.getFlag("core", "statusId") === "scared");
+    if (!scaredEffect) return;
+    const currentValue = Number(scaredEffect.getFlag("singularity", "value") ?? 0);
+    if (!Number.isFinite(currentValue) || currentValue <= 0) return;
+    const nextValue = currentValue - 1;
+    if (nextValue <= 0) {
+      await scaredEffect.delete();
+      return;
+    }
+    await scaredEffect.update({ "flags.singularity.value": nextValue });
+  });
+
+  Hooks.on("updateCombat", async (combat, changed) => {
+    if (!("turn" in changed) && !("round" in changed)) return;
+    const prevId = combat?.previous?.combatantId;
+    if (!prevId) return;
+    const prevCombatant = combat.combatants.get(prevId);
+    const actor = prevCombatant?.actor;
+    if (!actor) return;
+    const isIncorporeal = actor.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
+    if (!isIncorporeal) return;
+    const tokenDoc = prevCombatant?.token?.document || prevCombatant?.token;
+    if (!tokenDoc) return;
+    const inWall = tokenDoc.getFlag("singularity", "incorporealInWall") === true;
+    if (!inWall) {
+      const turns = Number(tokenDoc.getFlag("singularity", "incorporealWallTurns") ?? 0);
+      if (turns !== 0) {
+        await tokenDoc.setFlag("singularity", "incorporealWallTurns", 0);
+      }
+      return;
+    }
+    const nextTurns = Number(tokenDoc.getFlag("singularity", "incorporealWallTurns") ?? 0) + 1;
+    await tokenDoc.setFlag("singularity", "incorporealWallTurns", nextTurns);
+    const roll = new Roll(`${nextTurns}d10`);
+    await roll.evaluate();
+    await roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      flavor: `<div class="roll-flavor"><b>Incorporeal Collision</b><br>${nextTurns}d10 Chaos damage (ended turn in solid object) = <strong>${roll.total}</strong></div>`
+    });
+  });
+
+  Hooks.on("updateToken", async (tokenDoc, changed) => {
+    if (!("x" in changed) && !("y" in changed)) return;
+    const actor = tokenDoc?.actor;
+    if (!actor) return;
+    const isIncorporeal = actor.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
+    const token = tokenDoc.object;
+    if (!token) return;
+    const dest = { x: tokenDoc.x, y: tokenDoc.y };
+    let collision = false;
+    try {
+      collision = token.checkCollision(dest, { type: "move" });
+    } catch (err) {
+      collision = false;
+    }
+    if (!isIncorporeal) {
+      if (tokenDoc.getFlag("singularity", "incorporealInWall")) {
+        await tokenDoc.setFlag("singularity", "incorporealInWall", false);
+        await tokenDoc.setFlag("singularity", "incorporealWallTurns", 0);
+      }
+      return;
+    }
+    const current = tokenDoc.getFlag("singularity", "incorporealInWall") === true;
+    if (current !== collision) {
+      await tokenDoc.setFlag("singularity", "incorporealInWall", collision);
+      if (!collision) {
+        await tokenDoc.setFlag("singularity", "incorporealWallTurns", 0);
+      }
+    }
+  });
+
+  Hooks.on("preUpdateToken", (tokenDoc, update) => {
+    const actor = tokenDoc?.actor;
+    if (!actor) return;
+    const isParalyzed = actor.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed");
+    if (!isParalyzed) return;
+    if ("x" in update || "y" in update) {
+      ui.notifications?.warn("Paralyzed: cannot move.");
+      return false;
+    }
+  });
+
+  Hooks.on("deleteActiveEffect", (effect) => {
+    const active = canvas?.tokens?.controlled?.[0];
+    if (active?.actor?.id === effect.parent?.id) {
+      updateStatusSummary(active);
+    }
+  });
+
+  Hooks.on("preCreateActiveEffect", (effect, data) => {
+    const statusId = data?.flags?.core?.statusId;
+    const statusDef = CONFIG.singularity?.statusEffectsMap?.[statusId];
+    if (!statusDef) return;
+    const update = {};
+    update["name"] = statusDef.label;
+    update["flags.singularity.description"] = statusDef.flags?.singularity?.description || "";
+    update["flags.singularity.hasValue"] = statusDef.flags?.singularity?.hasValue === true;
+    if (statusDef.flags?.singularity?.hasValue) {
+      const value = Number(data?.flags?.singularity?.value ?? 1);
+      update["flags.singularity.value"] = value;
+    }
+    effect.updateSource(update);
+  });
+
+  Hooks.on("renderTokenHUD", (hud, html) => {
+    const token = hud?.object;
+    const actor = token?.actor;
+    if (!actor) return;
+    const statusMap = CONFIG.singularity?.statusEffectsMap || {};
+    const $html = html instanceof jQuery ? html : $(html);
+    $html.find(".status-effects .effect-control").each((_, el) => {
+      const statusId = el.dataset.statusId;
+      const statusDef = statusMap[statusId];
+      if (!statusDef) return;
+      const effect = actor.effects.find(e => e.getFlag("core", "statusId") === statusId);
+      const $img = $(el);
+      if (statusDef.flags?.singularity?.description) {
+        $img.attr("title", statusDef.flags.singularity.description);
+      }
+      if (!effect || statusDef.flags?.singularity?.hasValue !== true) {
+        return;
+      }
+      if (!$img.parent().hasClass("singularity-status-wrap")) {
+        $img.wrap('<div class="singularity-status-wrap"></div>');
+      }
+      const $wrap = $img.parent();
+      const value = Number(effect.getFlag("singularity", "value") ?? 1);
+      $wrap.attr("data-status-value", value);
+      let $badge = $wrap.find(".singularity-status-counter");
+      if (!$badge.length) {
+        $badge = $('<span class="singularity-status-counter"></span>');
+        $wrap.append($badge);
+      }
+      $badge.text(value);
+    });
+
+    $html.find(".status-effects .effect-control")
+      .off("contextmenu.singularity")
+      .on("contextmenu.singularity", async (event) => {
+        const statusId = event.currentTarget.dataset.statusId;
+        const statusDef = statusMap[statusId];
+        if (!statusDef || statusDef.flags?.singularity?.hasValue !== true) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const effect = actor.effects.find(e => e.getFlag("core", "statusId") === statusId);
+        if (!effect) return;
+        const delta = event.shiftKey ? -1 : 1;
+        const currentValue = Number(effect.getFlag("singularity", "value") ?? 1);
+        const nextValue = currentValue + delta;
+        if (nextValue <= 0) {
+          await effect.delete();
+          return;
+        }
+        await effect.update({ "flags.singularity.value": nextValue });
+        const $img = $(event.currentTarget);
+        const $wrap = $img.parent(".singularity-status-wrap");
+        if ($wrap.length) {
+          $wrap.attr("data-status-value", nextValue);
+          $wrap.find(".singularity-status-counter").text(nextValue);
+        }
+      });
+  });
+
   // Register system-specific actors and items
   CONFIG.Actor.documentClass = SingularityActor;
   CONFIG.Item.documentClass = SingularityItem;

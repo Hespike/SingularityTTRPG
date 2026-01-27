@@ -465,6 +465,10 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
 
   async _onRollAttack(event) {
     event.preventDefault();
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")) {
+      ui.notifications.warn("Paralyzed: cannot take actions or reactions.");
+      return;
+    }
     const attackId = parseInt(event.currentTarget.dataset.attackId);
     const attacks = this.actor.system.attacks || [];
     const attack = attacks[attackId];
@@ -473,19 +477,35 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
 
     // Calculate ability score
     const abilityScore = this.actor.system.abilities?.[attack.ability] || 0;
-    const attackBonus = (attack.baseAttackBonus || 0) + abilityScore;
+    const fatiguedEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
+    const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
+    const blindedPenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded") ? 10 : 0;
+    const isRangedAttack = attack.type === "ranged" || attack.weaponMode === "thrown";
+    if (isRangedAttack && this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded")) {
+      ui.notifications.warn("Blinded: ranged attacks are impossible.");
+      return;
+    }
+    const attackBonus = (attack.baseAttackBonus || 0) + abilityScore - fatiguedPenalty - blindedPenalty;
 
-    const roll = new Roll("1d20 + @bonus", { bonus: attackBonus });
+    const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
+      target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
+    );
+    const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
+    const roll = new Roll(`${dieFormula} + @bonus`, { bonus: attackBonus });
     await roll.evaluate();
     
     roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: `<b>${attack.name} - Attack</b><br>${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability}) = <strong>${roll.total}</strong>`
+      flavor: `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedPenalty ? ` - ${fatiguedPenalty} (Fatigued)` : ""}${blindedPenalty ? " - 10 (Blinded)" : ""}${hasParalyzedTarget ? " (advantage vs Paralyzed)" : ""} = <strong>${roll.total}</strong>`
     });
   }
 
   async _onRollDamage(event) {
     event.preventDefault();
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")) {
+      ui.notifications.warn("Paralyzed: cannot take actions or reactions.");
+      return;
+    }
     const attackId = parseInt(event.currentTarget.dataset.attackId);
     const attacks = this.actor.system.attacks || [];
     const attack = attacks[attackId];
@@ -510,9 +530,16 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
 
     const roll = new Roll(damageFormula);
     await roll.evaluate();
+
+    const isIncorporeal = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
+    const hasCorporealTarget = isIncorporeal && Array.from(game.user?.targets || []).some(
+      target => !target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal")
+    );
+    const finalTotal = hasCorporealTarget ? Math.floor(roll.total / 2) : roll.total;
+    const incorporealText = hasCorporealTarget ? ` (half vs corporeal: ${finalTotal})` : "";
     
-    const criticalButton = `<div class="chat-card-buttons" style="margin-top: 5px;"><button type="button" class="critical-hit-button" data-roll-total="${roll.total}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bolt"></i> Critical Hit (Double Damage)</button></div>`;
-    const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType}) = <strong>${roll.total}</strong>${criticalButton}</div>`;
+    const criticalButton = `<div class="chat-card-buttons" style="margin-top: 5px;"><button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bolt"></i> Critical Hit (Double Damage)</button></div>`;
+    const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType}) = <strong>${roll.total}</strong>${incorporealText}${criticalButton}</div>`;
     
     const message = await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -520,7 +547,7 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
     });
 
     await message.setFlag("singularity", "damageRoll", {
-      total: roll.total,
+      total: finalTotal,
       formula: damageFormula,
       damageType: attack.damageType,
       attackName: attack.name
@@ -531,6 +558,17 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
     event.preventDefault();
     const ability = event.currentTarget.dataset.savingThrow;
     if (!ability) return;
+    const isParalyzed = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed");
+    if (isParalyzed && (ability === "might" || ability === "agility")) {
+      const abilityDisplay = ability.charAt(0).toUpperCase() + ability.slice(1);
+      const roll = new Roll("0");
+      await roll.evaluate();
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: `<b>${abilityDisplay} Saving Throw</b><br>Extreme Failure (Paralyzed)`
+      });
+      return;
+    }
 
     const savingThrow = this.actor.system.savingThrows?.[ability] || {};
     const rank = savingThrow.rank || "Novice";
@@ -543,12 +581,14 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
     // Get ability score
     const abilityScore = this.actor.system.abilities?.[ability] || 0;
     
-    const totalBonus = rankBonus + abilityScore + otherBonuses;
+    const fatiguedEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
+    const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
+    const totalBonus = rankBonus + abilityScore + otherBonuses - fatiguedPenalty;
 
     const roll = new Roll("1d20 + @bonus", { bonus: totalBonus });
     await roll.evaluate();
     
-    const breakdown = `${rankBonus} (${rank}) + ${abilityScore} (${ability})${otherBonuses > 0 ? ` + ${otherBonuses} (other)` : ''}`;
+    const breakdown = `${rankBonus} (${rank}) + ${abilityScore} (${ability})${otherBonuses > 0 ? ` + ${otherBonuses} (other)` : ''}${fatiguedPenalty ? ` - ${fatiguedPenalty} (fatigued)` : ''}`;
     
     roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),

@@ -1,8 +1,3 @@
-2026/01/27-08:18:30.202 3ba8 Recovering log #38
-2026/01/27-08:18:30.210 3ba8 Delete type=0 #38
-2026/01/27-08:18:30.210 3ba8 Delete type=3 #36
-2026/01/27-08:25:34.509 7cec Level-0 table #43: started
-2026/01/27-08:25:34.509 7cec Level-0 table #43: 0 bytes OK
-2026/01/27-08:25:34.514 7cec Delete type=0 #41
-2026/01/27-08:25:34.520 7cec Manual compaction at level-0 from '!items!WUIPc3FbyDfzhKb0' @ 72057594037927935 : 1 .. '!items!WUIPc3FbyDfzhKb0' @ 0 : 0; will stop at (end)
-2026/01/27-08:25:34.520 7cec Manual compaction at level-1 from '!items!WUIPc3FbyDfzhKb0' @ 72057594037927935 : 1 .. '!items!WUIPc3FbyDfzhKb0' @ 0 : 0; will stop at (end)
+2026/01/27-21:37:00.025 1cbc Recovering log #46
+2026/01/27-21:37:00.038 1cbc Delete type=0 #46
+2026/01/27-21:37:00.038 1cbc Delete type=3 #44

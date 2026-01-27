@@ -37,7 +37,8 @@ export class SingularityActor extends Actor {
     
     // Add agility to AC (in Singularity, ability scores are used directly)
     // AC = 10 + Agility + Armor bonus
-    const agility = parseInt(systemData.abilities.agility) || 0;
+    const isParalyzed = this.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed");
+    const agility = isParalyzed ? 0 : (parseInt(systemData.abilities.agility) || 0);
     acBase += agility;
 
     // Calculate armor bonus from equipped armor
@@ -603,8 +604,12 @@ export class SingularityActor extends Actor {
     
     // Add agility to AC (in Singularity, ability scores are used directly)
     // AC = 10 + Agility + Armor bonus
-    const agility = parseInt(systemData.abilities.agility) || 0;
+    const isParalyzed = this.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed");
+    const agility = isParalyzed ? 0 : (parseInt(systemData.abilities.agility) || 0);
     acBase += agility;
+    if (this.effects?.some(effect => effect.getFlag("core", "statusId") === "offbalance")) {
+      acBase -= 2;
+    }
 
     // Calculate armor bonus from equipped armor
     for (const item of this.items) {

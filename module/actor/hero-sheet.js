@@ -603,6 +603,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       const agility = calculatedAbilityScores.agility || 0;
       const might = calculatedAbilityScores.might || 0;
       let agilityContribution = 0;
+      const isStunned = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "stunned");
+      const isParalyzed = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed");
+      const isProneStatus = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "prone");
+      const isOffBalance = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "offbalance");
       
       // Check if character meets Might requirement for armor
       let meetsMightRequirement = true;
@@ -621,8 +625,15 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         }
       }
       // If doesn't meet Might requirement, agilityContribution stays 0
+      if (isStunned || isParalyzed) {
+        agilityContribution = 0;
+      }
       
       calculatedAc += agilityContribution;
+
+      if (isOffBalance) {
+        calculatedAc -= 2;
+      }
       
       // Add powerset bonus (Bastion)
       let powersetAcBonus = 0;
@@ -654,6 +665,13 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         might: might,
         mightDeficit: mightDeficit,
         meetsMightRequirement: meetsMightRequirement,
+        stunned: isStunned,
+        paralyzed: isParalyzed,
+        prone: isProneStatus,
+        proneMeleeAc: isProneStatus ? -2 : 0,
+        proneRangedAc: isProneStatus ? 2 : 0,
+        offBalance: isOffBalance,
+        offBalanceAc: isOffBalance ? -2 : 0,
         powersetBonus: powersetAcBonus,
         untrainedPenalty: untrainedPenalty,
         effectiveTraining: effectiveTraining,
@@ -1467,6 +1485,13 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       // Get equipped weapons to match with attacks
       const equippedWeapons = items.filter(i => i && i.type === "weapon" && i.system?.basic?.equipped === true);
       
+      const scaredEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "scared");
+      const scaredPenalty = Math.max(0, Number(scaredEffect?.getFlag("singularity", "value") ?? 0));
+      const pronePenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "prone") ? 2 : 0;
+      const fatiguedEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
+      const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
+      const blindedPenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded") ? 10 : 0;
+
       // Process attacks to calculate dynamic attack bonuses and damage
       const attacksWithCalculations = (actorData.system.attacks || []).map(attack => {
         const attackCopy = { ...attack };
@@ -1695,6 +1720,22 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           if (currentAbilityScore !== 0) {
             parts.push(`${currentAbilityScore >= 0 ? '+' : ''}${currentAbilityScore} (${attack.ability.charAt(0).toUpperCase() + attack.ability.slice(1)})`);
           }
+          if (scaredPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= scaredPenalty;
+            parts.push(`-${scaredPenalty} (Scared)`);
+          }
+          if (pronePenalty > 0) {
+            attackCopy.calculatedAttackBonus -= pronePenalty;
+            parts.push(`-${pronePenalty} (Prone)`);
+          }
+          if (fatiguedPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= fatiguedPenalty;
+            parts.push(`-${fatiguedPenalty} (Fatigued)`);
+          }
+          if (blindedPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= blindedPenalty;
+            parts.push(`-${blindedPenalty} (Blinded)`);
+          }
           attackCopy.attackBonusBreakdown = parts.length > 0 ? parts.join(" ") : "+0";
         } else if (attack.attackBonus !== undefined) {
           // Legacy support: if attackBonus exists but no baseAttackBonus, use it as-is
@@ -1705,6 +1746,22 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           }
           if (deadeyeBonus > 0) {
             parts.push(`+${deadeyeBonus} (Deadeye)`);
+          }
+          if (scaredPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= scaredPenalty;
+            parts.push(`-${scaredPenalty} (Scared)`);
+          }
+          if (pronePenalty > 0) {
+            attackCopy.calculatedAttackBonus -= pronePenalty;
+            parts.push(`-${pronePenalty} (Prone)`);
+          }
+          if (fatiguedPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= fatiguedPenalty;
+            parts.push(`-${fatiguedPenalty} (Fatigued)`);
+          }
+          if (blindedPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= blindedPenalty;
+            parts.push(`-${blindedPenalty} (Blinded)`);
           }
           attackCopy.attackBonusBreakdown = parts.join(" ");
         } else {
@@ -1722,6 +1779,22 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           }
           if (currentAbilityScore !== 0) {
             parts.push(`${currentAbilityScore >= 0 ? '+' : ''}${currentAbilityScore} (${(attack.ability || "might").charAt(0).toUpperCase() + (attack.ability || "might").slice(1)})`);
+          }
+          if (scaredPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= scaredPenalty;
+            parts.push(`-${scaredPenalty} (Scared)`);
+          }
+          if (pronePenalty > 0) {
+            attackCopy.calculatedAttackBonus -= pronePenalty;
+            parts.push(`-${pronePenalty} (Prone)`);
+          }
+          if (fatiguedPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= fatiguedPenalty;
+            parts.push(`-${fatiguedPenalty} (Fatigued)`);
+          }
+          if (blindedPenalty > 0) {
+            attackCopy.calculatedAttackBonus -= blindedPenalty;
+            parts.push(`-${blindedPenalty} (Blinded)`);
           }
           attackCopy.attackBonusBreakdown = parts.length > 0 ? parts.join(" ") : "+0";
         }
@@ -1989,6 +2062,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       // Calculate land speed AFTER progression data is populated (base 25 + bonuses from talents)
       // Also check for armor Might requirement penalties
       let landSpeed = 25; // Base land speed
+      const isBlinded = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded");
       
       // Check if equipped armor has Might requirement penalty (use stored deficit from AC calculation)
       let speedPenalty = null; // "halved" or "immobile"
@@ -2056,6 +2130,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         landSpeed = 0;
         console.log("Singularity | Armor Might requirement not met (4+ deficit), character is immobile");
       }
+
+      if (isBlinded && landSpeed > 0) {
+        landSpeed = Math.ceil(landSpeed / 2 / 5) * 5;
+      }
       
       // Store calculated land speed in context (don't modify actor data)
       context.speeds.land = landSpeed;
@@ -2087,6 +2165,21 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         console.log("Singularity | Paragon detected, flying speed set to 15 ft");
       }
       context.calculatedFlyingSpeed = calculatedFlyingSpeed;
+
+      if (isBlinded) {
+        for (const [speedType, value] of Object.entries(context.speeds || {})) {
+          if (typeof value === "number" && value > 0) {
+            context.speeds[speedType] = Math.ceil(value / 2 / 5) * 5;
+          }
+        }
+        if (context.calculatedSwimmingSpeed) {
+          context.calculatedSwimmingSpeed = Math.ceil(context.calculatedSwimmingSpeed / 2 / 5) * 5;
+        }
+        if (context.calculatedFlyingSpeed) {
+          context.calculatedFlyingSpeed = Math.ceil(context.calculatedFlyingSpeed / 2 / 5) * 5;
+        }
+        context.blindedSpeedPenalty = true;
+      }
 
       // Calculate Wound Limit: 3 + Endurance (+ 2 if Hard to Kill)
       const wounds = actorData.system.wounds || [];
@@ -3853,6 +3946,13 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
   async _onAbilityRoll(event) {
     event.preventDefault();
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")) {
+      ui.notifications.warn("Paralyzed: you cannot take actions or reactions.");
+      return;
+    }
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "dazed")) {
+      ui.notifications.warn("Dazed: you cannot take reactions.");
+    }
     const ability = event.currentTarget.dataset.ability;
     if (!ability) return;
 
@@ -3941,6 +4041,13 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     const abilityScore = abilityBonuses[ability] || 0;
     const abilityDisplay = ability.charAt(0).toUpperCase() + ability.slice(1);
 
+    const scaredEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "scared");
+    const scaredPenalty = Math.max(0, Number(scaredEffect?.getFlag("singularity", "value") ?? 0));
+    const pronePenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "prone") ? 2 : 0;
+    const fatiguedEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
+    const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
+    const totalAbilityScore = abilityScore - scaredPenalty;
+
     const dialogContent = `
       <form class="singularity-roll-dialog">
         <div class="roll-fields-row">
@@ -3950,7 +4057,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           </div>
           <div class="form-group-inline">
             <label>${abilityDisplay} Score:</label>
-            <input type="number" id="ability-score" value="${abilityScore}" readonly class="readonly-input"/>
+            <input type="number" id="ability-score" value="${totalAbilityScore}" readonly class="readonly-input"/>
           </div>
           <div class="form-group-inline">
             <label>Extra Modifier:</label>
@@ -3984,7 +4091,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             await roll.evaluate();
             
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
-            const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Check</b><br>1d20 + ${abilityScore} (${abilityDisplay})${extraText} = <strong>${roll.total}</strong></div>`;
+            const scaredText = scaredPenalty > 0 ? ` - ${scaredPenalty} (Scared)` : "";
+            const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Check</b><br>1d20 + ${abilityScore} (${abilityDisplay})${scaredText}${extraText} = <strong>${roll.total}</strong></div>`;
             
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -4239,6 +4347,19 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     event.stopPropagation();
     const ability = event.currentTarget.dataset.savingThrow;
     if (!ability) return;
+    const isParalyzed = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed");
+    if (isParalyzed && (ability === "might" || ability === "agility")) {
+      const abilityDisplay = ability.charAt(0).toUpperCase() + ability.slice(1);
+      const roll = new Roll("0");
+      await roll.evaluate();
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: `<div class="roll-flavor"><b>${abilityDisplay} Saving Throw</b><br>Extreme Failure (Paralyzed)</div>`
+      });
+      return;
+    }
+    const fatiguedEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
+    const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
 
     const savingThrows = this.actor.system.savingThrows || {};
     const savingThrow = savingThrows[ability];
@@ -4445,6 +4566,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             
             // Build roll formula: 1d20 + ability + training + other + extra
             let rollFormula = `1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
+            if (fatiguedPenalty > 0) {
+              rollFormula += ` - ${fatiguedPenalty}`;
+            }
             if (extra && extra !== "0") {
               rollFormula += ` + ${extra}`;
             }
@@ -4454,7 +4578,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             
             const otherText = otherBonuses !== 0 ? ` + ${otherBonuses} (Other)` : "";
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
-            const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Saving Throw</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${savingThrow.rank})${otherText}${extraText} = <strong>${roll.total}</strong></div>`;
+            const fatiguedText = fatiguedPenalty > 0 ? ` - ${fatiguedPenalty} (Fatigued)` : "";
+            const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Saving Throw</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${savingThrow.rank})${otherText}${fatiguedText}${extraText} = <strong>${roll.total}</strong></div>`;
             
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -4672,17 +4797,47 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
   _onSkillRoll(event) {
     event.preventDefault();
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")) {
+      ui.notifications.warn("Paralyzed: you cannot take actions or reactions.");
+      return;
+    }
     const skillName = event.currentTarget.dataset.skill;
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded")) {
+      if (skillName === "Perception") {
+        const roll = new Roll("0");
+        roll.evaluate();
+        roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+          flavor: "Perception Check — Automatic Failure (Blinded)"
+        });
+        return;
+      }
+    }
+    if (skillName === "Perception" && this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "deafened")) {
+      const roll = new Roll("0");
+      roll.evaluate();
+      roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: "Perception Check (hearing) — Automatic Failure (Deafened)"
+      });
+      return;
+    }
     const modifier = this.actor.getSkillModifier(skillName);
-    const roll = new Roll("1d20 + @mod", { mod: modifier });
+    const fatiguedEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
+    const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
+    const roll = new Roll(`1d20 + @mod${fatiguedPenalty ? ` - ${fatiguedPenalty}` : ""}`, { mod: modifier });
     roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: `${skillName} Check`
+      flavor: `${skillName} Check${fatiguedPenalty ? ` (Fatigued -${fatiguedPenalty})` : ""}`
     });
   }
 
   _onWeaponAttack(event) {
     event.preventDefault();
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")) {
+      ui.notifications.warn("Paralyzed: you cannot take actions or reactions.");
+      return;
+    }
     const itemId = event.currentTarget.closest(".item").dataset.itemId;
     const item = this.actor.items.get(itemId);
     if (!item) return;
@@ -5458,6 +5613,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
   async _onRollAttack(event) {
     event.preventDefault();
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")) {
+      ui.notifications.warn("Paralyzed: you cannot take actions or reactions.");
+      return;
+    }
     const attackId = parseInt(event.currentTarget.dataset.attackId);
     const attacks = this.actor.system.attacks || [];
     const attack = attacks[attackId];
@@ -5468,6 +5627,11 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     const items = this.actor.items || [];
     const equippedWeapons = items.filter(i => i && i.type === "weapon" && i.system?.basic?.equipped === true);
     const matchingWeapon = equippedWeapons.find(w => w.name && attack.name && w.name.toLowerCase() === attack.name.toLowerCase());
+    const isRangedAttack = attack.type === "ranged" || attack.weaponMode === "thrown" || matchingWeapon?.system?.basic?.type === "ranged";
+    if (isRangedAttack && this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded")) {
+      ui.notifications.warn("Blinded: ranged attacks are impossible.");
+      return;
+    }
 
     // Calculate dynamic attack bonus (must match the calculation in getData())
     // First, calculate ability bonuses the same way as getData()
@@ -5721,6 +5885,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     }
     
     // Calculate final attack bonus
+    const scaredEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "scared");
+    const scaredPenalty = Math.max(0, Number(scaredEffect?.getFlag("singularity", "value") ?? 0));
+    const blindedPenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded") ? 10 : 0;
     let attackBonus = 0;
     if (attack.baseAttackBonus !== undefined && attack.ability) {
       // New format: baseAttackBonus + weapon competence bonus + current ability score + Deadeye bonus
@@ -5733,6 +5900,18 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       // No baseAttackBonus, use only competence bonus, ability, and Deadeye bonus
       const currentAbilityScore = calculatedAbilityScores[attack.ability || "might"] || 0;
       attackBonus = weaponCompetenceBonus + currentAbilityScore + deadeyeBonus;
+    }
+    if (scaredPenalty > 0) {
+      attackBonus -= scaredPenalty;
+    }
+    if (pronePenalty > 0) {
+      attackBonus -= pronePenalty;
+    }
+    if (fatiguedPenalty > 0) {
+      attackBonus -= fatiguedPenalty;
+    }
+    if (blindedPenalty > 0) {
+      attackBonus -= blindedPenalty;
     }
 
     const dialogContent = `
@@ -5768,8 +5947,12 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             const bonus = parseFloat(html.find("#attack-bonus").val()) || 0;
             const extra = html.find("#extra-modifier").val().trim() || "0";
             
-            // Build roll formula: 1d20 + bonus + extra
-            let rollFormula = `1d20 + ${bonus}`;
+            const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
+              target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
+            );
+            const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
+            // Build roll formula: d20 + bonus + extra
+            let rollFormula = `${dieFormula} + ${bonus}`;
             if (extra && extra !== "0") {
               rollFormula += ` + ${extra}`;
             }
@@ -5782,7 +5965,12 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             const deadeyeData = this.actor.system.combat?.deadeye || { active: false };
             const isDeadeyeActive = deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"));
             const deadeyeInfo = isDeadeyeActive ? ` (includes +5 Deadeye)` : "";
-            const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>1d20 + ${bonus} (Attack Bonus${deadeyeInfo})${extraText} = <strong>${roll.total}</strong></div>`;
+            const scaredText = scaredPenalty > 0 ? ` (includes -${scaredPenalty} Scared)` : "";
+            const proneText = pronePenalty > 0 ? ` (includes -${pronePenalty} Prone)` : "";
+            const fatiguedText = fatiguedPenalty > 0 ? ` (includes -${fatiguedPenalty} Fatigued)` : "";
+            const blindedText = blindedPenalty > 0 ? ` (includes -${blindedPenalty} Blinded)` : "";
+            const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
+            const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText})${advantageText}${extraText} = <strong>${roll.total}</strong></div>`;
             
             const message = await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -5811,6 +5999,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
   async _onRollDamage(event) {
     event.preventDefault();
+    if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")) {
+      ui.notifications.warn("Paralyzed: you cannot take actions or reactions.");
+      return;
+    }
     const attackId = parseInt(event.currentTarget.dataset.attackId);
     const attacks = this.actor.system.attacks || [];
     const attack = attacks[attackId];
@@ -6056,8 +6248,14 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               }
             }
             
-            const criticalButton = `<div class="chat-card-buttons" style="margin-top: 5px;"><button type="button" class="critical-hit-button" data-roll-total="${roll.total}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bolt"></i> Critical Hit (Double Damage)</button></div>`;
-            const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType})${supersonicText}${extraText} = <strong>${roll.total}</strong>${acComparison}${criticalButton}</div>`;
+            const isIncorporeal = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
+            const hasCorporealTarget = isIncorporeal && Array.from(game.user?.targets || []).some(
+              target => !target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal")
+            );
+            const finalTotal = hasCorporealTarget ? Math.floor(roll.total / 2) : roll.total;
+            const incorporealText = hasCorporealTarget ? ` (half vs corporeal: ${finalTotal})` : "";
+            const criticalButton = `<div class="chat-card-buttons" style="margin-top: 5px;"><button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bolt"></i> Critical Hit (Double Damage)</button></div>`;
+            const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType})${supersonicText}${extraText} = <strong>${roll.total}</strong>${incorporealText}${acComparison}${criticalButton}</div>`;
             
             const message = await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -6066,7 +6264,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             
             // Store the original roll data in the message flags for critical hit
             await message.setFlag("singularity", "damageRoll", {
-              total: roll.total,
+              total: finalTotal,
               formula: rollFormula,
               damageType: attack.damageType,
               attackName: attack.name

@@ -4363,3 +4363,77 @@ button.weapon-attack:hover {
 .npc-browser-dialog .npc-browser-error {
   color: #ff6b6b;
 }
+
+/* Status effect counters */
+.singularity-status-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.singularity-status-counter {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: rgba(15, 17, 22, 0.9);
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  border: 1px solid rgba(189, 95, 255, 0.6);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+/* Top-right status summary */
+.singularity-status-summary {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(15, 17, 22, 0.8);
+  border: 1px solid rgba(189, 95, 255, 0.4);
+  border-radius: 6px;
+  z-index: 100;
+  max-width: 40vw;
+  flex-wrap: wrap;
+}
+
+.singularity-status-summary.hidden {
+  display: none;
+}
+
+.singularity-status-summary .status-item {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+.singularity-status-summary .status-item img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+.singularity-status-summary .status-item .status-value {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: rgba(15, 17, 22, 0.9);
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+  border: 1px solid rgba(189, 95, 255, 0.6);
+  box-sizing: border-box;
+}
