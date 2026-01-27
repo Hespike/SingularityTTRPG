@@ -1480,7 +1480,19 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         }
         const isWeaponAttack = Boolean(attack.weaponId) || Boolean(matchingWeapon);
         const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
-        attackCopy.canDelete = !isWeaponAttack && !isUnarmed;
+        const isTalentAttack = attack.isTalentAttack === true || (attack.name && attack.name.toLowerCase() === "blast");
+        if (isTalentAttack) {
+          attackCopy.isTalentAttack = true;
+          if (!attackCopy.weaponImg) {
+            attackCopy.weaponImg = "icons/svg/explosion.svg";
+          }
+        }
+        const isCustom = attack.isCustom;
+        attackCopy.canDelete = isCustom === true
+          ? true
+          : isCustom === false
+            ? false
+            : (!isWeaponAttack && !isUnarmed && !isTalentAttack);
         
         // Determine weapon competence rank and bonus
         let weaponCompetenceRank = "Novice"; // Default
@@ -4726,10 +4738,11 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     const attack = attacks[attackId];
     if (!attack) return;
     const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
+    const isTalentAttack = attack.isTalentAttack === true || (attack.name && attack.name.toLowerCase() === "blast");
     const equippedWeapons = this.actor.items.filter(item => item.type === "weapon" && item.system?.basic?.equipped === true);
     const baseAttackName = attack.name?.replace(/\s*\(Melee\)$/i, "").replace(/\s*\(Thrown\)$/i, "");
     const matchingWeapon = equippedWeapons.find(w => w.name && baseAttackName && w.name.toLowerCase() === baseAttackName.toLowerCase());
-    if (isUnarmed || attack.weaponId || matchingWeapon) {
+    if (isUnarmed || isTalentAttack || attack.weaponId || matchingWeapon || attack.isCustom === false) {
       return;
     }
     attacks.splice(attackId, 1);
@@ -4896,7 +4909,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             const matchingWeapon = equippedWeapons.find(w => w.name && baseAttackName && w.name.toLowerCase() === baseAttackName.toLowerCase());
             const isUnarmed = attackData?.name && attackData.name.toLowerCase() === "unarmed strike";
             const isWeaponAttack = Boolean(attackData?.weaponId) || Boolean(matchingWeapon);
-            const isCustom = attackData?.isCustom ?? !(isWeaponAttack || isUnarmed);
+            const isTalentAttack = attackData?.isTalentAttack === true || (attackData?.name && attackData.name.toLowerCase() === "blast");
+            const isCustom = attackData?.isCustom ?? !(isWeaponAttack || isUnarmed || isTalentAttack);
             const newAttack = {
               name: name,
               icon: icon,
@@ -4907,7 +4921,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               ability: ability, // Store which ability this attack uses
               cost: cost,
               type: type,
-              isCustom: isCustom
+              isCustom: isCustom,
+              isTalentAttack: isTalentAttack
             };
             
             // Remove legacy fields if they exist
@@ -5185,7 +5200,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               range: range,
               cost: 2, // Blast costs 2 energy
               type: "ranged",
-              isCustom: true
+              isCustom: false,
+              isTalentAttack: true,
+              weaponImg: "icons/svg/explosion.svg"
             };
 
             attacks.push(newAttack);

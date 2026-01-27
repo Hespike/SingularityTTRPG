@@ -540,7 +540,10 @@ export class SingularityActor extends Actor {
     
     // Remove attacks for weapons that are no longer equipped or don't exist
     systemData.attacks = systemData.attacks.filter(attack => {
-      if (attack?.isCustom) {
+      if (attack?.isCustom || attack?.isTalentAttack) {
+        return true;
+      }
+      if (attack?.name && attack.name.toLowerCase() === "blast") {
         return true;
       }
       // Keep Unarmed Strike

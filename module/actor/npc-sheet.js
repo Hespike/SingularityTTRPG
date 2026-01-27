@@ -182,6 +182,10 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
       );
       const isWeaponAttack = Boolean(attack.weaponId) || Boolean(matchingWeapon);
       const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
+      const isTalentAttack = attack.isTalentAttack === true || (attack.name && attack.name.toLowerCase() === "blast");
+      if (isTalentAttack && !attack.weaponImg) {
+        attack.weaponImg = "icons/svg/explosion.svg";
+      }
       
       const abilityScore = calculatedAbilityScores[attack.ability] || 0;
       const attackBonus = (attack.baseAttackBonus || 0) + abilityScore;
@@ -200,12 +204,17 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
         damageFormula = "1d4";
       }
       
+      const isCustom = attack.isCustom;
       return {
         ...attack,
         calculatedAttackBonus: attackBonus,
         calculatedDamage: damageFormula,
         attackBonusBreakdown: `${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})`,
-        canDelete: !isWeaponAttack && !isUnarmed
+        canDelete: isCustom === true
+          ? true
+          : isCustom === false
+            ? false
+            : (!isWeaponAttack && !isUnarmed && !isTalentAttack)
       };
     }).filter(a => a !== null); // Filter out null entries
     
