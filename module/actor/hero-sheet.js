@@ -713,7 +713,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     // Skills - calculate total bonus for each skill
     // According to handbook: Novice +0, Apprentice +4, Competent +8, Masterful +12, Legendary +16
     // Note: Paragon talent skills (Intimidation, Persuasion) are added in actor.js prepareData
-    const skills = actorData.system.skills || {};
+    const skills = foundry.utils.deepClone(actorData.system.skills || {});
     const trainingBonuses = {
       "Novice": 0,
       "Apprentice": 4,
@@ -727,13 +727,34 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     const skillsWithBonus = {};
     const lockedTrainingSkills = {};
     
+    const equippedArmorForNoisy = actorData.items?.find(i => i.type === "armor" && i.system?.basic?.equipped === true);
+    const traits = equippedArmorForNoisy?.system?.basic?.traits || equippedArmorForNoisy?.system?.basic?.properties || [];
+    const traitList = Array.isArray(traits) ? traits : String(traits || "").split(",").map(t => t.trim());
+    let noisyPenalty = 0;
+    for (const trait of traitList) {
+      const match = String(trait).match(/Noisy\s*\((\d+)\)/i);
+      if (match) {
+        noisyPenalty = Math.max(noisyPenalty, Number(match[1]));
+      } else if (/^Noisy$/i.test(String(trait))) {
+        noisyPenalty = Math.max(noisyPenalty, 1);
+      }
+    }
+    if (noisyPenalty > 0 && !skills["Stealth"]) {
+      skills["Stealth"] = {
+        rank: "Novice",
+        ability: "agility",
+        otherBonuses: 0
+      };
+    }
+
     for (const [skillName, skill] of Object.entries(skills)) {
       const abilityName = skill.ability;
       const abilityScore = calculatedAbilityScores[abilityName] || 0;
       const trainingBonus = trainingBonuses[skill.rank] || 0;
     // Ensure otherBonuses exists, default to 0, and parse as number
     const otherBonuses = (skill.otherBonuses !== undefined && skill.otherBonuses !== null) ? Number(skill.otherBonuses) || 0 : 0;
-    const totalBonus = Number(abilityScore) + Number(trainingBonus) + Number(otherBonuses);
+    const noisy = skillName === "Stealth" ? noisyPenalty : 0;
+    const totalBonus = Number(abilityScore) + Number(trainingBonus) + Number(otherBonuses) - noisy;
       
       // Format bonus for display (add + sign for positive numbers)
       const bonusDisplay = totalBonus >= 0 ? `+${totalBonus}` : `${totalBonus}`;
@@ -744,7 +765,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         totalBonus: totalBonus,
         bonusDisplay: bonusDisplay,
         lockedOtherBonuses: skill.lockedOtherBonuses || false, // Preserve locked status
-        lockedSource: skill.lockedSource || null // Preserve source
+        lockedSource: skill.lockedSource || null, // Preserve source
+        noisyPenalty: noisy
       };
       
       // Separate Heavy Armor from editable skills
@@ -3343,14 +3365,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
     const skills = this.actor.system.skills || {};
     const skill = skills[skillName];
-    
-    if (!skill) {
-      ui.notifications.warn(`Skill "${skillName}" not found.`);
-      return;
-    }
 
     // Get ability score
-    const abilityName = skill.ability;
+    const abilityName = skill?.ability || this.actor._getSkillAbility(skillName);
     const abilityScore = this.actor.system.abilities[abilityName] || 0;
 
     // Get training level bonus
@@ -3362,8 +3379,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       "Masterful": 12,
       "Legendary": 16
     };
-    const trainingBonus = trainingBonuses[skill.rank] || 0;
-    const otherBonuses = Number(skill.otherBonuses) || 0;
+    const trainingBonus = trainingBonuses[skill?.rank || "Novice"] || 0;
+    const otherBonuses = Number(skill?.otherBonuses) || 0;
+    const noisyPenalty = skillName === "Stealth" ? this.actor._getNoisyPenalty() : 0;
 
     // Capitalize ability name for display
     const abilityDisplay = abilityName.charAt(0).toUpperCase() + abilityName.slice(1);
@@ -3387,6 +3405,12 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             <label>Other Bonuses:</label>
             <input type="number" id="other-bonuses" value="${otherBonuses}" readonly class="readonly-input"/>
           </div>
+          ${noisyPenalty > 0 ? `
+          <div class="form-group-inline">
+            <label>Noisy Penalty:</label>
+            <input type="number" id="noisy-penalty" value="-${noisyPenalty}" readonly class="readonly-input"/>
+          </div>
+          ` : ''}
           <div class="form-group-inline">
             <label>Extra Modifier:</label>
             <input type="text" id="extra-modifier" value="0" placeholder="0 or +1d6" class="editable-input"/>
@@ -3413,6 +3437,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             
             // Build roll formula: 1d20 + ability + training + other + extra
             let rollFormula = `1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
+            if (noisyPenalty > 0) {
+              rollFormula += ` - ${noisyPenalty}`;
+            }
             if (extra && extra !== "0") {
               rollFormula += ` + ${extra}`;
             }
@@ -3421,8 +3448,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             await roll.evaluate();
             
             const otherText = otherBonuses !== 0 ? ` + ${otherBonuses} (Other)` : "";
+            const noisyText = noisyPenalty > 0 ? ` - ${noisyPenalty} (Noisy)` : "";
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
-            const flavor = `<div class="roll-flavor"><b>${skillName} Skill Roll</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${skill.rank})${otherText}${extraText} = <strong>${roll.total}</strong></div>`;
+            const flavor = `<div class="roll-flavor"><b>${skillName} Skill Roll</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${skill?.rank || "Novice"})${otherText}${noisyText}${extraText} = <strong>${roll.total}</strong></div>`;
             
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),

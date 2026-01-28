@@ -1585,9 +1585,16 @@
   text-align: center;
 }
 
-.skill-list .skill .skill-other-bonus {
+.skill-list .skill .skill-other-bonus-wrap {
   grid-column: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skill-list .skill .skill-other-bonus {
   width: 100%;
+  flex: 1 1 auto;
   background: rgba(255, 255, 255, 0.1) !important;
   border: 1px solid rgba(189, 95, 255, 0.3) !important;
   color: #ffffff !important;
@@ -4436,4 +4443,11 @@ button.weapon-attack:hover {
   text-align: center;
   border: 1px solid rgba(189, 95, 255, 0.6);
   box-sizing: border-box;
+}
+
+.skill-noisy-penalty {
+  margin-left: 6px;
+  color: #ff6b6b;
+  font-size: 12px;
+  font-weight: bold;
 }

@@ -648,18 +648,42 @@ export class SingularityActor extends Actor {
    * Get skill modifier
    */
   getSkillModifier(skillName) {
-    const skill = this.system.skills[skillName];
+    const skills = this.system.skills || {};
+    const skill = skills[skillName];
+    const noisyPenalty = skillName === "Stealth" ? this._getNoisyPenalty() : 0;
     if (!skill) {
       // If not trained, return only ability score
       const ability = this._getSkillAbility(skillName);
-      return this.getAbilityScore(ability);
+      return this.getAbilityScore(ability) - noisyPenalty;
     }
 
     const ability = skill.ability || this._getSkillAbility(skillName);
     const abilityScore = this.getAbilityScore(ability);
     const trainingBonus = this._getTrainingBonus(skill.rank || "Novice");
+    const otherBonuses = Number(skill.otherBonuses) || 0;
     
-    return abilityScore + trainingBonus;
+    return abilityScore + trainingBonus + otherBonuses - noisyPenalty;
+  }
+
+  /**
+   * Get noisy armor penalty to Stealth (Noisy (X))
+   */
+  _getNoisyPenalty() {
+    const armors = this.items.filter(item => item.type === "armor" && item.system?.basic?.equipped === true);
+    let highest = 0;
+    for (const armor of armors) {
+      const traits = armor.system?.basic?.traits || armor.system?.basic?.properties || [];
+      const traitList = Array.isArray(traits) ? traits : String(traits).split(",").map(t => t.trim());
+      for (const trait of traitList) {
+        const match = String(trait).match(/Noisy\s*\((\d+)\)/i);
+        if (match) {
+          highest = Math.max(highest, Number(match[1]));
+        } else if (/^Noisy$/i.test(String(trait))) {
+          highest = Math.max(highest, 1);
+        }
+      }
+    }
+    return highest;
   }
 
   /**
