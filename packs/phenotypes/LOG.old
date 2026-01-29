@@ -1,3 +1,8 @@
-2026/01/27-21:37:00.025 1cbc Recovering log #46
-2026/01/27-21:37:00.038 1cbc Delete type=0 #46
-2026/01/27-21:37:00.038 1cbc Delete type=3 #44
+2026/01/28-07:54:54.747 3764 Recovering log #49
+2026/01/28-07:54:54.761 3764 Delete type=0 #49
+2026/01/28-07:54:54.761 3764 Delete type=3 #48
+2026/01/28-08:35:24.393 242c Level-0 table #53: started
+2026/01/28-08:35:24.394 242c Level-0 table #53: 0 bytes OK
+2026/01/28-08:35:24.398 242c Delete type=0 #51
+2026/01/28-08:35:24.398 242c Manual compaction at level-0 from '!items!WUIPc3FbyDfzhKb0' @ 72057594037927935 : 1 .. '!items!WUIPc3FbyDfzhKb0' @ 0 : 0; will stop at (end)
+2026/01/28-08:35:24.399 242c Manual compaction at level-1 from '!items!WUIPc3FbyDfzhKb0' @ 72057594037927935 : 1 .. '!items!WUIPc3FbyDfzhKb0' @ 0 : 0; will stop at (end)

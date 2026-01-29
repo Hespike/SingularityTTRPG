@@ -1974,6 +1974,12 @@
   cursor: not-allowed;
 }
 
+.sheet-header .header-grid input.readonly-input {
+  cursor: default !important;
+  user-select: none;
+  pointer-events: none;
+}
+
 .form-group-inline input.editable-input {
   background: rgba(255, 255, 255, 0.15) !important;
   border-color: rgba(189, 95, 255, 0.5) !important;
