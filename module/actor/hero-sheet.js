@@ -1224,6 +1224,36 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     
     // Always set calculatedMaxHp (never null - it's always calculated or from stored value)
     context.calculatedMaxHp = calculatedMaxHp;
+
+    // Keep actor max HP in sync with calculated value for token bars
+    if (this.actor?.isOwner && this.actor.system?.combat?.hp?.max !== calculatedMaxHp) {
+      try {
+        console.log(
+          "Singularity | Max HP mismatch:",
+          this.actor.name,
+          "stored=",
+          this.actor.system?.combat?.hp?.max,
+          "calculated=",
+          calculatedMaxHp,
+          "powerset=",
+          powersetName,
+          "endurance=",
+          enduranceScore,
+          "primeLevel=",
+          primeLevel,
+          "enhancedVitality=",
+          hasEnhancedVitality,
+          "ironbound=",
+          hasIronbound
+        );
+        await this.actor.update({
+          "system.combat.hp.max": calculatedMaxHp,
+          "system.combat.hp.value": Math.min(this.actor.system?.combat?.hp?.value ?? 0, calculatedMaxHp)
+        });
+      } catch (err) {
+        console.warn("Singularity | Failed to sync max HP:", err);
+      }
+    }
     
     // Calculate HP breakdown for display
     const hpBreakdown = {
@@ -2079,7 +2109,6 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       }
       
       context.backgroundBonuses = backgroundBonuses;
-      console.log("Singularity | Final backgroundBonuses:", backgroundBonuses);
 
       // Calculate land speed AFTER progression data is populated (base 25 + bonuses from talents)
       // Also check for armor Might requirement penalties
@@ -2129,17 +2158,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       // Check for Swift Runner talent (+5 to land speed)
       // Reuse allTalentNames that was already calculated earlier in the function for armor training checks
       
-      console.log("Singularity | Checking talents for Swift Runner.");
-      console.log("Singularity | All talent names:", allTalentNames);
-      
       const hasSwiftRunner = allTalentNames.includes("Swift Runner");
-      console.log("Singularity | Has Swift Runner:", hasSwiftRunner);
       
       if (hasSwiftRunner) {
         landSpeed += 5;
-        console.log("Singularity | Swift Runner detected, land speed increased to", landSpeed);
-      } else {
-        console.log("Singularity | No Swift Runner found, land speed remains", landSpeed);
       }
       
       // Apply Might requirement penalty (halve speed if 1-3 deficit, set to 0 if 4+)
@@ -2267,7 +2289,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       // Debug: Check if our template was used
       if (this.element) {
         const hasOurClasses = this.element.hasClass('singularity');
-        console.log("Singularity | Sheet rendered. Has our classes:", hasOurClasses, "Element classes:", this.element.attr('class'));
+        // Intentionally no noisy logging during renders.
         
         if (!hasOurClasses) {
           console.error("Singularity | WARNING: Template not loaded correctly! Using base sheet instead.");
@@ -6866,7 +6888,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       calculatedMaxHp = actorData.system.combat?.hp?.max || 0;
     }
     
-    updateData["system.combat.hp.value"] = calculatedMaxHp;
+    updateData["system.combat.hp.value"] = this.actor.system?.combat?.hp?.max ?? 0;
     
     // 2. Remove wounds (but not extreme wounds)
     const wounds = foundry.utils.deepClone(this.actor.system.wounds || []);
@@ -8292,6 +8314,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           updateData["system.attacks"] = attacks;
         }
       }
+
+      if (talentName && talentName.toLowerCase().includes("weapon training")) {
+        updateData[`system.progression.${levelKey}.${slotType}WeaponCategory`] = null;
+      }
     }
     
     // If deleting a Bastion talent slot, check if it's Bastion's Resistance and remove the corresponding resistance
@@ -8461,7 +8487,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     event.preventDefault();
     const select = event.currentTarget;
     const value = select.value;
-    const slotType = $(select).closest(".progression-slot").data("slot-type");
+    const slotType = select.dataset.slotType || $(select).closest(".progression-slot").data("slot-type");
     
     // For Bastion ability boosts, validate that Endurance is not selected
     if (slotType === "bastionAbilityBoost1" || slotType === "bastionAbilityBoost2") {

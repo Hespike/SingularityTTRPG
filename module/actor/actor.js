@@ -78,27 +78,54 @@ export class SingularityActor extends Actor {
       if (hasEnhancedVitality) break;
     }
     
+    // Calculate ability bonuses from progression (matches hero-sheet getData)
+    const abilityBonuses = { might: 0, agility: 0, endurance: 0, wits: 0, charm: 0 };
+    const addBoost = (ability) => {
+      if (abilityBonuses.hasOwnProperty(ability)) {
+        abilityBonuses[ability] += 1;
+      }
+    };
+    addBoost(systemData.progression?.level1?.humanAbilityBoost);
+    addBoost(systemData.progression?.level1?.terranAbilityBoost);
+    addBoost(systemData.progression?.level1?.backgroundAbilityBoost);
+
+    const powersetName = systemData.progression?.level1?.powersetName || systemData.basic?.powerset;
+    if (powersetName === "Bastion") {
+      abilityBonuses.endurance += 1;
+      const ability1 = systemData.progression?.level1?.bastionAbilityBoost1;
+      if (ability1 && ability1 !== "endurance") addBoost(ability1);
+      const ability2 = systemData.progression?.level1?.bastionAbilityBoost2;
+      if (ability2 && ability2 !== "endurance") addBoost(ability2);
+    } else if (powersetName === "Paragon") {
+      abilityBonuses.might += 1;
+      const ability1 = systemData.progression?.level1?.paragonAbilityBoost1;
+      if (ability1 && ability1 !== "might") addBoost(ability1);
+      const ability2 = systemData.progression?.level1?.paragonAbilityBoost2;
+      if (ability2 && ability2 !== "might") addBoost(ability2);
+    } else if (powersetName === "Marksman") {
+      abilityBonuses.agility += 1;
+      const ability1 = systemData.progression?.level1?.marksmanAbilityBoost1;
+      if (ability1 && ability1 !== "agility") addBoost(ability1);
+      const ability2 = systemData.progression?.level1?.marksmanAbilityBoost2;
+      if (ability2 && ability2 !== "agility") addBoost(ability2);
+    }
+
+    const enduranceScore = abilityBonuses.endurance || 0;
+
     // Calculate max HP for Bastion characters
     // Formula: (14 + Endurance) × Bastion level
     // If Ironbound is selected: (14 + Endurance × 2) × Bastion level
     // Enhanced Vitality adds: +2 × Prime Level
-    const powersetName = systemData.progression?.level1?.powersetName || systemData.basic?.powerset;
     if (powersetName === "Bastion") {
       const bastionLevel = primeLevel;
-      
-      // Calculate endurance including powerset bonus (+1 from Bastion)
-      // This matches how getData() calculates it in hero-sheet.js
-      let endurance = systemData.abilities?.endurance || 0;
-      // Bastion gets +1 Endurance at level 1
-      endurance += 1;
       
       // Check if Ironbound talent is selected
       const bastionTalentName = systemData.progression?.level1?.bastionTalentName || "";
       const hasIronbound = bastionTalentName && bastionTalentName.toLowerCase().includes("ironbound");
       
-      let enduranceContribution = endurance;
+      let enduranceContribution = enduranceScore;
       if (hasIronbound) {
-        enduranceContribution = endurance * 2;
+        enduranceContribution = enduranceScore * 2;
       }
       
       let calculatedMaxHp = (14 + enduranceContribution) * bastionLevel;
@@ -115,10 +142,9 @@ export class SingularityActor extends Actor {
       }
     } else if (powersetName === "Paragon") {
       const paragonLevel = primeLevel;
-      const endurance = systemData.abilities?.endurance || 0;
       
       // Paragon HP: (12 + Endurance) × Paragon level
-      let calculatedMaxHp = (12 + endurance) * paragonLevel;
+      let calculatedMaxHp = (12 + enduranceScore) * paragonLevel;
       
       // Add Enhanced Vitality bonus
       if (hasEnhancedVitality) {
@@ -132,9 +158,8 @@ export class SingularityActor extends Actor {
       }
     } else if (powersetName === "Gadgeteer") {
       const gadgeteerLevel = primeLevel;
-      const endurance = systemData.abilities?.endurance || 0;
       // Gadgeteer HP: (8 + Endurance) × Gadgeteer level
-      let calculatedMaxHp = (8 + endurance) * gadgeteerLevel;
+      let calculatedMaxHp = (8 + enduranceScore) * gadgeteerLevel;
       
       // Add Enhanced Vitality bonus if applicable
       if (hasEnhancedVitality) {
@@ -147,9 +172,8 @@ export class SingularityActor extends Actor {
       }
     } else if (powersetName === "Marksman") {
       const marksmanLevel = primeLevel;
-      const endurance = systemData.abilities?.endurance || 0;
       // Marksman HP: (8 + Endurance) × Marksman level
-      let calculatedMaxHp = (8 + endurance) * marksmanLevel;
+      let calculatedMaxHp = (8 + enduranceScore) * marksmanLevel;
       
       // Add Enhanced Vitality bonus if applicable
       if (hasEnhancedVitality) {
@@ -172,9 +196,10 @@ export class SingularityActor extends Actor {
           systemData.combat.hp.value = calculatedMaxHp;
         }
       } else {
-        // For non-Bastion characters without Enhanced Vitality, ensure HP doesn't exceed max
-        if (systemData.combat.hp.max && systemData.combat.hp.value > systemData.combat.hp.max) {
-          systemData.combat.hp.value = systemData.combat.hp.max;
+        // No powerset and no Enhanced Vitality: reset max HP to 0
+        systemData.combat.hp.max = 0;
+        if (systemData.combat.hp.value !== 0) {
+          systemData.combat.hp.value = 0;
         }
       }
     }

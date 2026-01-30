@@ -9,6 +9,28 @@ import { SingularityItem } from "./item/item.js";
 import { SingularityItemSheet } from "./item/item-sheet.js";
 import { importVanguard } from "./utilities/import-pregens.js";
 
+const syncTokenHpBars = async (actor) => {
+  if (!actor) return;
+  const value = actor.system?.combat?.hp?.value ?? 0;
+  const max = actor.system?.combat?.hp?.max ?? 0;
+  for (const scene of game.scenes) {
+    const updates = [];
+    for (const token of scene.tokens) {
+      if (token.actorId !== actor.id) continue;
+      if (!token.actorLink) continue;
+      if (!token.bar1 || token.bar1.attribute !== "combat.hp") continue;
+      if (token.bar1.value === value && token.bar1.max === max) continue;
+      updates.push({
+        _id: token.id,
+        bar1: { ...token.bar1, value, max }
+      });
+    }
+    if (updates.length) {
+      await scene.updateEmbeddedDocuments("Token", updates);
+    }
+  }
+};
+
 Hooks.on("preCreateActor", async function(actor, data, options, userId) {
   // Set default credits to 10 for new hero actors
   if (actor.type === "hero") {
@@ -487,6 +509,43 @@ Hooks.once("init", function() {
     }
   });
 
+  Hooks.on("updateActor", async (actor, change) => {
+    const hpChange = change?.system?.combat?.hp;
+    if (!hpChange) return;
+    await syncTokenHpBars(actor);
+  });
+
+  Hooks.on("updateToken", async (tokenDoc, change) => {
+    const actor = tokenDoc.actor;
+    if (!actor) return;
+    const bar = tokenDoc.getBarAttribute?.("bar1");
+    if (!bar || bar.attribute !== "combat.hp") return;
+    if (!("actorData" in change) && !("bar1" in change)) return;
+    const value = change?.bar1?.value ?? change?.actorData?.system?.combat?.hp?.value ?? bar.value ?? actor.system?.combat?.hp?.value ?? 0;
+    const max = change?.bar1?.max ?? change?.actorData?.system?.combat?.hp?.max ?? bar.max ?? actor.system?.combat?.hp?.max ?? 0;
+    const currentValue = actor.system?.combat?.hp?.value ?? 0;
+    const currentMax = actor.system?.combat?.hp?.max ?? 0;
+    if (tokenDoc.actorLink) {
+      if (value === currentValue) return;
+    } else if (value === currentValue && max === currentMax) {
+      return;
+    }
+    try {
+      if (tokenDoc.actorLink) {
+        await actor.update({
+          "system.combat.hp.value": value
+        });
+      } else {
+        await actor.update({
+          "system.combat.hp.value": value,
+          "system.combat.hp.max": max
+        });
+      }
+    } catch (err) {
+      console.warn("Singularity | Failed to sync actor HP from token:", err);
+    }
+  });
+
   Hooks.on("updateCombat", async (combat, changed) => {
     if (!("turn" in changed) && !("round" in changed)) return;
     const prevId = combat?.previous?.combatantId;
@@ -660,6 +719,32 @@ Hooks.once("init", function() {
   // Register system-specific actors and items
   CONFIG.Actor.documentClass = SingularityActor;
   CONFIG.Item.documentClass = SingularityItem;
+
+  Hooks.on("preCreateActor", (actor, data) => {
+    if (actor.type !== "hero" && actor.type !== "npc") return;
+    data.prototypeToken = data.prototypeToken || {};
+    data.prototypeToken.actorLink = true;
+  });
+
+  Hooks.on("preCreateToken", (tokenDoc, data) => {
+    data.actorLink = true;
+  });
+
+  Hooks.on("preUpdateToken", (tokenDoc, changes) => {
+    if ("actorLink" in changes && changes.actorLink !== true) {
+      changes.actorLink = true;
+    }
+  });
+
+  Hooks.on("renderTokenConfig", (_app, html) => {
+    const $html = html instanceof jQuery ? html : $(html);
+    const input = $html.find('input[name="actorLink"]');
+    if (input.length) {
+      input.prop("checked", true);
+      input.prop("disabled", true);
+      input.closest(".form-group, .form-fields, .form-group-stacked").css("opacity", 0.6);
+    }
+  });
   
   // Configure initiative system
   // Initiative = Wits + Training Bonus + Other Bonuses (no dice roll, just a flat value)
@@ -849,6 +934,28 @@ Hooks.on("renderDialog", function(dialog, html, data) {
 Hooks.once("ready", async function() {
   console.log("Singularity | System Ready");
   
+  // Force actorLink on existing prototypes and active tokens
+  if (game.user?.isGM) {
+    for (const actor of game.actors) {
+      if ((actor.type === "hero" || actor.type === "npc") && actor.prototypeToken?.actorLink !== true) {
+        await actor.update({ "prototypeToken.actorLink": true });
+      }
+    }
+    for (const scene of game.scenes) {
+      const updates = scene.tokens
+        .filter(t => t.actorLink !== true)
+        .map(t => ({ _id: t.id, actorLink: true }));
+      if (updates.length) {
+        await scene.updateEmbeddedDocuments("Token", updates);
+      }
+    }
+    for (const actor of game.actors) {
+      await syncTokenHpBars(actor);
+    }
+  }
+
+  // Max HP is owned by the actor sheet; don't recalculate it here.
+
   // Auto-create pregenerated heroes in pregens compendium if they don't exist
   // Wait a bit for compendiums to fully initialize
   setTimeout(async () => {
