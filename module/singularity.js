@@ -369,6 +369,18 @@ Hooks.once("init", function() {
           description: "-2 penalty to AC while threatened from opposite sides."
         }
       }
+    },
+    {
+      id: "dead",
+      label: "Dead",
+      icon: "icons/svg/skull.svg",
+      flags: {
+        core: { statusId: "dead" },
+        singularity: {
+          hasValue: false,
+          description: "Defeated."
+        }
+      }
     }
   ];
 
@@ -724,10 +736,28 @@ Hooks.once("init", function() {
     if (actor.type !== "hero" && actor.type !== "npc") return;
     data.prototypeToken = data.prototypeToken || {};
     data.prototypeToken.actorLink = true;
+  data.prototypeToken.bar1 = data.prototypeToken.bar1 || {};
+  data.prototypeToken.bar1.attribute = "combat.hp";
+  data.prototypeToken.displayBars = CONST.TOKEN_DISPLAY_MODES.ALWAYS;
+  data.prototypeToken.lockRotation = true;
+  data.prototypeToken.disposition =
+    actor.type === "hero"
+      ? CONST.TOKEN_DISPOSITIONS.FRIENDLY
+      : CONST.TOKEN_DISPOSITIONS.HOSTILE;
   });
 
   Hooks.on("preCreateToken", (tokenDoc, data) => {
     data.actorLink = true;
+  data.bar1 = data.bar1 || {};
+  data.bar1.attribute = "combat.hp";
+  data.displayBars = CONST.TOKEN_DISPLAY_MODES.ALWAYS;
+  data.lockRotation = true;
+  const actorType = tokenDoc.actor?.type;
+  if (actorType === "hero") {
+    data.disposition = CONST.TOKEN_DISPOSITIONS.FRIENDLY;
+  } else if (actorType === "npc") {
+    data.disposition = CONST.TOKEN_DISPOSITIONS.HOSTILE;
+  }
   });
 
   Hooks.on("preUpdateToken", (tokenDoc, changes) => {
@@ -934,17 +964,68 @@ Hooks.on("renderDialog", function(dialog, html, data) {
 Hooks.once("ready", async function() {
   console.log("Singularity | System Ready");
   
-  // Force actorLink on existing prototypes and active tokens
+  // Force actorLink, bar1 defaults, lock rotation, and disposition on existing prototypes and active tokens
   if (game.user?.isGM) {
     for (const actor of game.actors) {
-      if ((actor.type === "hero" || actor.type === "npc") && actor.prototypeToken?.actorLink !== true) {
-        await actor.update({ "prototypeToken.actorLink": true });
+      if (actor.type !== "hero" && actor.type !== "npc") continue;
+      const updates = {};
+      if (actor.prototypeToken?.actorLink !== true) {
+        updates["prototypeToken.actorLink"] = true;
+      }
+      if (actor.prototypeToken?.bar1?.attribute !== "combat.hp") {
+        updates["prototypeToken.bar1.attribute"] = "combat.hp";
+      }
+      if (actor.prototypeToken?.displayBars !== CONST.TOKEN_DISPLAY_MODES.ALWAYS) {
+        updates["prototypeToken.displayBars"] = CONST.TOKEN_DISPLAY_MODES.ALWAYS;
+      }
+      if (actor.prototypeToken?.lockRotation !== true) {
+        updates["prototypeToken.lockRotation"] = true;
+      }
+      const desiredDisposition =
+        actor.type === "hero"
+          ? CONST.TOKEN_DISPOSITIONS.FRIENDLY
+          : CONST.TOKEN_DISPOSITIONS.HOSTILE;
+      if (actor.prototypeToken?.disposition !== desiredDisposition) {
+        updates["prototypeToken.disposition"] = desiredDisposition;
+      }
+      if (Object.keys(updates).length) {
+        await actor.update(updates);
       }
     }
     for (const scene of game.scenes) {
       const updates = scene.tokens
-        .filter(t => t.actorLink !== true)
-        .map(t => ({ _id: t.id, actorLink: true }));
+        .map(t => {
+          const actor = t.actorId ? game.actors.get(t.actorId) : null;
+          const actorType = actor?.type;
+          const desiredDisposition =
+            actorType === "hero"
+              ? CONST.TOKEN_DISPOSITIONS.FRIENDLY
+              : actorType === "npc"
+                ? CONST.TOKEN_DISPOSITIONS.HOSTILE
+                : null;
+
+          const needsUpdate =
+            t.actorLink !== true ||
+            t.bar1?.attribute !== "combat.hp" ||
+            t.displayBars !== CONST.TOKEN_DISPLAY_MODES.ALWAYS ||
+            t.lockRotation !== true ||
+            (desiredDisposition !== null && t.disposition !== desiredDisposition);
+
+          if (!needsUpdate) return null;
+
+          const update = {
+            _id: t.id,
+            actorLink: true,
+            bar1: { ...t.bar1, attribute: "combat.hp" },
+            displayBars: CONST.TOKEN_DISPLAY_MODES.ALWAYS,
+            lockRotation: true
+          };
+          if (desiredDisposition !== null) {
+            update.disposition = desiredDisposition;
+          }
+          return update;
+        })
+        .filter(Boolean);
       if (updates.length) {
         await scene.updateEmbeddedDocuments("Token", updates);
       }
@@ -5504,11 +5585,114 @@ async function loadNpcCrs(html, npcs, filterCr = "") {
 
 
 // Handle Critical Hit button clicks in chat messages
+const normalizeDamageType = (value) => String(value || "").trim().toLowerCase();
+const isAllDamageType = (value) => {
+  const normalized = normalizeDamageType(value);
+  return normalized === "all" || normalized === "all damage" || normalized === "all damages";
+};
+const getCalculatedResistances = (actor) => {
+  const resistances = actor?.system?.resistances || [];
+  const primeLevel = actor?.system?.basic?.primeLevel || 1;
+  return resistances.map((resistance) => {
+    const copy = { ...resistance };
+    if (copy.value === null && copy.source === "Bastion's Resistance") {
+      copy.calculatedValue = 2 * primeLevel;
+    } else if (copy.value !== null && copy.value !== undefined) {
+      copy.calculatedValue = copy.value;
+    }
+    return copy;
+  });
+};
+const getDamageAdjustment = (actor, damageType) => {
+  const normalizedType = normalizeDamageType(damageType);
+  const isIncorporeal = actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
+  if (isIncorporeal && normalizedType !== "chaos") {
+    return { immune: true, resist: 0, weak: 0, reason: "Incorporeal immunity" };
+  }
+
+  const immunities = actor?.system?.immunities || [];
+  const isImmune = immunities.some(i => {
+    const type = normalizeDamageType(i?.type);
+    return type === normalizedType || isAllDamageType(type);
+  });
+  if (isImmune) {
+    return { immune: true, resist: 0, weak: 0, reason: "Immunity" };
+  }
+
+  const resistances = getCalculatedResistances(actor);
+  const resist = resistances
+    .filter(r => {
+      const type = normalizeDamageType(r?.type);
+      return type === normalizedType || isAllDamageType(type);
+    })
+    .reduce((sum, r) => sum + (Number(r.calculatedValue) || 0), 0);
+
+  const weaknesses = actor?.system?.weaknesses || [];
+  const weak = weaknesses
+    .filter(w => {
+      const type = normalizeDamageType(w?.type);
+      return type === normalizedType || isAllDamageType(type);
+    })
+    .reduce((sum, w) => sum + (Number(w.value) || 0), 0);
+
+  return { immune: false, resist, weak, reason: null };
+};
+
 Hooks.on("renderChatMessageHTML", function(message, html, data) {
   // Convert HTMLElement to jQuery for compatibility (or use vanilla JS)
   const $html = $(html);
   
   // Add click handler for critical hit buttons
+  const applyDamageToTarget = async (button, baseDamage, damageType, attackName, options = {}) => {
+    const targets = Array.from(game.user?.targets || []);
+    if (!targets.length) {
+      ui.notifications.warn("No target selected.");
+      return;
+    }
+
+    const targetToken = targets[0];
+    const targetActor = targetToken.actor;
+    if (!targetActor) {
+      ui.notifications.error("Target has no actor.");
+      return;
+    }
+
+    const { immune, resist, weak, reason } = getDamageAdjustment(targetActor, damageType);
+    let appliedDamage = 0;
+    let detailText = "";
+
+    if (immune) {
+      appliedDamage = 0;
+      detailText = reason ? `${reason} (0 applied)` : "Immune (0 applied)";
+    } else {
+      appliedDamage = Math.max(0, baseDamage - resist + weak);
+      const parts = [];
+      if (resist) parts.push(`-${resist} resist`);
+      if (weak) parts.push(`+${weak} weak`);
+      detailText = parts.length ? parts.join(", ") : "No adjustments";
+    }
+
+    const currentHp = targetActor.system?.combat?.hp?.value ?? 0;
+    const maxHp = targetActor.system?.combat?.hp?.max ?? 0;
+    const newHp = Math.max(0, currentHp - appliedDamage);
+    await targetActor.update({ "system.combat.hp.value": newHp });
+
+    const targetName = targetToken.name || targetActor.name || "Target";
+    const kindLabel = options.isCritical ? "Critical Applied" : "Damage Applied";
+    const flavor = `<div class="roll-flavor"><b>${attackName} - ${kindLabel}</b><br>Target: ${targetName}<br>Base: ${baseDamage} (${damageType})<br>${detailText}<br><strong>Applied: ${appliedDamage}</strong> (HP: ${currentHp} → ${newHp}${maxHp ? ` / ${maxHp}` : ""})</div>`;
+
+    await ChatMessage.create({
+      speaker: message.speaker,
+      flavor: flavor
+    });
+
+    if (button) {
+      button.disabled = true;
+      button.style.opacity = "0.5";
+      button.style.cursor = "not-allowed";
+    }
+  };
+
   $html.find(".critical-hit-button").click(async function(event) {
     event.preventDefault();
     const button = event.currentTarget;
@@ -5521,26 +5705,23 @@ Hooks.on("renderChatMessageHTML", function(message, html, data) {
       return;
     }
     
-    // Calculate critical damage (double)
     const criticalDamage = rollTotal * 2;
-    
-    // Create a new roll for the critical damage
-    const criticalRoll = new Roll(`${rollTotal} * 2`);
-    await criticalRoll.evaluate();
-    
-    // Create flavor text for critical hit
-    const flavor = `<div class="roll-flavor"><b>${attackName} - Critical Hit!</b><br>${rollTotal} × 2 = <strong>${criticalDamage}</strong> (${damageType})</div>`;
-    
-    // Send critical damage message
-    await criticalRoll.toMessage({
-      speaker: ChatMessage.getSpeaker({ actor: message.speaker?.actor }),
-      flavor: flavor
-    });
-    
-    // Disable the button to prevent multiple clicks
-    button.disabled = true;
-    button.style.opacity = "0.5";
-    button.style.cursor = "not-allowed";
+    await applyDamageToTarget(button, criticalDamage, damageType, attackName, { isCritical: true });
+  });
+
+  $html.find(".apply-damage-button").click(async function(event) {
+    event.preventDefault();
+    const button = event.currentTarget;
+    const rollTotal = parseFloat(button.dataset.rollTotal);
+    const damageType = button.dataset.damageType;
+    const attackName = button.dataset.attackName;
+
+    if (isNaN(rollTotal)) {
+      ui.notifications.error("Invalid damage roll total");
+      return;
+    }
+
+    await applyDamageToTarget(button, rollTotal, damageType, attackName, { isCritical: false });
   });
 });
 

@@ -1,7 +1,9 @@
 <form class="{{cssClass}} flexcol" autocomplete="off">
   {{!-- Sheet Header --}}
   <header class="sheet-header">
-    <img class="profile-img" src="{{actor.img}}" data-action="change-image" title="Click to change portrait or token image" height="100" width="100"/>
+    <div class="profile-section">
+      <img class="profile-img" src="{{actor.img}}" data-action="change-image" title="Click to change portrait or token image" height="100" width="100"/>
+    </div>
     <div class="header-fields">
       <h1 class="charname"><input name="name" type="text" value="{{actor.name}}" placeholder="NPC Name" required/></h1>
       <div class="header-grid">
@@ -36,6 +38,95 @@
   <section class="sheet-body">
     {{!-- Main Tab --}}
     <div class="tab main" data-group="primary" data-tab="main">
+      <div class="combat">
+        <h3>Combat</h3>
+        <div class="combat-stats">
+          <div class="stat combat-combined-stat">
+            <div class="combat-combined-content">
+              <div class="hp-section">
+                <label>Hit Points</label>
+                <div class="hp-inputs">
+                  <div class="hp-current">
+                    <label class="hp-label">Current</label>
+                    <input type="number" name="system.combat.hp.value" value="{{actor.system.combat.hp.value}}" min="0"/>
+                  </div>
+                  <span class="hp-separator">/</span>
+                  <div class="hp-max">
+                    <label class="hp-label">Max</label>
+                    <input type="number" name="system.combat.hp.max" value="{{actor.system.combat.hp.max}}" min="0"/>
+                  </div>
+                </div>
+              </div>
+              <div class="ac-section">
+                <label>Armor Class</label>
+                <div class="ac-display">
+                  <div class="ac-value">{{system.combat.ac}}</div>
+                </div>
+              </div>
+              <div class="initiative-section npc-initiative-compact">
+                <label>Initiative</label>
+                <div class="initiative-display">
+                  {{#if calculatedInitiative}}
+                  <div class="initiative-value clickable" data-action="show-initiative-breakdown" title="Click to see breakdown">{{calculatedInitiative}}</div>
+                  {{else}}
+                  <div class="initiative-value clickable" data-action="show-initiative-breakdown" title="Click to see breakdown">0</div>
+                  {{/if}}
+                </div>
+                <div class="initiative-controls">
+                  <div class="initiative-rank-wrapper">
+                    <label class="initiative-rank-label">Competence</label>
+                    <select class="initiative-rank" name="system.combat.initiative.rank">
+                      <option value="Novice" {{#if (eq actor.system.combat.initiative.rank "Novice")}}selected{{/if}}{{#unless actor.system.combat.initiative.rank}}selected{{/unless}}>Novice</option>
+                      <option value="Apprentice" {{#if (eq actor.system.combat.initiative.rank "Apprentice")}}selected{{/if}}>Apprentice</option>
+                      <option value="Competent" {{#if (eq actor.system.combat.initiative.rank "Competent")}}selected{{/if}}>Competent</option>
+                      <option value="Masterful" {{#if (eq actor.system.combat.initiative.rank "Masterful")}}selected{{/if}}>Masterful</option>
+                      <option value="Legendary" {{#if (eq actor.system.combat.initiative.rank "Legendary")}}selected{{/if}}>Legendary</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="attacks">
+        <h3>Attacks</h3>
+        <ol class="attack-list">
+          {{#each attacks as |attack id|}}
+          <li class="attack" data-attack-id="{{id}}">
+            {{#if attack.weaponImg}}
+            <img class="attack-icon weapon-icon" src="{{attack.weaponImg}}" alt="{{attack.name}}" onerror="this.src='icons/svg/sword.svg'">
+            {{/if}}
+            <div class="attack-content">
+              <div class="attack-header">
+                <h4>
+                  {{#unless attack.weaponImg}}
+                  {{#if attack.icon}}<i class="fas {{attack.icon}}"></i>{{/if}}
+                  {{/unless}}
+                  {{attack.name}}
+                </h4>
+                <div class="attack-controls">
+                  <button type="button" class="attack-roll" data-attack-id="{{id}}" title="Roll Attack">Roll Attack</button>
+                  <button type="button" class="damage-roll" data-attack-id="{{id}}" title="Roll Damage">Roll Damage</button>
+                  <a class="attack-edit" data-attack-id="{{id}}" title="Edit"><i class="fas fa-edit"></i></a>
+                  {{#if attack.canDelete}}
+                  <a class="attack-delete" data-attack-id="{{id}}" title="Delete"><i class="fas fa-trash"></i></a>
+                  {{/if}}
+                </div>
+              </div>
+              <div class="attack-details">
+              <span>Attack Bonus: {{calculatedAttackBonus}} {{#if attackBonusBreakdown}}<span class="attack-breakdown" title="{{attackBonusBreakdown}}">({{attackBonusBreakdown}})</span>{{/if}}</span>
+              <span>Damage: {{calculatedDamage}}</span>
+              <span>Type: {{attack.damageType}}</span>
+              <span>Energy Cost: {{#if (eq attack.cost 0)}}0{{else}}{{attack.cost}}{{/if}}</span>
+              </div>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+      </div>
+
       <div class="abilities">
         <h3>Ability Scores</h3>
         <div class="ability-grid">
@@ -66,87 +157,6 @@
           </div>
         </div>
         <p class="notes" style="font-size: 11px; color: #999; margin-top: 5px;">Click ability name to roll check, click value to see breakdown. Double-click value to edit.</p>
-      </div>
-
-      <div class="combat">
-        <h3>Combat</h3>
-        <div class="combat-stats">
-          <div class="stat hp-stat">
-            <label>Hit Points</label>
-            <div class="hp-inputs">
-              <div class="hp-current">
-                <label class="hp-label">Current</label>
-                <input type="number" name="system.combat.hp.value" value="{{actor.system.combat.hp.value}}" min="0"/>
-              </div>
-              <span class="hp-separator">/</span>
-              <div class="hp-max">
-                <label class="hp-label">Max</label>
-                <input type="number" name="system.combat.hp.max" value="{{actor.system.combat.hp.max}}" min="0"/>
-              </div>
-            </div>
-          </div>
-          <div class="stat">
-            <label>Armor Class</label>
-            <span>{{system.combat.ac}}</span>
-          </div>
-          <div class="stat">
-            <label>Initiative</label>
-            <div class="initiative-controls">
-              <div class="initiative-value-wrapper">
-                {{#if calculatedInitiative}}
-                <div class="initiative-value clickable" data-action="show-initiative-breakdown" title="Click to see breakdown">{{calculatedInitiative}}</div>
-                {{else}}
-                <div class="initiative-value clickable" data-action="show-initiative-breakdown" title="Click to see breakdown">0</div>
-                {{/if}}
-              </div>
-              <div class="initiative-rank-wrapper">
-                <label class="initiative-rank-label">Competence</label>
-                <select class="initiative-rank" name="system.combat.initiative.rank">
-                  <option value="Novice" {{#if (eq actor.system.combat.initiative.rank "Novice")}}selected{{/if}}{{#unless actor.system.combat.initiative.rank}}selected{{/unless}}>Novice</option>
-                  <option value="Apprentice" {{#if (eq actor.system.combat.initiative.rank "Apprentice")}}selected{{/if}}>Apprentice</option>
-                  <option value="Competent" {{#if (eq actor.system.combat.initiative.rank "Competent")}}selected{{/if}}>Competent</option>
-                  <option value="Masterful" {{#if (eq actor.system.combat.initiative.rank "Masterful")}}selected{{/if}}>Masterful</option>
-                  <option value="Legendary" {{#if (eq actor.system.combat.initiative.rank "Legendary")}}selected{{/if}}>Legendary</option>
-                </select>
-              </div>
-              <div class="initiative-other-wrapper">
-                <label class="initiative-other-label">Other Bonuses</label>
-                <input type="number" class="initiative-other-bonus" name="system.combat.initiative.otherBonuses" value="{{#if actor.system.combat.initiative.otherBonuses}}{{actor.system.combat.initiative.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="speeds">
-        <h3>Speeds</h3>
-        <div class="speed-list">
-          {{#if speeds.land}}
-          <div class="speed-item">
-            <label class="speed-label">Land</label>
-            <input type="number" name="system.combat.speeds.land" value="{{speeds.land}}" min="0" class="speed-input"/>
-            <span class="speed-unit">ft.</span>
-          </div>
-          {{else}}
-          <div class="speed-item">
-            <label class="speed-label">Land</label>
-            <input type="number" name="system.combat.speeds.land" value="{{#if actor.system.combat.speed}}{{actor.system.combat.speed}}{{else}}0{{/if}}" min="0" class="speed-input"/>
-            <span class="speed-unit">ft.</span>
-          </div>
-          {{/if}}
-          {{#each speeds as |speedValue speedType|}}
-          {{#unless (eq speedType "land")}}
-          <div class="speed-item">
-            <label class="speed-label">{{speedType}}</label>
-            <input type="number" name="system.combat.speeds.{{speedType}}" value="{{speedValue}}" min="0" class="speed-input"/>
-            <span class="speed-unit">ft.</span>
-            <a class="speed-delete" data-speed-type="{{speedType}}" title="Remove"><i class="fas fa-times"></i></a>
-          </div>
-          {{/unless}}
-          {{/each}}
-        </div>
-        <button type="button" class="add-speed-type">Add Speed Type</button>
-        </div>
       </div>
 
       <div class="saving-throws">
@@ -228,7 +238,7 @@
               <div class="saving-throw-other-wrapper">
                 <label class="saving-throw-other-label">Other Bonuses</label>
                 <input type="number" class="saving-throw-other-bonus" data-saving-throw="wits" value="{{#if savingThrows.wits.otherBonuses}}{{savingThrows.wits.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
-      </div>
+              </div>
               <button type="button" class="saving-throw-roll" data-saving-throw="wits">Roll</button>
             </div>
           </div>
@@ -255,41 +265,37 @@
         </div>
       </div>
 
-      <div class="attacks">
-        <h3>Attacks</h3>
-        <ol class="attack-list">
-          {{#each attacks as |attack id|}}
-          <li class="attack" data-attack-id="{{id}}">
-            {{#if attack.weaponImg}}
-            <img class="attack-icon weapon-icon" src="{{attack.weaponImg}}" alt="{{attack.name}}" onerror="this.src='icons/svg/sword.svg'">
-            {{/if}}
-            <div class="attack-content">
-              <div class="attack-header">
-                <h4>
-                  {{#unless attack.weaponImg}}
-                  {{#if attack.icon}}<i class="fas {{attack.icon}}"></i>{{/if}}
-                  {{/unless}}
-                  {{attack.name}}
-                </h4>
-                <div class="attack-controls">
-                  <button type="button" class="attack-roll" data-attack-id="{{id}}" title="Roll Attack">Roll Attack</button>
-                  <button type="button" class="damage-roll" data-attack-id="{{id}}" title="Roll Damage">Roll Damage</button>
-                  <a class="attack-edit" data-attack-id="{{id}}" title="Edit"><i class="fas fa-edit"></i></a>
-                  {{#if attack.canDelete}}
-                  <a class="attack-delete" data-attack-id="{{id}}" title="Delete"><i class="fas fa-trash"></i></a>
-                  {{/if}}
-                </div>
-              </div>
-              <div class="attack-details">
-              <span>Attack Bonus: {{calculatedAttackBonus}} {{#if attackBonusBreakdown}}<span class="attack-breakdown" title="{{attackBonusBreakdown}}">({{attackBonusBreakdown}})</span>{{/if}}</span>
-              <span>Damage: {{calculatedDamage}}</span>
-              <span>Type: {{attack.damageType}}</span>
-              </div>
-            </div>
-          </li>
+      <div class="speeds">
+        <h3>Speeds</h3>
+        <div class="speed-list">
+          {{#if speeds.land}}
+          <div class="speed-item">
+            <label class="speed-label">Land</label>
+            <input type="number" name="system.combat.speeds.land" value="{{speeds.land}}" min="0" class="speed-input"/>
+            <span class="speed-unit">ft.</span>
+          </div>
+          {{else}}
+          <div class="speed-item">
+            <label class="speed-label">Land</label>
+            <input type="number" name="system.combat.speeds.land" value="{{#if actor.system.combat.speed}}{{actor.system.combat.speed}}{{else}}0{{/if}}" min="0" class="speed-input"/>
+            <span class="speed-unit">ft.</span>
+          </div>
+          {{/if}}
+          {{#each speeds as |speedValue speedType|}}
+          {{#unless (eq speedType "land")}}
+          <div class="speed-item">
+            <label class="speed-label">{{speedType}}</label>
+            <input type="number" name="system.combat.speeds.{{speedType}}" value="{{speedValue}}" min="0" class="speed-input"/>
+            <span class="speed-unit">ft.</span>
+            <a class="speed-delete" data-speed-type="{{speedType}}" title="Remove"><i class="fas fa-times"></i></a>
+          </div>
+          {{/unless}}
           {{/each}}
-        </ol>
+        </div>
+        <button type="button" class="add-speed-type">Add Speed Type</button>
+        </div>
       </div>
+
     </div>
 
     {{!-- Abilities Tab --}}

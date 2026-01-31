@@ -827,6 +827,58 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* Roll dialog quick modifiers */
+.singularity-roll-dialog .quick-modifiers {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-start;
+}
+
+.singularity-roll-dialog .quick-modifier-btn {
+  padding: 4px 8px;
+  background: rgba(30, 33, 45, 0.8);
+  color: #BD5FFF;
+  border: 1px solid rgba(189, 95, 255, 0.4);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.singularity-roll-dialog .quick-modifier-btn:hover {
+  background: rgba(189, 95, 255, 0.2);
+  border-color: #BD5FFF;
+  box-shadow: 0 0 8px rgba(189, 95, 255, 0.6);
+  color: #ffffff;
+}
+
+/* NPC compact initiative layout */
+.npc-initiative-compact .initiative-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.npc-initiative-compact .initiative-rank-wrapper,
+.npc-initiative-compact .initiative-other-wrapper {
+  width: 100%;
+  max-width: 140px;
+  align-items: center;
+}
+
+.npc-initiative-compact .initiative-rank-label,
+.npc-initiative-compact .initiative-other-label {
+  display: none;
+}
+
+.npc-initiative-compact .initiative-rank-wrapper select,
+.npc-initiative-compact .initiative-other-bonus {
+  width: 100%;
+  max-width: 120px;
+}
+
 /* Initiative Breakdown Dialog */
 .initiative-breakdown {
   padding: 10px;
@@ -2093,6 +2145,7 @@ button.item-create,
 button.add-skill,
 button.add-special-ability,
 button.add-trait,
+button.add-speed-type,
 button.add-attack {
   margin-top: 10px;
   padding: 8px 20px;
@@ -2110,6 +2163,7 @@ button.item-create:hover,
 button.add-skill:hover,
 button.add-special-ability:hover,
 button.add-trait:hover,
+button.add-speed-type:hover,
 button.add-attack:hover {
   background: rgba(189, 95, 255, 0.2);
   border-color: #BD5FFF;

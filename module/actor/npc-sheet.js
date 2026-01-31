@@ -487,17 +487,116 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
     }
     const attackBonus = (attack.baseAttackBonus || 0) + abilityScore - fatiguedPenalty - blindedPenalty;
 
-    const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
-      target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
-    );
-    const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
-    const roll = new Roll(`${dieFormula} + @bonus`, { bonus: attackBonus });
-    await roll.evaluate();
-    
-    roll.toMessage({
-      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedPenalty ? ` - ${fatiguedPenalty} (Fatigued)` : ""}${blindedPenalty ? " - 10 (Blinded)" : ""}${hasParalyzedTarget ? " (advantage vs Paralyzed)" : ""} = <strong>${roll.total}</strong>`
+    const dialogContent = `
+      <form class="singularity-roll-dialog">
+        <div class="roll-fields-row">
+          <div class="form-group-inline">
+            <label>Attack Roll:</label>
+            <input type="text" id="attack-roll" value="1d20" readonly class="readonly-input"/>
+          </div>
+          <div class="form-group-inline">
+            <label>Attack Bonus:</label>
+            <input type="number" id="attack-bonus" value="${attackBonus}" readonly class="readonly-input"/>
+          </div>
+          <div class="form-group-inline">
+            <label>Extra Modifier:</label>
+            <input type="text" id="extra-modifier" value="0" placeholder="0 or +1d6" class="editable-input"/>
+          </div>
+          <div class="form-group-inline">
+            <label>Repeated Penalty:</label>
+            <select id="repeated-penalty" class="editable-input">
+              <option value="0">None</option>
+              <option value="-5">-5</option>
+              <option value="-10">-10</option>
+              <option value="-15">-15</option>
+              <option value="-20">-20</option>
+            </select>
+          </div>
+        </div>
+        <p class="help-text">Add any extra bonuses (e.g., +2, +1d6, -1). Click "Roll Attack" to roll 1d20 + Attack Bonus + Repeated Penalty + Extra Modifier.</p>
+      </form>
+    `;
+
+    const dialogTitle = `Roll Attack: ${attack.name}`;
+    const d = new Dialog({
+      title: dialogTitle,
+      content: dialogContent,
+      buttons: {
+        roll: {
+          icon: '<i class="fas fa-dice-d20"></i>',
+          label: "Roll Attack",
+          callback: async (html) => {
+            const bonus = parseFloat(html.find("#attack-bonus").val()) || 0;
+            const extra = html.find("#extra-modifier").val().trim() || "0";
+            const repeatedPenalty = parseFloat(html.find("#repeated-penalty").val()) || 0;
+
+            const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
+              target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
+            );
+            const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
+            let rollFormula = `${dieFormula} + ${bonus}`;
+            if (repeatedPenalty) {
+              rollFormula += ` + ${repeatedPenalty}`;
+            }
+            if (extra && extra !== "0") {
+              rollFormula += ` + ${extra}`;
+            }
+
+            const roll = new Roll(rollFormula);
+            await roll.evaluate();
+
+            const fatiguedText = fatiguedPenalty ? ` - ${fatiguedPenalty} (Fatigued)` : "";
+            const blindedText = blindedPenalty ? " - 10 (Blinded)" : "";
+            const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
+            const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
+            const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+            let acComparison = "";
+            const targets = Array.from(game.user.targets);
+            if (targets.length > 0) {
+              const targetToken = targets[0];
+              const targetName = targetToken.name || targetToken.actor?.name || "Target";
+              const targetActor = targetToken.actor;
+              const getTargetAc = async (actor) => {
+                if (!actor) return null;
+                if (actor.type === "hero" && actor.sheet?.getData) {
+                  const sheetData = await actor.sheet.getData();
+                  return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                }
+                return actor.system?.combat?.ac ?? null;
+              };
+              const targetAC = await getTargetAc(targetActor);
+              if (targetAC !== null) {
+                const difference = roll.total - targetAC;
+                if (difference >= 10) {
+                  acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${targetAC})</span>`;
+                } else if (difference >= 0) {
+                  acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${targetAC})</span>`;
+                } else if (difference >= -9) {
+                  acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                } else {
+                  acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                }
+              }
+            }
+            const acLine = acComparison ? `<br>${acComparison}` : "";
+            const flavor = `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedText}${blindedText}${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}`;
+
+            roll.toMessage({
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              flavor
+            });
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => {}
+        }
+      },
+      default: "roll"
     });
+
+    await d.render(true);
   }
 
   async _onRollDamage(event) {
@@ -538,8 +637,11 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
     const finalTotal = hasCorporealTarget ? Math.floor(roll.total / 2) : roll.total;
     const incorporealText = hasCorporealTarget ? ` (half vs corporeal: ${finalTotal})` : "";
     
-    const criticalButton = `<div class="chat-card-buttons" style="margin-top: 5px;"><button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bolt"></i> Critical Hit (Double Damage)</button></div>`;
-    const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType}) = <strong>${roll.total}</strong>${incorporealText}${criticalButton}</div>`;
+    const actionButtons = `<div class="chat-card-buttons" style="margin-top: 5px;">
+      <button type="button" class="apply-damage-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(40, 110, 70, 0.5); color: #ffffff; border: 1px solid rgba(40, 110, 70, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bullseye"></i> Apply Damage</button>
+      <button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px; margin-left: 6px;"><i class="fas fa-bolt"></i> Apply Critical (x2)</button>
+    </div>`;
+    const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType}) = <strong>${roll.total}</strong>${incorporealText}${actionButtons}</div>`;
     
     const message = await roll.toMessage({
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),

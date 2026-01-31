@@ -5937,6 +5937,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     // Calculate final attack bonus
     const scaredEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "scared");
     const scaredPenalty = Math.max(0, Number(scaredEffect?.getFlag("singularity", "value") ?? 0));
+    const pronePenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "prone") ? 2 : 0;
+    const fatiguedEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
+    const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
     const blindedPenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded") ? 10 : 0;
     let attackBonus = 0;
     if (attack.baseAttackBonus !== undefined && attack.ability) {
@@ -5979,8 +5982,18 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             <label>Extra Modifier:</label>
             <input type="text" id="extra-modifier" value="0" placeholder="0 or +1d6" class="editable-input"/>
           </div>
+          <div class="form-group-inline">
+            <label>Repeated Penalty:</label>
+            <select id="repeated-penalty" class="editable-input">
+              <option value="0">None</option>
+              <option value="-5">-5</option>
+              <option value="-10">-10</option>
+              <option value="-15">-15</option>
+              <option value="-20">-20</option>
+            </select>
+          </div>
         </div>
-        <p class="help-text">Add any extra bonuses (e.g., +2, +1d6, -1). Click "Roll Attack" to roll 1d20 + Attack Bonus + Extra Modifier.</p>
+        <p class="help-text">Add any extra bonuses (e.g., +2, +1d6, -1). Click "Roll Attack" to roll 1d20 + Attack Bonus + Repeated Penalty + Extra Modifier.</p>
       </form>
     `;
 
@@ -5996,6 +6009,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           callback: async (html) => {
             const bonus = parseFloat(html.find("#attack-bonus").val()) || 0;
             const extra = html.find("#extra-modifier").val().trim() || "0";
+            const repeatedPenalty = parseFloat(html.find("#repeated-penalty").val()) || 0;
             
             const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
               target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
@@ -6003,6 +6017,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
             // Build roll formula: d20 + bonus + extra
             let rollFormula = `${dieFormula} + ${bonus}`;
+            if (repeatedPenalty) {
+              rollFormula += ` + ${repeatedPenalty}`;
+            }
             if (extra && extra !== "0") {
               rollFormula += ` + ${extra}`;
             }
@@ -6010,6 +6027,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             const roll = new Roll(rollFormula);
             await roll.evaluate();
             
+            const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
             // Add Deadeye info if applicable
             const deadeyeData = this.actor.system.combat?.deadeye || { active: false };
@@ -6020,7 +6038,36 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             const fatiguedText = fatiguedPenalty > 0 ? ` (includes -${fatiguedPenalty} Fatigued)` : "";
             const blindedText = blindedPenalty > 0 ? ` (includes -${blindedPenalty} Blinded)` : "";
             const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
-            const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText})${advantageText}${extraText} = <strong>${roll.total}</strong></div>`;
+            let acComparison = "";
+            const targets = Array.from(game.user.targets);
+            if (targets.length > 0) {
+              const targetToken = targets[0];
+              const targetName = targetToken.name || targetToken.actor?.name || "Target";
+              const targetActor = targetToken.actor;
+              const getTargetAc = async (actor) => {
+                if (!actor) return null;
+                if (actor.type === "hero" && actor.sheet?.getData) {
+                  const sheetData = await actor.sheet.getData();
+                  return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                }
+                return actor.system?.combat?.ac ?? null;
+              };
+              const targetAC = await getTargetAc(targetActor);
+              if (targetAC !== null) {
+                const difference = roll.total - targetAC;
+                if (difference >= 10) {
+                  acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${targetAC})</span>`;
+                } else if (difference >= 0) {
+                  acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${targetAC})</span>`;
+                } else if (difference >= -9) {
+                  acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                } else {
+                  acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                }
+              }
+            }
+            const acLine = acComparison ? `<br>${acComparison}` : "";
+            const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText})${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}</div>`;
             
             const message = await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -6044,7 +6091,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       default: "roll"
     });
     
-    d.render(true);
+    await d.render(true);
   }
 
   async _onRollDamage(event) {
@@ -6258,54 +6305,17 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             const supersonicText = supersonicBonus > 0 ? ` + ${supersonicBonus} (Supersonic Moment)` : "";
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
             
-            // Try to get the last attack roll result for this attack to compare against AC
-            let attackRollTotal = null;
-            let targetAC = null;
-            let acComparison = "";
-            
-            // Look for the most recent attack roll message for this attack
-            const recentMessages = game.messages.contents.slice(-20).reverse(); // Check last 20 messages, most recent first
-            for (const msg of recentMessages) {
-              const attackRollData = msg.getFlag("singularity", "attackRoll");
-              if (attackRollData && attackRollData.attackId === attackId) {
-                attackRollTotal = attackRollData.total;
-                break;
-              }
-            }
-            
-            // Check for targeted tokens to get AC
-            const targets = Array.from(game.user.targets);
-            if (targets.length > 0 && attackRollTotal !== null) {
-              // Get the first target's AC
-              const targetToken = targets[0];
-              const targetActor = targetToken.actor;
-              if (targetActor && targetActor.system) {
-                targetAC = targetActor.system.combat?.ac || null;
-                
-                if (targetAC !== null) {
-                  const difference = attackRollTotal - targetAC;
-                  
-                  if (difference >= 10) {
-                    acComparison = `<br><span style="color: #00ff00; font-weight: bold;">Extreme Success! (+${difference} over AC ${targetAC})</span>`;
-                  } else if (difference >= 0) {
-                    acComparison = `<br><span style="color: #90ee90; font-weight: bold;">Success! (Hit AC ${targetAC})</span>`;
-                  } else if (difference >= -9) {
-                    acComparison = `<br><span style="color: #ffa500; font-weight: bold;">Failure (${difference} vs AC ${targetAC})</span>`;
-                  } else {
-                    acComparison = `<br><span style="color: #ff0000; font-weight: bold;">Extreme Failure (${difference} vs AC ${targetAC})</span>`;
-                  }
-                }
-              }
-            }
-            
             const isIncorporeal = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
             const hasCorporealTarget = isIncorporeal && Array.from(game.user?.targets || []).some(
               target => !target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal")
             );
             const finalTotal = hasCorporealTarget ? Math.floor(roll.total / 2) : roll.total;
             const incorporealText = hasCorporealTarget ? ` (half vs corporeal: ${finalTotal})` : "";
-            const criticalButton = `<div class="chat-card-buttons" style="margin-top: 5px;"><button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bolt"></i> Critical Hit (Double Damage)</button></div>`;
-            const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType})${supersonicText}${extraText} = <strong>${roll.total}</strong>${incorporealText}${acComparison}${criticalButton}</div>`;
+            const actionButtons = `<div class="chat-card-buttons" style="margin-top: 5px;">
+              <button type="button" class="apply-damage-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(40, 110, 70, 0.5); color: #ffffff; border: 1px solid rgba(40, 110, 70, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bullseye"></i> Apply Damage</button>
+              <button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px; margin-left: 6px;"><i class="fas fa-bolt"></i> Apply Critical (x2)</button>
+            </div>`;
+            const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType})${supersonicText}${extraText} = <strong>${roll.total}</strong>${incorporealText}${actionButtons}</div>`;
             
             const message = await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
