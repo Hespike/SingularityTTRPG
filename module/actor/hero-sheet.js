@@ -1,8 +1,12 @@
 /**
- * Hero Character Sheet
- * @extends {foundry.appv1.sheets.ActorSheet}
+ * Hero Character Sheet (Application V2)
+ * @extends {foundry.applications.api.DocumentSheetV2}
  */
-export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
+console.log('Singularity | hero-sheet.js loaded');
+const BaseActorSheetV2 = foundry.applications.api.ActorSheetV2 || foundry.applications.api.DocumentSheetV2;
+export class SingularityActorSheetHero extends foundry.applications.api.HandlebarsApplicationMixin(
+  BaseActorSheetV2
+) {
   constructor(...args) {
     super(...args);
     
@@ -51,33 +55,72 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       }
     }
   }
+  static TEMPLATE = "systems/singularity/templates/actor-sheets/hero-sheet.html";
+
   /** @override */
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["singularity", "sheet", "actor", "hero"],
-      template: "systems/singularity/templates/actor-sheets/hero-sheet.html",
-      width: 800,
-      height: 900,
-      resizable: true,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "main" }],
-      scrollY: [".sheet-body"]
-    });
+  static DEFAULT_OPTIONS = foundry.utils.mergeObject(super.DEFAULT_OPTIONS, {
+    classes: ["singularity", "sheet", "actor", "hero"],
+    position: { width: 800, height: 900 },
+    window: { resizable: true },
+    tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "main" }],
+    scrollY: [".sheet-body"]
+  });
+
+  static PARTS = {
+    body: { template: "systems/singularity/templates/actor-sheets/hero-sheet.html" }
+  };
+
+  get actor() {
+    return this.document;
+  }
+
+  get title() {
+    return this.actor?.name || "Unnamed Hero";
   }
 
   /** @override */
   getTitle() {
-    // Return just the actor's name, not the TYPES.Actor.hero format
-    return this.actor?.name || "Unnamed Hero";
+    return this.title;
+  }
+
+  /** @override */
+  async _prepareContext(options = {}) {
+    return this.getData(options);
+  }
+
+  /** @override */
+  async _onRender(context, options) {
+    if (super._onRender) {
+      await super._onRender(context, options);
+    }
+    if (this.element) {
+      if (!this._singularitySized) {
+        this.setPosition({ width: 800, height: 900 });
+        this._singularitySized = true;
+      }
+      const $html = this.element instanceof jQuery ? this.element : $(this.element);
+      this.activateListeners($html);
+      const tabToShow = this._preferredTab || "main";
+      this._activateTab($html, tabToShow);
+      if (this._scrollPositions?.[tabToShow] !== undefined) {
+        $html.find(`.tab.${tabToShow}`).scrollTop(this._scrollPositions[tabToShow]);
+      }
+    }
   }
 
   /** @override */
   async getData(options = {}) {
     try {
-      const context = await super.getData(options);
+      const context = {
+        actor: this.actor,
+        system: this.actor?.system || {},
+        data: this.actor?.system || {},
+        items: this.actor?.items || [],
+        effects: this.actor?.effects || [],
+        cssClass: "singularity sheet actor hero"
+      };
       // Ensure cssClass is set correctly for template
-      if (!context.cssClass || !context.cssClass.includes('singularity')) {
-        context.cssClass = "singularity sheet actor hero";
-      }
+      context.cssClass = "singularity sheet actor hero";
       const actorData = context.actor;
 
       // Initialize progression early to avoid errors (use safe defaults, don't modify actor data)
@@ -1880,9 +1923,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
       // Enrich notes content for display
       try {
-        context.enrichedNotes = await TextEditor.enrichHTML(notes, { async: true, secrets: this.actor.isOwner, relativeTo: this.actor });
-        context.enrichedBackstory = await TextEditor.enrichHTML(backstory, { async: true, secrets: this.actor.isOwner, relativeTo: this.actor });
-        context.enrichedAppearance = await TextEditor.enrichHTML(appearance, { async: true, secrets: this.actor.isOwner, relativeTo: this.actor });
+        const textEditor = foundry.applications?.ux?.TextEditor?.implementation || TextEditor;
+        context.enrichedNotes = await textEditor.enrichHTML(notes, { async: true, secrets: this.actor.isOwner, relativeTo: this.actor });
+        context.enrichedBackstory = await textEditor.enrichHTML(backstory, { async: true, secrets: this.actor.isOwner, relativeTo: this.actor });
+        context.enrichedAppearance = await textEditor.enrichHTML(appearance, { async: true, secrets: this.actor.isOwner, relativeTo: this.actor });
       } catch (error) {
         console.error("Singularity | Error enriching notes:", error);
         // Fallback to empty strings if enrichment fails
@@ -2300,8 +2344,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           if (sheetBody.length) {
             sheetBody.css('display', 'block');
             
-            // Restore the previously active tab, or default to "main" if no tab was active
-            const tabToActivate = activeTab || "main";
+            // Restore the preferred tab if set, otherwise keep active tab or default to main
+            const tabToActivate = this._preferredTab || activeTab || "main";
             const tabElement = this.element.find(`.tab[data-tab="${tabToActivate}"]`);
             const tabNav = this.element.find(`.sheet-tabs .item[data-tab="${tabToActivate}"]`);
             
@@ -2339,7 +2383,16 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
   }
 
   activateListeners(html) {
-    super.activateListeners(html);
+    if (super.activateListeners) {
+      super.activateListeners(html);
+    }
+    html.find(".sheet-tabs .item").on("click", (event) => {
+      event.preventDefault();
+      const tab = event.currentTarget.dataset.tab;
+      if (tab) {
+        this._activateTab(html, tab);
+      }
+    });
 
     // Everything below here is only needed if the sheet is editable
     if (!this.isEditable) return;
@@ -2384,8 +2437,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       ui.notifications.warn(`${skillName} other bonus is locked (comes from ${source}).`);
     });
 
-    // Add item
-    html.find(".item-create").click(this._onItemCreate.bind(this));
+    // Add item (exclude buy buttons which are separate flows)
+    html.find(".item-create:not(.buy-weapon):not(.buy-armor)").click(this._onItemCreate.bind(this));
     
     // Buy armor from compendium
     html.find(".buy-armor").click(this._onBuyArmor.bind(this));
@@ -2413,8 +2466,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     // Roll ability check
     html.find(".ability-roll").click(this._onAbilityRoll.bind(this));
 
-    // Roll saving throw
-    html.find(".saving-throw-roll").click(this._onRollSavingThrow.bind(this));
+    // Roll saving throw (handled by data-action binding below)
 
     // Update other bonuses on saving throw
     html.find(".saving-throw-other-bonus").on("change blur", this._onUpdateSavingThrowOtherBonuses.bind(this));
@@ -2435,6 +2487,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
     // Resistances, Weaknesses, and Immunities management
     html.find(".add-rwi").click(this._onAddRWI.bind(this));
+    html.off("click", ".rwi-delete");
     html.on("click", ".rwi-delete", this._onDeleteRWI.bind(this));
 
     // Wounds management
@@ -2463,6 +2516,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     html.find(".long-rest-button").click(this._onLongRest.bind(this));
 
     // Progression slot management
+    html.off("click", ".slot-delete");
     html.on("click", ".slot-delete", this._onDeleteProgressionSlot.bind(this));
     
     // Handle clicks on progression slot items to show details (but not on delete button)
@@ -2472,6 +2526,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     html.on("click", ".progression-slot[data-slot-type='genericTalent'], .progression-slot[data-slot-type='humanGenericTalent'], .progression-slot[data-slot-type='terranGenericTalent'], .progression-slot[data-slot-type='bastionTalent'], .progression-slot[data-slot-type='paragonTalent'], .progression-slot[data-slot-type='gadgeteerTalent'], .progression-slot[data-slot-type='marksmanTalent']", this._onTalentSlotClick.bind(this));
     
     // Handle clicks on phenotype, subtype, and powerset progression slots
+    html.off("click", ".progression-slot[data-slot-type='phenotype']");
+    html.off("click", ".progression-slot[data-slot-type='subtype']");
     html.on("click", ".progression-slot[data-slot-type='phenotype']", this._onPhenotypeSlotClick.bind(this));
     html.on("click", ".progression-slot[data-slot-type='subtype']", this._onSubtypeSlotClick.bind(this));
     html.on("click", ".progression-slot[data-slot-type='background']", this._onBackgroundSlotClick.bind(this));
@@ -2487,27 +2543,35 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     });
 
     // Handle Initiative breakdown click
+    html.off("click", "[data-action='show-initiative-breakdown']");
     html.on("click", "[data-action='show-initiative-breakdown']", this._onShowInitiativeBreakdown.bind(this));
     
     // Handle AC breakdown click
+    html.off("click", "[data-action='show-ac-breakdown']");
     html.on("click", "[data-action='show-ac-breakdown']", this._onShowAcBreakdown.bind(this));
     
     // Handle ability breakdown click
+    html.off("click", "[data-action='show-ability-breakdown']");
     html.on("click", "[data-action='show-ability-breakdown']", this._onShowAbilityBreakdown.bind(this));
     
     // Handle ability name click (roll)
+    html.off("click", "[data-action='roll-ability']");
     html.on("click", "[data-action='roll-ability']", this._onAbilityNameRoll.bind(this));
     
     // Handle HP breakdown click
+    html.off("click", "[data-action='show-hp-breakdown']");
     html.on("click", "[data-action='show-hp-breakdown']", this._onShowHpBreakdown.bind(this));
     
     // Handle saving throw breakdown click
+    html.off("click", "[data-action='show-saving-throw-breakdown']");
     html.on("click", "[data-action='show-saving-throw-breakdown']", this._onShowSavingThrowBreakdown.bind(this));
     
     // Handle saving throw name click (roll)
     html.on("click", "[data-action='roll-saving-throw']", this._onRollSavingThrow.bind(this));
     
     // Handle Prime Level increase/decrease buttons
+    html.off("click", "[data-action='increase-level']");
+    html.off("click", "[data-action='decrease-level']");
     html.on("click", "[data-action='increase-level']", this._onIncreaseLevel.bind(this));
     html.on("click", "[data-action='decrease-level']", this._onDecreaseLevel.bind(this));
 
@@ -2533,6 +2597,15 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       })
       .on("change", this._onInlineEdit.bind(this))
       .on("blur", this._onInlineEdit.bind(this));
+  }
+
+  _activateTab(html, tabName) {
+    const $tabs = html.find(".sheet-tabs .item");
+    const $panes = html.find(".sheet-body .tab");
+    $tabs.removeClass("active");
+    $panes.removeClass("active");
+    html.find(`.sheet-tabs .item[data-tab="${tabName}"]`).addClass("active");
+    html.find(`.sheet-body .tab[data-tab="${tabName}"]`).addClass("active");
   }
 
   /** @override */
@@ -2641,19 +2714,99 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </form>
     `;
 
-    new Dialog({
-      title: "Add Skill",
-      content: template,
-      buttons: {
-        add: {
-          icon: '<i class="fas fa-check"></i>',
-          label: "Add",
-          callback: async (html) => {
-            const skillName = html.find('input[name="skillName"]').val()?.trim();
-            const ability = html.find('select[name="ability"]').val();
-            const rank = html.find('select[name="rank"]').val();
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const getDialogForm = (event) => {
+      if (dialog?.element?.length) {
+        const el = dialog.element[0] || dialog.element;
+        return el.querySelector("form");
+      }
+      if (event?.currentTarget?.closest) {
+        return event.currentTarget.closest("form");
+      }
+      if (event?.closest) {
+        return event.closest("form");
+      }
+      if (event?.target?.closest) {
+        return event.target.closest("form");
+      }
+      return null;
+    };
 
-            if (!skillName) {
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: "Add Skill",
+          content: template,
+          buttons: [
+            {
+              action: "add",
+              icon: '<i class="fas fa-check"></i>',
+              label: "Add",
+              callback: async (event) => {
+                const dialogEl = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+                const root = dialogEl instanceof HTMLElement ? dialogEl : document;
+                const rawName = String(root.querySelector('input[name="skillName"]')?.value ?? "");
+                const skillName = rawName.trim().replace(/\s+/g, " ");
+                const normalizedSkillName = skillName
+                  ? skillName.charAt(0).toUpperCase() + skillName.slice(1).toLowerCase()
+                  : "";
+                const ability = root.querySelector('select[name="ability"]')?.value;
+                const rank = root.querySelector('select[name="rank"]')?.value;
+
+                if (!normalizedSkillName) {
+                  ui.notifications.warn("Please enter a skill name.");
+                  return;
+                }
+
+                const skills = foundry.utils.deepClone(this.actor.system.skills || {});
+                
+                // Check if skill already exists
+                if (skills[normalizedSkillName]) {
+                  ui.notifications.warn(`Skill "${normalizedSkillName}" already exists.`);
+                  return;
+                }
+
+                skills[normalizedSkillName] = {
+                  ability: ability.toLowerCase(),
+                  rank: rank,
+                  otherBonuses: 0
+                };
+
+                await this.actor.update({ "system.skills": skills });
+                // Force a full re-render and stay on Skills tab
+                this.render(true);
+                setTimeout(() => {
+                  this._activateTab($(this.element), "skills");
+                }, 0);
+                ui.notifications.info(`Added skill: ${normalizedSkillName}`);
+              }
+            },
+            {
+              action: "cancel",
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          ],
+          default: "add"
+        }
+      : {
+          title: "Add Skill",
+          content: template,
+          buttons: {
+            add: {
+              icon: '<i class="fas fa-check"></i>',
+              label: "Add",
+              callback: async (html) => {
+                const $html = html instanceof jQuery ? html : $(html);
+                const rawName = $html.find('input[name="skillName"]').val() ?? "";
+                const skillName = String(rawName).trim().replace(/\s+/g, " ");
+                const normalizedSkillName = skillName
+                  ? skillName.charAt(0).toUpperCase() + skillName.slice(1).toLowerCase()
+                  : "";
+                const ability = $html.find('select[name="ability"]').val();
+                const rank = $html.find('select[name="rank"]').val();
+
+            if (!normalizedSkillName) {
               ui.notifications.warn("Please enter a skill name.");
               return;
             }
@@ -2661,12 +2814,12 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             const skills = foundry.utils.deepClone(this.actor.system.skills || {});
             
             // Check if skill already exists
-            if (skills[skillName]) {
-              ui.notifications.warn(`Skill "${skillName}" already exists.`);
+            if (skills[normalizedSkillName]) {
+              ui.notifications.warn(`Skill "${normalizedSkillName}" already exists.`);
               return;
             }
 
-            skills[skillName] = {
+            skills[normalizedSkillName] = {
               ability: ability.toLowerCase(),
               rank: rank,
               otherBonuses: 0
@@ -2675,18 +2828,22 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             await this.actor.update({ "system.skills": skills });
             // Force a full re-render
             this.render(true);
-            ui.notifications.info(`Added skill: ${skillName}`);
-          }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
-        }
-      },
-      default: "add",
-      close: () => {}
-    }).render(true);
+            ui.notifications.info(`Added skill: ${normalizedSkillName}`);
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "add",
+          close: () => {}
+        };
+    dialogOptions.position = { width: 520 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    dialog.render(true);
   }
 
   async _onDeleteSkill(skillName) {
@@ -2708,15 +2865,19 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     const self = this;
     const actor = this.actor;
 
-    // Confirm deletion using standard Dialog
-    new Dialog({
-      title: "Delete Skill",
-      content: `<p>Are you sure you want to delete the skill "<strong>${skillName}</strong>"?</p>`,
-      buttons: {
-        yes: {
-          icon: '<i class="fas fa-check"></i>',
-          label: "Delete",
-          callback: async () => {
+    // Confirm deletion using DialogV2 when available
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: "Delete Skill",
+          content: `<p>Are you sure you want to delete the skill "<strong>${skillName}</strong>"?</p>`,
+          buttons: [
+            {
+              action: "yes",
+              icon: '<i class="fas fa-check"></i>',
+              label: "Delete",
+              callback: async () => {
             try {
               console.log("Delete callback called for skill:", skillName);
               const currentSkills = actor.system.skills || {};
@@ -2763,6 +2924,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               
               // Force a full re-render of the sheet
               await self.render(true);
+              setTimeout(() => {
+                self._activateTab($(self.element), "skills");
+              }, 0);
               console.log("Sheet re-rendered");
               
               // Double-check after render
@@ -2773,17 +2937,98 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               console.error("Error deleting skill:", error);
               ui.notifications.error(`Failed to delete skill: ${error.message}`);
             }
-          }
-        },
-        no: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
+              }
+            },
+            {
+              action: "no",
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          ],
+          default: "no"
         }
-      },
-      default: "no",
-      close: () => {}
-    }).render(true);
+      : {
+          title: "Delete Skill",
+          content: `<p>Are you sure you want to delete the skill "<strong>${skillName}</strong>"?</p>`,
+          buttons: {
+            yes: {
+              icon: '<i class="fas fa-check"></i>',
+              label: "Delete",
+              callback: async () => {
+                try {
+                  console.log("Delete callback called for skill:", skillName);
+                  const currentSkills = actor.system.skills || {};
+                  console.log("Current skills:", currentSkills);
+                  
+                  if (!currentSkills[skillName]) {
+                    console.warn("Skill not found in skills object:", skillName);
+                    ui.notifications.warn(`Skill "${skillName}" not found.`);
+                    return;
+                  }
+                  
+                  // Use Foundry's unset operator to remove the skill
+                  const updateData = {};
+                  updateData[`system.skills.-=${skillName}`] = null;
+                  
+                  console.log("Update data (using unset):", updateData);
+                  
+                  try {
+                    await actor.update(updateData, { render: false });
+                    console.log("Actor updated with unset operator");
+                    
+                    // Refresh actor data
+                    await actor.prepareData();
+                    console.log("Actor skills after update:", actor.system.skills);
+                    
+                    // If unset didn't work, try replacing the entire object
+                    if (actor.system.skills && actor.system.skills[skillName]) {
+                      console.log("Unset didn't work, trying full object replacement");
+                      const updatedSkills = { ...currentSkills };
+                      delete updatedSkills[skillName];
+                      
+                      await actor.update({ "system.skills": updatedSkills }, { diff: false, render: false });
+                      await actor.prepareData();
+                      console.log("Actor skills after full replacement:", actor.system.skills);
+                    }
+                  } catch (error) {
+                    console.error("Error updating actor:", error);
+                    // Fallback: try full object replacement
+                    const updatedSkills = { ...currentSkills };
+                    delete updatedSkills[skillName];
+                    await actor.update({ "system.skills": updatedSkills }, { diff: false, render: false });
+                    await actor.prepareData();
+                  }
+                  
+                  // Force a full re-render of the sheet
+                  await self.render(true);
+                  setTimeout(() => {
+                    self._activateTab($(self.element), "skills");
+                  }, 0);
+                  console.log("Sheet re-rendered");
+                  
+                  // Double-check after render
+                  console.log("Final actor skills check:", actor.system.skills);
+                  
+                  ui.notifications.info(`Deleted skill: ${skillName}`);
+                } catch (error) {
+                  console.error("Error deleting skill:", error);
+                  ui.notifications.error(`Failed to delete skill: ${error.message}`);
+                }
+              }
+            },
+            no: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "no",
+          close: () => {}
+        };
+    dialogOptions.position = { width: 420 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    dialog.render(true);
   }
 
   async _onAddSpeed(event) {
@@ -2926,6 +3171,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     
     const rwiType = $(event.currentTarget).data("type"); // "resistance", "weakness", or "immunity"
     if (!rwiType) return;
+    const rwiKey = rwiType === "weakness" ? "weaknesses" : rwiType === "immunity" ? "immunities" : `${rwiType}s`;
     
     const damageTypes = [
       "Energy",
@@ -2952,9 +3198,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         </div>
         ${rwiType === "resistance" || rwiType === "weakness" ? `
         <div class="form-group">
-          <label>Value (optional):</label>
-          <input type="number" name="value" min="0" placeholder="e.g., 5"/>
-          <p style="font-size: 11px; color: #a0aec0; margin-top: 5px;">Leave empty if the value is determined by other factors (e.g., 2 × Bastion level)</p>
+          <label>Value${rwiType === "resistance" || rwiType === "weakness" ? "" : " (optional)"}:</label>
+          <input type="number" name="value" ${rwiType === "resistance" || rwiType === "weakness" ? 'min="1" required' : 'min="0"'} placeholder="e.g., 5"/>
+          ${rwiType === "resistance" || rwiType === "weakness" ? "" : '<p style="font-size: 11px; color: #a0aec0; margin-top: 5px;">Leave empty if the value is determined by other factors (e.g., 2 × Bastion level)</p>'}
         </div>
         ` : ''}
       </form>
@@ -2981,42 +3227,96 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </style>
     `;
     
-    new Dialog({
-      title: `Add ${rwiType.charAt(0).toUpperCase() + rwiType.slice(1)}`,
-      content: template,
-      buttons: {
-        save: {
-          icon: '<i class="fas fa-check"></i>',
-          label: "Add",
-          callback: async (html) => {
-            const damageType = html.find('select[name="damageType"]').val();
-            const value = html.find('input[name="value"]').val();
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogTitle = `Add ${rwiType.charAt(0).toUpperCase() + rwiType.slice(1)}`;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: template,
+          buttons: [
+            { action: "save", icon: '<i class="fas fa-check"></i>', label: "Add" },
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "save",
+          submit: async (result, dialog) => {
+            if (result !== "save") return;
+            const root = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+            const container = root?.shadowRoot || root;
+            const damageType = container?.querySelector('select[name="damageType"]')?.value;
+            const value = container?.querySelector('input[name="value"]')?.value;
             
             if (!damageType) {
               ui.notifications.warn("Please select a damage type.");
               return;
             }
-            
-            const rwiArray = foundry.utils.deepClone(this.actor.system[rwiType + "s"] || []);
+
+            let parsedValue = value !== undefined && value !== "" ? parseInt(value, 10) : null;
+            if (parsedValue !== null && Number.isNaN(parsedValue)) parsedValue = null;
+            if ((rwiType === "resistance" || rwiType === "weakness") && (!parsedValue || parsedValue <= 0)) {
+              ui.notifications.warn(`Please enter a ${rwiType} value greater than 0.`);
+              return;
+            }
+
+            const rwiArray = foundry.utils.deepClone(this.actor.system[rwiKey] || []);
             const newItem = {
               type: damageType,
-              value: value ? parseInt(value) : null
+              value: parsedValue
             };
             
             rwiArray.push(newItem);
             
-            await this.actor.update({ [`system.${rwiType}s`]: rwiArray });
+            await this.actor.update({ [`system.${rwiKey}`]: rwiArray });
             this.render();
             ui.notifications.info(`Added ${damageType} ${rwiType}.`);
           }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
         }
-      },
-      default: "save"
-    }).render(true);
+      : {
+          title: dialogTitle,
+          content: template,
+          buttons: {
+            save: {
+              icon: '<i class="fas fa-check"></i>',
+              label: "Add",
+              callback: async (html) => {
+                const damageType = html.find('select[name="damageType"]').val();
+                const value = html.find('input[name="value"]').val();
+                
+                if (!damageType) {
+                  ui.notifications.warn("Please select a damage type.");
+                  return;
+                }
+
+                let parsedValue = value !== undefined && value !== "" ? parseInt(value, 10) : null;
+                if (parsedValue !== null && Number.isNaN(parsedValue)) parsedValue = null;
+                if ((rwiType === "resistance" || rwiType === "weakness") && (!parsedValue || parsedValue <= 0)) {
+                  ui.notifications.warn(`Please enter a ${rwiType} value greater than 0.`);
+                  return;
+                }
+
+                const rwiArray = foundry.utils.deepClone(this.actor.system[rwiKey] || []);
+                const newItem = {
+                  type: damageType,
+                  value: parsedValue
+                };
+                
+                rwiArray.push(newItem);
+                
+                await this.actor.update({ [`system.${rwiKey}`]: rwiArray });
+                this.render();
+                ui.notifications.info(`Added ${damageType} ${rwiType}.`);
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          },
+          default: "save"
+        };
+    dialogOptions.position = { width: 420, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onRollWound(event) {
@@ -3240,8 +3540,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     const id = $(event.currentTarget).data("id");
     
     if (!rwiType || id === undefined) return;
+    const rwiKey = rwiType === "weakness" ? "weaknesses" : rwiType === "immunity" ? "immunities" : `${rwiType}s`;
     
-    const rwiArray = foundry.utils.deepClone(this.actor.system[rwiType + "s"] || []);
+    const rwiArray = foundry.utils.deepClone(this.actor.system[rwiKey] || []);
     if (id >= 0 && id < rwiArray.length) {
       const removed = rwiArray[id];
       
@@ -3253,7 +3554,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       
       rwiArray.splice(id, 1);
       
-      await this.actor.update({ [`system.${rwiType}s`]: rwiArray });
+      await this.actor.update({ [`system.${rwiKey}`]: rwiArray });
       this.render();
       ui.notifications.info(`Removed ${removed.type} ${rwiType}.`);
     }
@@ -3302,59 +3603,147 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </form>
     `;
 
-    new Dialog({
-      title: "Edit Skill",
-      content: template,
-      buttons: {
-        save: {
-          icon: '<i class="fas fa-check"></i>',
-          label: "Save",
-          callback: async (html) => {
-            const newSkillName = html.find('input[name="skillName"]').val()?.trim();
-            const ability = html.find('select[name="ability"]').val();
-            const rank = html.find('select[name="rank"]').val();
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: "Edit Skill",
+          content: template,
+          buttons: [
+            { action: "save", icon: '<i class="fas fa-check"></i>', label: "Save" },
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "save",
+          submit: async (result, dialog) => {
+            if (result !== "save") return;
+            const root = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+            const container = root?.shadowRoot || root;
+            const rawName = String(container?.querySelector('input[name="skillName"]')?.value ?? "");
+            const skillNameInput = rawName.trim().replace(/\s+/g, " ");
+            const normalizedSkillName = skillNameInput
+              ? skillNameInput.charAt(0).toUpperCase() + skillNameInput.slice(1).toLowerCase()
+              : "";
+            const ability = container?.querySelector('select[name="ability"]')?.value;
+            const rank = container?.querySelector('select[name="rank"]')?.value;
 
-            if (!newSkillName) {
+            if (!normalizedSkillName) {
               ui.notifications.warn("Please enter a skill name.");
               return;
             }
 
             const skills = foundry.utils.deepClone(this.actor.system.skills || {});
+            const currentNormalized = skillName
+              ? skillName.trim().replace(/\s+/g, " ").charAt(0).toUpperCase() + skillName.trim().replace(/\s+/g, " ").slice(1).toLowerCase()
+              : "";
             
-            // If the name changed, check if new name already exists
-            if (newSkillName !== skillName && skills[newSkillName]) {
-              ui.notifications.warn(`Skill "${newSkillName}" already exists.`);
-              return;
+            // If the name changed, check if normalized name already exists
+            if (normalizedSkillName !== currentNormalized) {
+              const hasDuplicate = Object.keys(skills).some(name => {
+                const normalized = name
+                  ? name.trim().replace(/\s+/g, " ").charAt(0).toUpperCase() + name.trim().replace(/\s+/g, " ").slice(1).toLowerCase()
+                  : "";
+                return normalized === normalizedSkillName;
+              });
+              if (hasDuplicate) {
+                ui.notifications.warn(`Skill "${normalizedSkillName}" already exists.`);
+                return;
+              }
             }
 
             // Get the existing skill data (preserve otherBonuses)
             const existingSkill = skills[skillName] || {};
             
             // If name changed, delete old and create new
-            if (newSkillName !== skillName) {
+            if (normalizedSkillName !== skillName) {
               delete skills[skillName];
             }
 
-            skills[newSkillName] = {
-              ability: ability.toLowerCase(),
-              rank: rank,
+            skills[normalizedSkillName] = {
+              ability: ability?.toLowerCase() || "might",
+              rank: rank || "Novice",
               otherBonuses: existingSkill.otherBonuses || 0
             };
 
             await this.actor.update({ "system.skills": skills });
-            this.render(true);
-            ui.notifications.info(`Updated skill: ${newSkillName}`);
+            this._preferredTab = "skills";
+            await this.render(true);
+            this._activateTab($(this.element), "skills");
+            ui.notifications.info(`Updated skill: ${normalizedSkillName}`);
           }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
         }
-      },
-      default: "save",
-      close: () => {}
-    }).render(true);
+      : {
+          title: "Edit Skill",
+          content: template,
+          buttons: {
+            save: {
+              icon: '<i class="fas fa-check"></i>',
+              label: "Save",
+              callback: async (html) => {
+                const rawName = String(html.find('input[name="skillName"]').val() ?? "");
+                const skillNameInput = rawName.trim().replace(/\s+/g, " ");
+                const normalizedSkillName = skillNameInput
+                  ? skillNameInput.charAt(0).toUpperCase() + skillNameInput.slice(1).toLowerCase()
+                  : "";
+                const ability = html.find('select[name="ability"]').val();
+                const rank = html.find('select[name="rank"]').val();
+
+                if (!normalizedSkillName) {
+                  ui.notifications.warn("Please enter a skill name.");
+                  return;
+                }
+
+                const skills = foundry.utils.deepClone(this.actor.system.skills || {});
+                const currentNormalized = skillName
+                  ? skillName.trim().replace(/\s+/g, " ").charAt(0).toUpperCase() + skillName.trim().replace(/\s+/g, " ").slice(1).toLowerCase()
+                  : "";
+                
+                // If the name changed, check if normalized name already exists
+                if (normalizedSkillName !== currentNormalized) {
+                  const hasDuplicate = Object.keys(skills).some(name => {
+                    const normalized = name
+                      ? name.trim().replace(/\s+/g, " ").charAt(0).toUpperCase() + name.trim().replace(/\s+/g, " ").slice(1).toLowerCase()
+                      : "";
+                    return normalized === normalizedSkillName;
+                  });
+                  if (hasDuplicate) {
+                    ui.notifications.warn(`Skill "${normalizedSkillName}" already exists.`);
+                    return;
+                  }
+                }
+
+                // Get the existing skill data (preserve otherBonuses)
+                const existingSkill = skills[skillName] || {};
+                
+                // If name changed, delete old and create new
+                if (normalizedSkillName !== skillName) {
+                  delete skills[skillName];
+                }
+
+                skills[normalizedSkillName] = {
+                  ability: ability.toLowerCase(),
+                  rank: rank,
+                  otherBonuses: existingSkill.otherBonuses || 0
+                };
+
+                await this.actor.update({ "system.skills": skills });
+                this._preferredTab = "skills";
+                await this.render(true);
+                this._activateTab($(this.element), "skills");
+                ui.notifications.info(`Updated skill: ${normalizedSkillName}`);
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "save",
+          close: () => {}
+        };
+    dialogOptions.position = { width: 520, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onUpdateSkillOtherBonuses(event) {
@@ -3495,8 +3884,12 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
   async _onItemCreate(event) {
     event.preventDefault();
     const type = event.currentTarget.dataset.type;
+    if (!type) {
+      ui.notifications.warn("Item type is missing.");
+      return;
+    }
     const itemData = {
-      name: `New ${type.capitalize()}`,
+      name: `New ${type ? type.charAt(0).toUpperCase() + type.slice(1) : "Item"}`,
       type: type,
       system: {}
     };
@@ -3525,6 +3918,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       return;
     }
     
+    const stripHtml = (value) => String(value || "").replace(/<[^>]*>/g, "").trim();
     // Load full armor documents to get system data (price, type, etc.)
     const allArmor = [];
     for (const armorIndex of allArmorIndex) {
@@ -3538,6 +3932,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             "heavy": "Heavy Armor"
           };
           
+          const rawDescription = armorDoc.system?.description || "";
+          const descriptionText = stripHtml(rawDescription);
           allArmor.push({
             _id: armorIndex._id,
             name: armorDoc.name,
@@ -3548,7 +3944,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             baseAC: armorDoc.system?.basic?.baseAC || 0,
             agilityCap: armorDoc.system?.basic?.agilityCap,
             mightRequirement: armorDoc.system?.basic?.mightRequirement,
-            description: armorDoc.system?.description || ""
+            description: descriptionText,
+            descriptionShort: descriptionText.length > 100
+              ? `${descriptionText.substring(0, 100)}...`
+              : descriptionText
           });
         }
       } catch (err) {
@@ -3569,7 +3968,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     });
     
     // Create dialog content
-    const content = await renderTemplate("systems/singularity/templates/dialogs/armor-selection.html", {
+    const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/dialogs/armor-selection.html", {
       armors: sortedArmor
     });
     
@@ -3577,84 +3976,178 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     const dialogTitle = "Buy Armor";
     const dialogId = `armor-buy-dialog-${Date.now()}`;
     
-    const dialog = new Dialog({
-      title: dialogTitle,
-      content: content,
-      buttons: {
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const bindArmorDialog = (html) => {
+      const root = html instanceof jQuery ? html[0] : html;
+      const dialogEl = root || dialog?.element || null;
+      if (!dialogEl) return;
+      const containers = [
+        dialogEl,
+        dialogEl.shadowRoot,
+        dialogEl.querySelector?.(".window-content"),
+        dialogEl.shadowRoot?.querySelector?.(".window-content")
+      ].filter(Boolean);
+      const selectAll = (selector) => {
+        const results = [];
+        for (const container of containers) {
+          results.push(...Array.from(container.querySelectorAll(selector)));
         }
-      },
-      default: "cancel",
-      render: (html) => {
-        // Handle filter buttons
-        html.find(".armor-filter-btn").on("click", (event) => {
-          const filter = $(event.currentTarget).data("filter");
-          
-          // Update active button
-          html.find(".armor-filter-btn").removeClass("active");
-          $(event.currentTarget).addClass("active");
-          
-          // Filter armor items
-          html.find(".armor-selection-item").each(function() {
-            const $item = $(this);
-            const armorType = $item.data("armor-type");
-            
-            if (filter === "all") {
-              $item.removeClass("hidden");
-            } else {
-              if (armorType === filter) {
-                $item.removeClass("hidden");
-              } else {
-                $item.addClass("hidden");
-              }
-            }
+        return results;
+      };
+
+      const applyFilterStyles = (buttonEl, isActive) => {
+        const $button = $(buttonEl);
+        $button.css({
+          background: isActive ? "rgba(189, 95, 255, 0.3)" : "rgba(189, 95, 255, 0.1)",
+          borderColor: isActive ? "#BD5FFF" : "rgba(189, 95, 255, 0.3)",
+          color: isActive ? "#ffffff" : "#d1d1d1",
+          fontWeight: isActive ? "bold" : "normal"
+        });
+        $button.toggleClass("active", isActive);
+      };
+
+      const setActiveFilter = (buttonEl) => {
+        selectAll(".armor-filter-btn").forEach((el) => applyFilterStyles(el, false));
+        if (buttonEl) {
+          applyFilterStyles(buttonEl, true);
+        }
+      };
+
+      const applyFilter = (filter) => {
+        const normalizedFilter = String(filter || "all").toLowerCase();
+        selectAll(".armor-selection-item").forEach((el) => {
+          const armorType = String(el.dataset?.armorType || el.getAttribute("data-armor-type") || "").toLowerCase();
+          if (normalizedFilter === "all" || armorType === normalizedFilter) {
+            el.classList.remove("hidden");
+            el.style.display = "flex";
+          } else {
+            el.classList.add("hidden");
+            el.style.display = "none";
+          }
+        });
+      };
+
+      const bindOnce = () => {
+        const filterButtons = selectAll(".armor-filter-btn");
+        const armorItems = selectAll(".armor-selection-item");
+        if (filterButtons.length === 0 || armorItems.length === 0) {
+          setTimeout(bindOnce, 50);
+          return;
+        }
+        if (dialogEl.dataset?.armorDialogBound === "1") {
+          return;
+        }
+        filterButtons.forEach((buttonEl) => {
+          if (buttonEl.dataset.armorFilterBound === "1") return;
+          buttonEl.dataset.armorFilterBound = "1";
+          buttonEl.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const filter = buttonEl.dataset.filter || "all";
+            setActiveFilter(buttonEl);
+            applyFilter(filter);
           });
         });
+
+        armorItems.forEach((itemEl) => {
+          if (itemEl.dataset.armorItemBound === "1") return;
+          itemEl.dataset.armorItemBound = "1";
+          itemEl.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const itemId = itemEl.dataset.itemId || itemEl.getAttribute("data-item-id");
         
-        // Handle armor selection
-        html.find(".armor-selection-item").on("click", async (event) => {
-          const itemId = $(event.currentTarget).data("item-id");
-          const itemUuid = `Compendium.singularity.armor.${itemId}`;
-          
-          // Get the full armor document
-          const armor = await armorPack.getDocument(itemId);
-          if (!armor) {
-            ui.notifications.error("Armor not found!");
-            return;
-          }
-          
-          // Check if player has enough credits
-          const currentCredits = this.actor.system.equipment?.credits || 0;
-          const armorPrice = armor.system.basic?.price || 0;
-          
-          if (currentCredits < armorPrice) {
-            ui.notifications.warn(`You don't have enough credits! This armor costs ${armorPrice} credits, but you only have ${currentCredits}.`);
-            return;
-          }
-          
-          // Create a copy of the armor item
-          const armorData = armor.toObject();
-          
-          // Add the armor to the actor's inventory
-          await this.actor.createEmbeddedDocuments("Item", [armorData]);
-          
-          // Deduct credits
-          const newCredits = currentCredits - armorPrice;
-          await this.actor.update({ "system.equipment.credits": newCredits });
-          
-          ui.notifications.info(`Purchased ${armor.name} for ${armorPrice} credits. Remaining credits: ${newCredits}.`);
-          
-          this.render();
-          
-          // Close the dialog
-          dialog.close();
+            // Get the full armor document
+            const armor = await armorPack.getDocument(itemId);
+            if (!armor) {
+              ui.notifications.error("Armor not found!");
+              return;
+            }
+            
+            // Check if player has enough credits
+            const actorCredits = this.actor?.system?.equipment?.credits;
+            let currentCredits = Number(actorCredits);
+            if (Number.isNaN(currentCredits)) {
+              currentCredits = 0;
+            }
+            if (this.element) {
+              const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+              const inputVal = $sheet.find('input[name="system.equipment.credits"]').val();
+              if (inputVal !== undefined && inputVal !== null && inputVal !== "") {
+                const parsed = Number(inputVal);
+                if (!Number.isNaN(parsed)) {
+                  currentCredits = parsed;
+                }
+              }
+            }
+            const armorPrice = armor.system.basic?.price || 0;
+            
+            if (currentCredits < armorPrice) {
+              ui.notifications.warn(`You don't have enough credits! This armor costs ${armorPrice} credits, but you only have ${currentCredits}.`);
+              return;
+            }
+            
+            // Create a copy of the armor item
+            const armorData = armor.toObject();
+            if (!armorData.type) {
+              armorData.type = armor.type;
+            }
+            
+            // Add the armor to the actor's inventory
+            await this.actor.createEmbeddedDocuments("Item", [armorData]);
+            
+            // Deduct credits
+            const newCredits = currentCredits - armorPrice;
+            await this.actor.update({ "system.equipment.credits": newCredits });
+            
+            ui.notifications.info(`Purchased ${armor.name} for ${armorPrice} credits. Remaining credits: ${newCredits}.`);
+            
+            this.render();
+            
+            // Close the dialog
+            dialog.close();
+          });
         });
+
+        const defaultButton = selectAll(".armor-filter-btn[data-filter='all']")[0];
+        setActiveFilter(defaultButton);
+        applyFilter("all");
+        dialogEl.dataset.armorDialogBound = "1";
+      };
+
+      setTimeout(bindOnce, 0);
+    };
+
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: content,
+          buttons: [
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "cancel"
+        }
+      : {
+          title: dialogTitle,
+          content: content,
+          buttons: {
+            cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          },
+          default: "cancel",
+          render: (html) => {
+            bindArmorDialog(html);
+          }
+        };
+    dialogOptions.position = { width: 900, height: 700 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
+    if (DialogClass?.name === "DialogV2") {
+      const dialogEl = dialog.element instanceof jQuery ? dialog.element[0] : dialog.element;
+      if (dialogEl) {
+        bindArmorDialog(dialogEl);
       }
-    });
-    
-    dialog.render(true);
+    }
   }
 
   async _onEquipArmor(event) {
@@ -3700,6 +4193,10 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     event.preventDefault();
     event.stopPropagation();
     
+    this._preferredTab = "equipment";
+    this._scrollPositions = this._scrollPositions || {};
+    this._scrollPositions.equipment = $(this.element).find(".tab.equipment").scrollTop() || 0;
+
     const itemId = $(event.currentTarget).data("item-id");
     const item = this.actor.items.get(itemId);
     
@@ -3710,7 +4207,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     
     await item.update({ "system.basic.equipped": false });
     ui.notifications.info(`Unequipped ${item.name}.`);
-    this.render();
+    this.render(true);
   }
 
   async _onBuyWeapon(event) {
@@ -3819,46 +4316,37 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     // Create and show dialog
     const dialogTitle = "Buy Weapon";
     const dialogId = `weapon-buy-dialog-${Date.now()}`;
-    
-    const dialog = new Dialog({
-      title: dialogTitle,
-      content: content,
-      buttons: {
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
-        }
-      },
-      default: "cancel",
-      render: (html) => {
-        // Handle filter buttons
-        html.find(".weapon-filter-btn").on("click", (event) => {
-          const filter = $(event.currentTarget).data("filter");
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const bindWeaponDialog = (html) => {
+      // Handle filter buttons
+      html.find(".weapon-filter-btn").on("click", (event) => {
+        const filter = $(event.currentTarget).data("filter");
+        
+        // Update active button
+        html.find(".weapon-filter-btn").removeClass("active");
+        $(event.currentTarget).addClass("active");
+        
+        // Filter weapon items
+        html.find(".weapon-selection-item").each(function() {
+          const $item = $(this);
+          const weaponType = $item.data("weapon-type");
           
-          // Update active button
-          html.find(".weapon-filter-btn").removeClass("active");
-          $(event.currentTarget).addClass("active");
-          
-          // Filter weapon items
-          html.find(".weapon-selection-item").each(function() {
-            const $item = $(this);
-            const weaponType = $item.data("weapon-type");
-            
-            if (filter === "all") {
+          if (filter === "all") {
+            $item.removeClass("hidden");
+          } else {
+            if (weaponType === filter) {
               $item.removeClass("hidden");
             } else {
-              if (weaponType === filter) {
-                $item.removeClass("hidden");
-              } else {
-                $item.addClass("hidden");
-              }
+              $item.addClass("hidden");
             }
-          });
+          }
         });
-        
-        // Handle weapon selection
-        html.find(".weapon-selection-item").on("click", async (event) => {
-          const itemId = $(event.currentTarget).data("item-id");
+      });
+      
+      // Handle weapon selection
+      html.find(".weapon-selection-item").on("click", async (event) => {
+        const itemId = $(event.currentTarget).data("item-id");
           
           // Get the full weapon document
           const weapon = await weaponsPack.getDocument(itemId);
@@ -3878,6 +4366,9 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           
           // Create a copy of the weapon item
           const weaponData = weapon.toObject();
+          if (!weaponData.type) {
+            weaponData.type = weapon.type;
+          }
           
           try {
             // Add the weapon to the actor's inventory
@@ -3905,16 +4396,49 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             ui.notifications.error(`Failed to purchase ${weapon.name}: ${purchaseError.message}`);
           }
         });
+    };
+
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: content,
+          buttons: [
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "cancel"
+        }
+      : {
+          title: dialogTitle,
+          content: content,
+          buttons: {
+            cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          },
+          default: "cancel",
+          render: (html) => {
+            bindWeaponDialog(html);
+          }
+        };
+    dialogOptions.position = { width: 900, height: 700 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
+    if (DialogClass?.name === "DialogV2") {
+      const dialogEl = dialog.element instanceof jQuery ? dialog.element[0] : dialog.element;
+      const $html = dialogEl ? $(dialogEl) : null;
+      if ($html) {
+        bindWeaponDialog($html);
       }
-    });
-    
-    dialog.render(true);
+    }
   }
 
   async _onEquipWeapon(event) {
     event.preventDefault();
     event.stopPropagation();
     
+    this._preferredTab = "equipment";
+    this._scrollPositions = this._scrollPositions || {};
+    this._scrollPositions.equipment = $(this.element).find(".tab.equipment").scrollTop() || 0;
+
     const itemId = $(event.currentTarget).data("item-id");
     const item = this.actor.items.get(itemId);
     
@@ -3945,13 +4469,17 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     
     await item.update({ "system.basic.equipped": true });
     ui.notifications.info(`Equipped ${item.name}.`);
-    this.render();
+    this.render(true);
   }
 
   async _onUnequipWeapon(event) {
     event.preventDefault();
     event.stopPropagation();
     
+    this._preferredTab = "equipment";
+    this._scrollPositions = this._scrollPositions || {};
+    this._scrollPositions.equipment = $(this.element).find(".tab.equipment").scrollTop() || 0;
+
     const itemId = $(event.currentTarget).data("item-id");
     const item = this.actor.items.get(itemId);
     
@@ -3962,7 +4490,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     
     await item.update({ "system.basic.equipped": false });
     ui.notifications.info(`Unequipped ${item.name}.`);
-    this.render();
+    this.render(true);
   }
 
   _onItemEdit(event) {
@@ -4120,16 +4648,22 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
     const dialogTitle = `Roll ${abilityDisplay} Check`;
     
-    const d = new Dialog({
-      title: dialogTitle,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          icon: '<i class="fas fa-dice-d20"></i>',
-          label: "Roll Ability",
-          callback: async (html) => {
-            const abilityScore = parseFloat(html.find("#ability-score").val()) || 0;
-            const extra = html.find("#extra-modifier").val().trim() || "0";
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: [
+            { action: "roll", icon: '<i class="fas fa-dice-d20"></i>', label: "Roll Ability" },
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "roll",
+          submit: async (result, dialog) => {
+            if (result !== "roll") return;
+            const root = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+            const container = root?.shadowRoot || root;
+            const abilityScore = parseFloat(container?.querySelector("#ability-score")?.value || "0") || 0;
+            const extra = (container?.querySelector("#extra-modifier")?.value || "0").trim() || "0";
             
             // Build roll formula: 1d20 + ability + extra
             let rollFormula = `1d20 + ${abilityScore}`;
@@ -4149,17 +4683,49 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               flavor: flavor
             });
           }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
         }
-      },
-      default: "roll"
-    });
-    
-    d.render(true);
+      : {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: {
+            roll: {
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Ability",
+              callback: async (html) => {
+                const abilityScore = parseFloat(html.find("#ability-score").val()) || 0;
+                const extra = html.find("#extra-modifier").val().trim() || "0";
+                
+                // Build roll formula: 1d20 + ability + extra
+                let rollFormula = `1d20 + ${abilityScore}`;
+                if (extra && extra !== "0") {
+                  rollFormula += ` + ${extra}`;
+                }
+                
+                const roll = new Roll(rollFormula);
+                await roll.evaluate();
+                
+                const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+                const scaredText = scaredPenalty > 0 ? ` - ${scaredPenalty} (Scared)` : "";
+                const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Check</b><br>1d20 + ${abilityScore} (${abilityDisplay})${scaredText}${extraText} = <strong>${roll.total}</strong></div>`;
+                
+                await roll.toMessage({
+                  speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                  flavor: flavor
+                });
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "roll"
+        };
+    dialogOptions.position = { width: 520, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onAbilityNameRoll(event) {
@@ -4226,18 +4792,32 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </div>
     `;
 
-    new Dialog({
-      title: `${abilityDisplay} Score Breakdown`,
-      content: dialogContent,
-      buttons: {
-        close: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Close",
-          callback: () => {}
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: `${abilityDisplay} Score Breakdown`,
+          content: dialogContent,
+          buttons: [
+            { action: "close", icon: '<i class="fas fa-times"></i>', label: "Close" }
+          ],
+          default: "close"
         }
-      },
-      default: "close"
-    }).render(true);
+      : {
+          title: `${abilityDisplay} Score Breakdown`,
+          content: dialogContent,
+          buttons: {
+            close: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Close",
+              callback: () => {}
+            }
+          },
+          default: "close"
+        };
+    dialogOptions.position = { width: 500, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onShowHpBreakdown(event) {
@@ -4304,18 +4884,32 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </div>
     `;
 
-    new Dialog({
-      title: "Maximum HP Breakdown",
-      content: dialogContent,
-      buttons: {
-        close: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Close",
-          callback: () => {}
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: "Maximum HP Breakdown",
+          content: dialogContent,
+          buttons: [
+            { action: "close", icon: '<i class="fas fa-times"></i>', label: "Close" }
+          ],
+          default: "close"
         }
-      },
-      default: "close"
-    }).render(true);
+      : {
+          title: "Maximum HP Breakdown",
+          content: dialogContent,
+          buttons: {
+            close: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Close",
+              callback: () => {}
+            }
+          },
+          default: "close"
+        };
+    dialogOptions.position = { width: 500, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onShowSavingThrowBreakdown(event) {
@@ -4378,18 +4972,32 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </div>
     `;
 
-    new Dialog({
-      title: `${abilityDisplay} Saving Throw Breakdown`,
-      content: dialogContent,
-      buttons: {
-        close: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Close",
-          callback: () => {}
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: `${abilityDisplay} Saving Throw Breakdown`,
+          content: dialogContent,
+          buttons: [
+            { action: "close", icon: '<i class="fas fa-times"></i>', label: "Close" }
+          ],
+          default: "close"
         }
-      },
-      default: "close"
-    }).render(true);
+      : {
+          title: `${abilityDisplay} Saving Throw Breakdown`,
+          content: dialogContent,
+          buttons: {
+            close: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Close",
+              callback: () => {}
+            }
+          },
+          default: "close"
+        };
+    dialogOptions.position = { width: 520, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onRollSavingThrow(event) {
@@ -4601,18 +5209,24 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
 
     const dialogTitle = `Roll ${abilityDisplay} Saving Throw`;
     
-    const d = new Dialog({
-      title: dialogTitle,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          icon: '<i class="fas fa-dice-d20"></i>',
-          label: "Roll Saving Throw",
-          callback: async (html) => {
-            const abilityScore = parseFloat(html.find("#ability-score").val()) || 0;
-            const trainingBonus = parseFloat(html.find("#training-bonus").val()) || 0;
-            const otherBonuses = parseFloat(html.find("#other-bonuses").val()) || 0;
-            const extra = html.find("#extra-modifier").val().trim() || "0";
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: [
+            { action: "roll", icon: '<i class="fas fa-dice-d20"></i>', label: "Roll Saving Throw" },
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "roll",
+          submit: async (result, dialog) => {
+            if (result !== "roll") return;
+            const root = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+            const container = root?.shadowRoot || root;
+            const abilityScore = parseFloat(container?.querySelector("#ability-score")?.value || "0") || 0;
+            const trainingBonus = parseFloat(container?.querySelector("#training-bonus")?.value || "0") || 0;
+            const otherBonuses = parseFloat(container?.querySelector("#other-bonuses")?.value || "0") || 0;
+            const extra = (container?.querySelector("#extra-modifier")?.value || "0").trim() || "0";
             
             // Build roll formula: 1d20 + ability + training + other + extra
             let rollFormula = `1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
@@ -4636,17 +5250,55 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               flavor: flavor
             });
           }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
         }
-      },
-      default: "roll"
-    });
-    
-    d.render(true);
+      : {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: {
+            roll: {
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Saving Throw",
+              callback: async (html) => {
+                const abilityScore = parseFloat(html.find("#ability-score").val()) || 0;
+                const trainingBonus = parseFloat(html.find("#training-bonus").val()) || 0;
+                const otherBonuses = parseFloat(html.find("#other-bonuses").val()) || 0;
+                const extra = html.find("#extra-modifier").val().trim() || "0";
+                
+                // Build roll formula: 1d20 + ability + training + other + extra
+                let rollFormula = `1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
+                if (fatiguedPenalty > 0) {
+                  rollFormula += ` - ${fatiguedPenalty}`;
+                }
+                if (extra && extra !== "0") {
+                  rollFormula += ` + ${extra}`;
+                }
+                
+                const roll = new Roll(rollFormula);
+                await roll.evaluate();
+                
+                const otherText = otherBonuses !== 0 ? ` + ${otherBonuses} (Other)` : "";
+                const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+                const fatiguedText = fatiguedPenalty > 0 ? ` - ${fatiguedPenalty} (Fatigued)` : "";
+                const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Saving Throw</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${savingThrow.rank})${otherText}${fatiguedText}${extraText} = <strong>${roll.total}</strong></div>`;
+                
+                await roll.toMessage({
+                  speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                  flavor: flavor
+                });
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "roll"
+        };
+    dialogOptions.position = { width: 560, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   _onUpdateSavingThrowOtherBonuses(event) {
@@ -4668,10 +5320,14 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
   async _onIncreaseLevel(event) {
     event.preventDefault();
     event.stopPropagation();
+
+    if (this._updatingPrimeLevel) return;
+    this._updatingPrimeLevel = true;
     
     const currentLevel = this.actor.system.basic.primeLevel || 1;
     if (currentLevel >= 20) {
       ui.notifications.warn("Maximum level is 20.");
+      this._updatingPrimeLevel = false;
       return;
     }
     
@@ -4679,15 +5335,20 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       "system.basic.primeLevel": currentLevel + 1
     });
     this.render();
+    this._updatingPrimeLevel = false;
   }
 
   async _onDecreaseLevel(event) {
     event.preventDefault();
     event.stopPropagation();
+
+    if (this._updatingPrimeLevel) return;
+    this._updatingPrimeLevel = true;
     
     const currentLevel = this.actor.system.basic.primeLevel || 1;
     if (currentLevel <= 1) {
       ui.notifications.warn("Minimum level is 1.");
+      this._updatingPrimeLevel = false;
       return;
     }
     
@@ -4695,6 +5356,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       "system.basic.primeLevel": currentLevel - 1
     });
     this.render();
+    this._updatingPrimeLevel = false;
   }
 
   async _onShowInitiativeBreakdown(event) {
@@ -4734,18 +5396,32 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </div>
     `;
 
-    new Dialog({
-      title: "Initiative Breakdown",
-      content: dialogContent,
-      buttons: {
-        close: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Close",
-          callback: () => {}
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: "Initiative Breakdown",
+          content: dialogContent,
+          buttons: [
+            { action: "close", icon: '<i class="fas fa-times"></i>', label: "Close" }
+          ],
+          default: "close"
         }
-      },
-      default: "close"
-    }).render(true);
+      : {
+          title: "Initiative Breakdown",
+          content: dialogContent,
+          buttons: {
+            close: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Close",
+              callback: () => {}
+            }
+          },
+          default: "close"
+        };
+    dialogOptions.position = { width: 500, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onShowAcBreakdown(event) {
@@ -4831,18 +5507,32 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </div>
     `;
 
-    new Dialog({
-      title: "Armor Class Breakdown",
-      content: dialogContent,
-      buttons: {
-        close: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Close",
-          callback: () => {}
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: "Armor Class Breakdown",
+          content: dialogContent,
+          buttons: [
+            { action: "close", icon: '<i class="fas fa-times"></i>', label: "Close" }
+          ],
+          default: "close"
         }
-      },
-      default: "close"
-    }).render(true);
+      : {
+          title: "Armor Class Breakdown",
+          content: dialogContent,
+          buttons: {
+            close: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Close",
+              callback: () => {}
+            }
+          },
+          default: "close"
+        };
+    dialogOptions.position = { width: 500, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   _onSkillRoll(event) {
@@ -5086,23 +5776,32 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       </form>
     `;
 
-    new Dialog({
-      title: isEdit ? "Edit Attack" : "Add Attack",
-      content: dialogContent,
-      buttons: {
-        save: {
-          icon: '<i class="fas fa-check"></i>',
-          label: "Save",
-          callback: async (html) => {
-            const name = html.find("#attack-name").val().trim();
-            const icon = html.find("#attack-icon").val() || "fa-sword";
-            const baseAttackBonus = parseFloat(html.find("#attack-bonus").val()) || 0;
-            const baseDamage = html.find("#attack-damage").val().trim();
-            const damageType = html.find("#attack-damage-type").val();
-            const range = html.find("#attack-range").val().trim();
-            const ability = html.find("#attack-ability").val() || "";
-            const cost = parseFloat(html.find("#attack-cost").val()) || 0;
-            const type = html.find("#attack-type").val() || "";
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const getDialogRoot = () => {
+      const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+      return el instanceof HTMLElement ? el : document;
+    };
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: isEdit ? "Edit Attack" : "Add Attack",
+          content: dialogContent,
+          buttons: [
+            {
+              action: "save",
+              icon: '<i class="fas fa-check"></i>',
+              label: "Save",
+              callback: async () => {
+                const root = getDialogRoot();
+                const name = String(root.querySelector("#attack-name")?.value ?? "").trim();
+                const icon = root.querySelector("#attack-icon")?.value || "fa-sword";
+                const baseAttackBonus = parseFloat(root.querySelector("#attack-bonus")?.value) || 0;
+                const baseDamage = String(root.querySelector("#attack-damage")?.value ?? "").trim();
+                const damageType = root.querySelector("#attack-damage-type")?.value;
+                const range = String(root.querySelector("#attack-range")?.value ?? "").trim();
+                const ability = root.querySelector("#attack-ability")?.value || "";
+                const cost = parseFloat(root.querySelector("#attack-cost")?.value) || 0;
+                const type = root.querySelector("#attack-type")?.value || "";
 
             if (!name) {
               ui.notifications.warn("Attack name is required.");
@@ -5143,17 +5842,50 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               attacks.push(newAttack);
             }
 
-            await this.actor.update({ "system.attacks": attacks });
-          }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
+                await this.actor.update({ "system.attacks": attacks });
+              }
+            },
+            {
+              action: "cancel",
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          ],
+          default: "save"
         }
-      },
-      default: "save"
-    }).render(true);
+      : {
+          title: isEdit ? "Edit Attack" : "Add Attack",
+          content: dialogContent,
+          buttons: {
+            save: {
+              icon: '<i class="fas fa-check"></i>',
+              label: "Save",
+              callback: async (html) => {
+                const $html = html instanceof jQuery ? html : $(html);
+                const name = $html.find("#attack-name").val().trim();
+                const icon = $html.find("#attack-icon").val() || "fa-sword";
+                const baseAttackBonus = parseFloat($html.find("#attack-bonus").val()) || 0;
+                const baseDamage = $html.find("#attack-damage").val().trim();
+                const damageType = $html.find("#attack-damage-type").val();
+                const range = $html.find("#attack-range").val().trim();
+                const ability = $html.find("#attack-ability").val() || "";
+                const cost = parseFloat($html.find("#attack-cost").val()) || 0;
+                const type = $html.find("#attack-type").val() || "";
+                await this.actor.update({ "system.attacks": attacks });
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "save"
+        };
+    dialogOptions.position = { width: 620 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    dialog.render(true);
   }
 
   async _applyBastionBenefits() {
@@ -5998,18 +6730,26 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     `;
 
     const dialogTitle = `Roll Attack: ${attack.name}`;
-    
-    const d = new Dialog({
-      title: dialogTitle,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          icon: '<i class="fas fa-dice-d20"></i>',
-          label: "Roll Attack",
-          callback: async (html) => {
-            const bonus = parseFloat(html.find("#attack-bonus").val()) || 0;
-            const extra = html.find("#extra-modifier").val().trim() || "0";
-            const repeatedPenalty = parseFloat(html.find("#repeated-penalty").val()) || 0;
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const getDialogRoot = () => {
+      const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+      return el instanceof HTMLElement ? el : document;
+    };
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: [
+            {
+              action: "roll",
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Attack",
+              callback: async () => {
+                const root = getDialogRoot();
+                const bonus = parseFloat(root.querySelector("#attack-bonus")?.value) || 0;
+                const extra = String(root.querySelector("#extra-modifier")?.value ?? "0").trim() || "0";
+                const repeatedPenalty = parseFloat(root.querySelector("#repeated-penalty")?.value) || 0;
             
             const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
               target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
@@ -6080,18 +6820,112 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               attackId: attackId,
               attackName: attack.name
             });
-          }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
+              }
+            },
+            {
+              action: "cancel",
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          ],
+          default: "roll"
         }
-      },
-      default: "roll"
-    });
-    
-    await d.render(true);
+      : {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: {
+            roll: {
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Attack",
+              callback: async (html) => {
+                const $html = html instanceof jQuery ? html : $(html);
+                const bonus = parseFloat($html.find("#attack-bonus").val()) || 0;
+                const extra = $html.find("#extra-modifier").val().trim() || "0";
+                const repeatedPenalty = parseFloat($html.find("#repeated-penalty").val()) || 0;
+                
+                const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
+                  target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
+                );
+                const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
+                // Build roll formula: d20 + bonus + extra
+                let rollFormula = `${dieFormula} + ${bonus}`;
+                if (repeatedPenalty) {
+                  rollFormula += ` + ${repeatedPenalty}`;
+                }
+                if (extra && extra !== "0") {
+                  rollFormula += ` + ${extra}`;
+                }
+                
+                const roll = new Roll(rollFormula);
+                await roll.evaluate();
+                
+                const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
+                const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+                // Add Deadeye info if applicable
+                const deadeyeData = this.actor.system.combat?.deadeye || { active: false };
+                const isDeadeyeActive = deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"));
+                const deadeyeInfo = isDeadeyeActive ? ` (includes +5 Deadeye)` : "";
+                const scaredText = scaredPenalty > 0 ? ` (includes -${scaredPenalty} Scared)` : "";
+                const proneText = pronePenalty > 0 ? ` (includes -${pronePenalty} Prone)` : "";
+                const fatiguedText = fatiguedPenalty > 0 ? ` (includes -${fatiguedPenalty} Fatigued)` : "";
+                const blindedText = blindedPenalty > 0 ? ` (includes -${blindedPenalty} Blinded)` : "";
+                const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
+                let acComparison = "";
+                const targets = Array.from(game.user.targets);
+                if (targets.length > 0) {
+                  const targetToken = targets[0];
+                  const targetName = targetToken.name || targetToken.actor?.name || "Target";
+                  const targetActor = targetToken.actor;
+                  const getTargetAc = async (actor) => {
+                    if (!actor) return null;
+                    if (actor.type === "hero" && actor.sheet?.getData) {
+                      const sheetData = await actor.sheet.getData();
+                      return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                    }
+                    return actor.system?.combat?.ac ?? null;
+                  };
+                  const targetAC = await getTargetAc(targetActor);
+                  if (targetAC !== null) {
+                    const difference = roll.total - targetAC;
+                    if (difference >= 10) {
+                      acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${targetAC})</span>`;
+                    } else if (difference >= 0) {
+                      acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${targetAC})</span>`;
+                    } else if (difference >= -9) {
+                      acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                    } else {
+                      acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                    }
+                  }
+                }
+                const acLine = acComparison ? `<br>${acComparison}` : "";
+                const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText})${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}</div>`;
+                
+                const message = await roll.toMessage({
+                  speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                  flavor: flavor
+                });
+                
+                // Store attack roll result for AC comparison when rolling damage
+                await message.setFlag("singularity", "attackRoll", {
+                  total: roll.total,
+                  attackId: attackId,
+                  attackName: attack.name
+                });
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "roll"
+        };
+    dialogOptions.position = { width: 560 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onRollDamage(event) {
@@ -6265,82 +7099,116 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     `;
 
     const dialogTitle = `Roll Damage: ${attack.name}`;
-    
-    const d = new Dialog({
-      title: dialogTitle,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          icon: '<i class="fas fa-dice-d20"></i>',
-          label: "Roll Damage",
-          callback: async (html) => {
-            const damageFormula = html.find("#damage-formula").val().trim();
-            const extra = html.find("#extra-modifier").val().trim() || "0";
-            // Get Supersonic bonus from the input field if it exists, otherwise calculate it
-            const supersonicBonusInput = html.find("#supersonic-bonus");
-            let supersonicBonus = 0;
-            if (supersonicBonusInput.length > 0) {
-              supersonicBonus = parseFloat(supersonicBonusInput.val()) || 0;
-            } else {
-              // Fallback: calculate from actor data
-              const supersonicData = this.actor.system.combat?.supersonicMoment || { active: false, distance: 0 };
-              if (supersonicData.active && attack.range === "Melee") {
-                const distance = Number(supersonicData.distance) || 0;
-                supersonicBonus = Math.floor(distance / 15) * 2;
-              }
-            }
-            
-            // Build roll formula: damageFormula + supersonicBonus + extra
-            let rollFormula = damageFormula;
-            if (supersonicBonus > 0) {
-              rollFormula += ` + ${supersonicBonus}`;
-            }
-            if (extra && extra !== "0") {
-              rollFormula += ` + ${extra}`;
-            }
-            
-            const roll = new Roll(rollFormula);
-            await roll.evaluate();
-            
-            const supersonicText = supersonicBonus > 0 ? ` + ${supersonicBonus} (Supersonic Moment)` : "";
-            const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
-            
-            const isIncorporeal = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
-            const hasCorporealTarget = isIncorporeal && Array.from(game.user?.targets || []).some(
-              target => !target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal")
-            );
-            const finalTotal = hasCorporealTarget ? Math.floor(roll.total / 2) : roll.total;
-            const incorporealText = hasCorporealTarget ? ` (half vs corporeal: ${finalTotal})` : "";
-            const actionButtons = `<div class="chat-card-buttons" style="margin-top: 5px;">
-              <button type="button" class="apply-damage-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(40, 110, 70, 0.5); color: #ffffff; border: 1px solid rgba(40, 110, 70, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bullseye"></i> Apply Damage</button>
-              <button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px; margin-left: 6px;"><i class="fas fa-bolt"></i> Apply Critical (x2)</button>
-            </div>`;
-            const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType})${supersonicText}${extraText} = <strong>${roll.total}</strong>${incorporealText}${actionButtons}</div>`;
-            
-            const message = await roll.toMessage({
-              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-              flavor: flavor
-            });
-            
-            // Store the original roll data in the message flags for critical hit
-            await message.setFlag("singularity", "damageRoll", {
-              total: finalTotal,
-              formula: rollFormula,
-              damageType: attack.damageType,
-              attackName: attack.name
-            });
-          }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const getDialogRoot = () => {
+      const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+      return el instanceof HTMLElement ? el : document;
+    };
+    const rollDamage = async (root) => {
+      const damageFormula = String(root.querySelector("#damage-formula")?.value ?? "").trim();
+      const extra = String(root.querySelector("#extra-modifier")?.value ?? "0").trim() || "0";
+      // Get Supersonic bonus from the input field if it exists, otherwise calculate it
+      const supersonicBonusInput = root.querySelector("#supersonic-bonus");
+      let supersonicBonus = 0;
+      if (supersonicBonusInput) {
+        supersonicBonus = parseFloat(supersonicBonusInput.value) || 0;
+      } else {
+        // Fallback: calculate from actor data
+        const supersonicData = this.actor.system.combat?.supersonicMoment || { active: false, distance: 0 };
+        if (supersonicData.active && attack.range === "Melee") {
+          const distance = Number(supersonicData.distance) || 0;
+          supersonicBonus = Math.floor(distance / 15) * 2;
         }
-      },
-      default: "roll"
-    });
-    
-    d.render(true);
+      }
+      
+      // Build roll formula: damageFormula + supersonicBonus + extra
+      let rollFormula = damageFormula;
+      if (supersonicBonus > 0) {
+        rollFormula += ` + ${supersonicBonus}`;
+      }
+      if (extra && extra !== "0") {
+        rollFormula += ` + ${extra}`;
+      }
+      
+      const roll = new Roll(rollFormula);
+      await roll.evaluate();
+      
+      const supersonicText = supersonicBonus > 0 ? ` + ${supersonicBonus} (Supersonic Moment)` : "";
+      const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+      
+      const isIncorporeal = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
+      const hasCorporealTarget = isIncorporeal && Array.from(game.user?.targets || []).some(
+        target => !target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal")
+      );
+      const finalTotal = hasCorporealTarget ? Math.floor(roll.total / 2) : roll.total;
+      const incorporealText = hasCorporealTarget ? ` (half vs corporeal: ${finalTotal})` : "";
+      const actionButtons = `<div class="chat-card-buttons" style="margin-top: 5px;">
+        <button type="button" class="apply-damage-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(40, 110, 70, 0.5); color: #ffffff; border: 1px solid rgba(40, 110, 70, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bullseye"></i> Apply Damage</button>
+        <button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px; margin-left: 6px;"><i class="fas fa-bolt"></i> Apply Critical (x2)</button>
+      </div>`;
+      const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType})${supersonicText}${extraText} = <strong>${roll.total}</strong>${incorporealText}${actionButtons}</div>`;
+      
+      const message = await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: flavor
+      });
+      
+      // Store the original roll data in the message flags for critical hit
+      await message.setFlag("singularity", "damageRoll", {
+        total: finalTotal,
+        formula: rollFormula,
+        damageType: attack.damageType,
+        attackName: attack.name
+      });
+    };
+
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: [
+            {
+              action: "roll",
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Damage",
+              callback: async () => {
+                const root = getDialogRoot();
+                await rollDamage(root);
+              }
+            },
+            {
+              action: "cancel",
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          ],
+          default: "roll"
+        }
+      : {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: {
+            roll: {
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Damage",
+              callback: async (html) => {
+                const $html = html instanceof jQuery ? html : $(html);
+                await rollDamage($html[0] || $html.get(0));
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "roll"
+        };
+    dialogOptions.position = { width: 560 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    dialog.render(true);
   }
 
   async _onSupersonicToggle(event) {
@@ -6708,13 +7576,27 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     event.preventDefault();
     
     // Confirm with the user
-    const confirmed = await Dialog.confirm({
-      title: "Long Rest",
-      content: "<p>Perform a Long Rest? This will:</p><ul><li>Restore HP to maximum</li><li>Remove all wounds (but not extreme wounds)</li><li>Refresh all used gadgets</li></ul>",
-      yes: () => true,
-      no: () => false,
-      defaultYes: true
-    });
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: "Long Rest",
+          content: "<p>Perform a Long Rest? This will:</p><ul><li>Restore HP to maximum</li><li>Remove all wounds (but not extreme wounds)</li><li>Refresh all used gadgets</li></ul>",
+          buttons: [
+            { action: "yes", label: "Yes" },
+            { action: "no", label: "No" }
+          ],
+          default: "yes"
+        }
+      : {
+          title: "Long Rest",
+          content: "<p>Perform a Long Rest? This will:</p><ul><li>Restore HP to maximum</li><li>Remove all wounds (but not extreme wounds)</li><li>Refresh all used gadgets</li></ul>",
+          yes: () => true,
+          no: () => false,
+          defaultYes: true
+        };
+    const confirmed = DialogClass?.name === "DialogV2"
+      ? (await DialogClass.wait(dialogOptions)) === "yes"
+      : await Dialog.confirm(dialogOptions);
     
     if (!confirmed) {
       return;
@@ -7490,7 +8372,8 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     }
     
     // Create dialog content
-    const content = await renderTemplate("systems/singularity/templates/dialogs/talent-selection.html", {
+    const templateRenderer = foundry.applications?.handlebars?.renderTemplate || renderTemplate;
+    const content = await templateRenderer("systems/singularity/templates/dialogs/talent-selection.html", {
       level: level,
       slotType: slotType,
       talents: selectedLevelTalents,
@@ -7513,21 +8396,34 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     // Create dialog with explicit title - use a unique ID to track it
     const dialogId = `talent-dialog-${Date.now()}`;
     
-    // Create dialog data object with explicit title
-    const dialogData = {
-      title: dialogTitle,
-      content: content,
-      buttons: {
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
-        }
-      },
-      default: "cancel",
-      render: (html) => {
+    const renderTalentDialog = (html) => {
+        console.log('Singularity | renderTalentDialog called', { dialogId, slotType, level });
         // Store references for use in callbacks
         const self = this;
         const originalLevel = level;
+
+        // Global debug: listen for any clicks on talent items at document level (temporary)
+        try {
+          $(document).off('click.singularityTalentDebug').on('click.singularityTalentDebug', '.talent-item', function (e) {
+            try { console.log('Singularity DEBUG | document captured click on', $(this).data('talent-id')); } catch (err) { /* ignore */ }
+          });
+
+          // Native capturing listener (in case delegated or jQuery handlers are blocked)
+          try {
+            document.removeEventListener('pointerdown', window.__singularityPointerHandler, true);
+            window.__singularityPointerHandler = function(e) {
+              const el = e.target && e.target.closest && e.target.closest('.talent-item');
+              if (el) {
+                try { console.log('Singularity CAPTURE | pointerdown on', el.dataset.talentId); } catch (err) { /* ignore */ }
+              }
+            };
+            document.addEventListener('pointerdown', window.__singularityPointerHandler, true);
+          } catch (err) {
+            /* ignore */
+          }
+        } catch (err) {
+          /* ignore */
+        }
         
         // Immediately fix the title in the HTML before Foundry can change it
         const $html = $(html);
@@ -7596,6 +8492,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         
         // Helper function to update talent list
         const updateTalentList = async (selectedLevel) => {
+          console.log('Singularity | updateTalentList', { selectedLevel, totalIndexed: index.size });
           // Get all talents for the selected level
           const talentsByLevel = {};
           let allTalents = Array.from(index.values());
@@ -7710,7 +8607,7 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           } else {
             filteredTalents.forEach(talent => {
               const talentItem = $(`
-                <div class="talent-item" data-talent-id="${talent._id}" data-talent-level="${talent.level}">
+                <div class="talent-item" data-talent-id="${talent._id}" data-talent-level="${talent.level}" role="button" tabindex="0" onclick="console.log('INLINE click', this.dataset.talentId); this.classList.toggle('singularity-clicked-test');" onpointerdown="console.log('INLINE pointerdown', this.dataset.talentId); this.classList.add('singularity-pressed-test');">
                   <img class="talent-icon" src="${talent.img || 'icons/svg/mystery-man.svg'}" alt="${talent.name}" onerror="this.src='icons/svg/mystery-man.svg'">
                   <div class="talent-info">
                     <div class="talent-name">${talent.name}</div>
@@ -7727,12 +8624,26 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         
         // Helper function to attach click handlers
         const attachTalentClickHandlers = (html, slotLevel, slotType, pack, dialog, self) => {
-          html.find(".talent-item").off("click").on("click", async (event) => {
+          // Bind to the rendered dialog container to ensure events reach the live DOM
+          const dialogContainer = (dialog && dialog.element && dialog.element.length) ? dialog.element : $(`.window-app[data-dialog-id="${dialogId}"]`);
+          console.log("Singularity | Attach handlers - dialogContainer length:", dialogContainer && dialogContainer.length, "htmlItems:", html.find('.talent-item').length, slotType, slotLevel);
+
+          const container = dialogContainer.length ? dialogContainer : html;
+
+          container.off("click", ".talent-item").on("click", ".talent-item", async (event) => {
+            console.log('Singularity | talent click event', event.currentTarget, 'containerLen', container.length);
             const talentId = $(event.currentTarget).data("talent-id");
+            console.log('Singularity | clicked talent id', talentId);
             const talentUuid = `Compendium.singularity.talents.${talentId}`;
             
             // Get the full talent document
-            const talent = await pack.getDocument(talentId);
+            let talent;
+            try {
+              talent = await pack.getDocument(talentId);
+            } catch (err) {
+              console.error("Singularity | Error fetching talent document:", err);
+            }
+
             if (!talent) {
               ui.notifications.error("Talent not found!");
               return;
@@ -7768,7 +8679,14 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
               [`system.progression.${levelKey}.${slotType}Img`]: talent.img || "icons/svg/mystery-man.svg"
             };
             
-            await self.actor.update(updateData);
+            try {
+              await self.actor.update(updateData);
+              ui.notifications.info(`Selected talent "${talent.name}" added to progression.`);
+            } catch (err) {
+              console.error("Singularity | Failed to update actor with talent:", err);
+              ui.notifications.error("Failed to apply talent. See console for details.");
+              return; // stop further processing
+            }
             
             // If this is a Paragon talent that grants skill bonuses, add the skill
             if (slotType === "paragonTalent") {
@@ -7862,6 +8780,15 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
             // Close the dialog
             dialog.close();
           });
+
+          // For extra debugging, listen for pointerdown as well
+          container.off("pointerdown", ".talent-item").on("pointerdown", ".talent-item", (e) => {
+            try {
+              console.log('Singularity | pointerdown on talent', $(e.currentTarget).data('talent-id'));
+            } catch (err) {
+              /* ignore */
+            }
+          });
         };
         
         // Handle level filter changes
@@ -7872,10 +8799,33 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         
         // Attach initial click handlers
         attachTalentClickHandlers(html, originalLevel, slotType, talentsPack, dialog, self);
-      }
-    };
+      };
     
-    const dialog = new Dialog(dialogData);
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: content,
+          buttons: [
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "cancel",
+          render: (_app, html) => renderTalentDialog(html)
+        }
+      : {
+          title: dialogTitle,
+          content: content,
+          buttons: {
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          },
+          default: "cancel",
+          render: renderTalentDialog
+        };
+    
+    const dialog = new DialogClass(dialogOptions);
     
     // Store the correct title on the dialog IMMEDIATELY after creation
     dialog._singularityDialogTitle = dialogTitle;
@@ -8036,10 +8986,20 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
       });
     };
     
-    const sortedItems = sortItems(availableItems);
+    const sortedItems = sortItems(availableItems).map(item => {
+      const rawDescription = item.system?.description || item.system?.basic?.description || item.description || "";
+      const stripper = foundry.utils?.stripHTML || ((html) => String(html || "").replace(/<[^>]*>/g, ""));
+      const stripped = stripper(rawDescription || "").replace(/\s+/g, " ").trim();
+      const descriptionShort = stripped.length > 180 ? `${stripped.slice(0, 177)}...` : stripped;
+      return {
+        ...item,
+        descriptionShort
+      };
+    });
     
     // Create dialog content using a generic template
-    const content = await renderTemplate("systems/singularity/templates/dialogs/item-selection.html", {
+    const templateRenderer = foundry.applications?.handlebars?.renderTemplate || renderTemplate;
+    const content = await templateRenderer("systems/singularity/templates/dialogs/item-selection.html", {
       level: level,
       slotType: slotType,
       items: sortedItems,
@@ -8053,17 +9013,134 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
     // Create dialog with explicit title - use a unique ID to track it
     const dialogId = `item-dialog-${Date.now()}`;
     
-    const dialog = new Dialog({
-      title: dialogTitle,
-      content: content,
-      buttons: {
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
+    const selectItemById = async (itemId) => {
+      if (!itemId) return;
+      const itemUuid = `Compendium.singularity.${compendiumName}.${itemId}`;
+      
+      // Get the full item document
+      const item = await pack.getDocument(itemId);
+      if (!item) {
+        ui.notifications.error(`${itemTypeLabel} not found!`);
+        return;
+      }
+      
+      // Update the progression slot
+      const levelKey = `level${level}`;
+      const updateData = {
+        [`system.progression.${levelKey}.${slotType}`]: itemUuid,
+        [`system.progression.${levelKey}.${slotType}Name`]: item.name,
+        [`system.progression.${levelKey}.${slotType}Img`]: item.img || "icons/svg/mystery-man.svg"
+      };
+      
+      // If phenotype, also update the header field
+      if (slotType === "phenotype") {
+        updateData["system.basic.phenotype"] = item.name;
+      }
+      // If subtype, also update the header field
+      if (slotType === "subtype") {
+        updateData["system.basic.subtype"] = item.name;
+      }
+      // If background, also update the header field
+      if (slotType === "background") {
+        updateData["system.basic.background"] = item.name;
+      }
+      // If powerset, also update the header field
+      if (slotType === "powerset") {
+        updateData["system.basic.powerset"] = item.name;
+        
+        // If Paragon is selected, clear any "Unarmed Strikes" weapon category selections
+        if (item.name === "Paragon") {
+          const level1Data = this.actor.system.progression?.level1 || {};
+          // Check humanGenericTalentWeaponCategory
+          if (level1Data.humanGenericTalentWeaponCategory === "Unarmed Strikes") {
+            updateData["system.progression.level1.humanGenericTalentWeaponCategory"] = "";
+          }
+          // Check terranGenericTalentWeaponCategory
+          if (level1Data.terranGenericTalentWeaponCategory === "Unarmed Strikes") {
+            updateData["system.progression.level1.terranGenericTalentWeaponCategory"] = "";
+          }
+          // Check genericTalentWeaponCategory for all levels
+          for (let lvl = 1; lvl <= 20; lvl++) {
+            const levelKey = `level${lvl}`;
+            const levelData = this.actor.system.progression?.[levelKey] || {};
+            if (levelData.genericTalentWeaponCategory === "Unarmed Strikes") {
+              updateData[`system.progression.${levelKey}.genericTalentWeaponCategory`] = "";
+            }
+          }
         }
-      },
-      default: "cancel",
-      render: (html) => {
+        
+        // If Bastion is selected, apply Bastion benefits
+        if (item.name === "Bastion") {
+          await this.actor.update(updateData);
+          // Apply other Bastion benefits (AC bonus, armor training, etc.)
+          await this._applyBastionBenefits();
+          this._preferredTab = "progression";
+          this.render(true);
+          dialog.close();
+          return;
+        }
+      }
+      
+      await this.actor.update(updateData);
+      
+      this._preferredTab = "progression";
+      this.render(true);
+      
+      // Close the dialog
+      dialog.close();
+    };
+
+    const bindItemSelection = (dialogInstance) => {
+      const root = dialogInstance?.element?.shadowRoot || dialogInstance?.element;
+      const container = root instanceof HTMLElement ? root : null;
+      const items = container?.querySelectorAll?.(".item-selection-item") || [];
+      if (!items.length) return false;
+      items.forEach((itemEl) => {
+        if (itemEl.dataset?.boundSelect === "true") return;
+        itemEl.dataset.boundSelect = "true";
+        itemEl.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const itemId = itemEl.getAttribute("data-item-id");
+          selectItemById(itemId);
+        });
+      });
+      return true;
+    };
+
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: content,
+          buttons: [
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "cancel",
+          render: (_app, _html) => {
+            const root = dialog?.element?.shadowRoot || dialog?.element;
+            const $root = root instanceof jQuery ? root : $(root);
+            const $html = $root.length ? $root : $(_html);
+            
+            // Add data attribute to identify this dialog
+            const dialogElement = $html.closest('.window-app');
+            if (dialogElement.length) {
+              dialogElement.attr('data-dialog-id', dialogId);
+            }
+          }
+        }
+      : {
+          title: dialogTitle,
+          content: content,
+          buttons: {
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "cancel",
+          render: (html) => {
         // Add data attribute to identify this dialog
         const dialogElement = $(html).closest('.window-app');
         if (dialogElement.length) {
@@ -8151,91 +9228,26 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
         }, 50);
         
         // Handle item selection
-        html.find(".item-selection-item").on("click", async (event) => {
-          const itemId = $(event.currentTarget).data("item-id");
-          const itemUuid = `Compendium.singularity.${compendiumName}.${itemId}`;
-          
-          // Get the full item document
-          const item = await pack.getDocument(itemId);
-          if (!item) {
-            ui.notifications.error(`${itemTypeLabel} not found!`);
-            return;
-          }
-          
-          // Update the progression slot
-          const levelKey = `level${level}`;
-          const updateData = {
-            [`system.progression.${levelKey}.${slotType}`]: itemUuid,
-            [`system.progression.${levelKey}.${slotType}Name`]: item.name,
-            [`system.progression.${levelKey}.${slotType}Img`]: item.img || "icons/svg/mystery-man.svg"
-          };
-          
-          // If phenotype, also update the header field
-          if (slotType === "phenotype") {
-            updateData["system.basic.phenotype"] = item.name;
-          }
-          // If subtype, also update the header field
-          if (slotType === "subtype") {
-            updateData["system.basic.subtype"] = item.name;
-          }
-          // If background, also update the header field
-          if (slotType === "background") {
-            updateData["system.basic.background"] = item.name;
-          }
-          // If powerset, also update the header field
-          if (slotType === "powerset") {
-            updateData["system.basic.powerset"] = item.name;
-            
-            // If Paragon is selected, clear any "Unarmed Strikes" weapon category selections
-            if (item.name === "Paragon") {
-              const level1Data = this.actor.system.progression?.level1 || {};
-              // Check humanGenericTalentWeaponCategory
-              if (level1Data.humanGenericTalentWeaponCategory === "Unarmed Strikes") {
-                updateData["system.progression.level1.humanGenericTalentWeaponCategory"] = "";
-              }
-              // Check terranGenericTalentWeaponCategory
-              if (level1Data.terranGenericTalentWeaponCategory === "Unarmed Strikes") {
-                updateData["system.progression.level1.terranGenericTalentWeaponCategory"] = "";
-              }
-              // Check genericTalentWeaponCategory for all levels
-              for (let lvl = 1; lvl <= 20; lvl++) {
-                const levelKey = `level${lvl}`;
-                const levelData = this.actor.system.progression?.[levelKey] || {};
-                if (levelData.genericTalentWeaponCategory === "Unarmed Strikes") {
-                  updateData[`system.progression.${levelKey}.genericTalentWeaponCategory`] = "";
-                }
-              }
-            }
-            
-            // If Bastion is selected, apply Bastion benefits
-            if (item.name === "Bastion") {
-              await this.actor.update(updateData);
-              // Apply other Bastion benefits (AC bonus, armor training, etc.)
-              await this._applyBastionBenefits();
-              this.render();
-              dialog.close();
-              return;
-            }
-          }
-          
-          await this.actor.update(updateData);
-          
-          this.render();
-          
-          // Close the dialog
-          dialog.close();
-        });
       }
-    });
+    };
     
     // Store the correct title on the dialog IMMEDIATELY after creation
+    dialogOptions.position = { width: 520, height: "auto" };
+    dialogOptions.window = { resizable: true };
+    const dialog = new DialogClass(dialogOptions);
     dialog._singularityDialogTitle = dialogTitle;
     // Also store it in the data object
     if (dialog.data) {
       dialog.data.title = dialogTitle;
     }
     
-    dialog.render(true);
+    await dialog.render(true);
+    const tryBind = () => bindItemSelection(dialog);
+    if (!tryBind()) {
+      setTimeout(tryBind, 50);
+      setTimeout(tryBind, 150);
+      setTimeout(tryBind, 300);
+    }
   }
 
   async _onDeleteProgressionSlot(event) {
@@ -8452,7 +9464,11 @@ export class SingularityActorSheetHero extends foundry.appv1.sheets.ActorSheet {
           (item.name === "Saving Throw Training (Apprentice)" || item.name.includes("Saving Throw Training"))
         );
         if (savingThrowTalent) {
-          await savingThrowTalent.delete();
+          try {
+            await savingThrowTalent.delete();
+          } catch (error) {
+            console.warn("Singularity | Saving Throw Training talent already removed.", error);
+          }
         }
         
         // Remove resistances from Bastion's Resistance if it was selected

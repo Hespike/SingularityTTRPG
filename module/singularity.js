@@ -873,7 +873,12 @@ Hooks.once("init", function() {
   });
 
   // Register sheet applications
-  foundry.documents.collections.Actors.unregisterSheet("core", foundry.appv1.sheets.ActorSheet);
+  const coreActorSheetV1 = foundry.appv1?.sheets?.ActorSheet;
+  const coreItemSheetV1 = foundry.appv1?.sheets?.ItemSheet;
+  const coreActorSheetV2 = foundry.applications?.api?.ActorSheetV2 || foundry.applications?.api?.DocumentSheetV2;
+  const coreItemSheetV2 = foundry.applications?.api?.ItemSheetV2 || foundry.applications?.api?.DocumentSheetV2;
+  if (coreActorSheetV1) foundry.documents.collections.Actors.unregisterSheet("core", coreActorSheetV1);
+  if (coreActorSheetV2) foundry.documents.collections.Actors.unregisterSheet("core", coreActorSheetV2);
   foundry.documents.collections.Actors.registerSheet("singularity", SingularityActorSheetHero, {
     types: ["hero"],
     makeDefault: true
@@ -883,7 +888,8 @@ Hooks.once("init", function() {
     makeDefault: true
   });
 
-  foundry.documents.collections.Items.unregisterSheet("core", foundry.appv1.sheets.ItemSheet);
+  if (coreItemSheetV1) foundry.documents.collections.Items.unregisterSheet("core", coreItemSheetV1);
+  if (coreItemSheetV2) foundry.documents.collections.Items.unregisterSheet("core", coreItemSheetV2);
   foundry.documents.collections.Items.registerSheet("singularity", SingularityItemSheet, {
     makeDefault: true
   });
@@ -5679,7 +5685,7 @@ Hooks.on("renderChatMessageHTML", function(message, html, data) {
 
     const targetName = targetToken.name || targetActor.name || "Target";
     const kindLabel = options.isCritical ? "Critical Applied" : "Damage Applied";
-    const flavor = `<div class="roll-flavor"><b>${attackName} - ${kindLabel}</b><br>Target: ${targetName}<br>Base: ${baseDamage} (${damageType})<br>${detailText}<br><strong>Applied: ${appliedDamage}</strong> (HP: ${currentHp} → ${newHp}${maxHp ? ` / ${maxHp}` : ""})</div>`;
+    const flavor = `<div class="roll-flavor"><b>${attackName} - ${kindLabel}</b><br>Target: ${targetName}<br>Base: ${baseDamage} (${damageType})<br>${detailText}<br><strong>Applied: ${appliedDamage} (${damageType})</strong> (HP: ${currentHp} → ${newHp}${maxHp ? ` / ${maxHp}` : ""})</div>`;
 
     await ChatMessage.create({
       speaker: message.speaker,

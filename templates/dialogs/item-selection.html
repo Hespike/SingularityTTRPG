@@ -1,15 +1,15 @@
-<div class="item-selection-dialog">
-  <div class="item-dialog-container">
-    <div class="item-content-area">
-      <p class="dialog-description">Select a {{itemTypeLabel}}:</p>
-      <div class="item-list">
+<div class="item-selection-dialog" style="padding: 0;">
+  <div class="item-dialog-container" style="display: flex; gap: 15px; min-height: 400px; max-height: 500px;">
+    <div class="item-content-area" style="flex: 1; display: flex; flex-direction: column; padding: 15px; min-width: 0;">
+      <p class="dialog-description" style="color: #d1d1d1; margin-bottom: 15px; font-size: 14px;">Select a {{itemTypeLabel}}:</p>
+      <div class="item-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
         {{#each items as |item|}}
-        <div class="item-selection-item" data-item-id="{{item._id}}">
-          <img class="item-icon" src="{{item.img}}" alt="{{item.name}}" onerror="this.src='icons/svg/mystery-man.svg'">
-          <div class="item-info">
-            <div class="item-name">{{item.name}}</div>
-            {{#if item.description}}
-            <div class="item-description">{{{item.description}}}</div>
+        <div class="item-selection-item" data-item-id="{{item._id}}" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(189, 95, 255, 0.3); border-radius: 5px; cursor: pointer;">
+          <img class="item-icon" src="{{item.img}}" alt="{{item.name}}" onerror="this.src='icons/svg/mystery-man.svg'" style="width: 40px; height: 40px; border: 1px solid rgba(189, 95, 255, 0.3); border-radius: 3px; flex-shrink: 0; object-fit: contain;">
+          <div class="item-info" style="flex: 1; min-width: 0;">
+            <div class="item-name" style="color: #ffffff; font-weight: bold; font-size: 14px; margin-bottom: 5px;">{{item.name}}</div>
+            {{#if item.descriptionShort}}
+            <div class="item-description" style="color: #a0aec0; font-size: 12px; line-height: 1.4;">{{item.descriptionShort}}</div>
             {{/if}}
           </div>
         </div>
@@ -18,95 +18,3 @@
     </div>
   </div>
 </div>
-
-<style>
-.item-selection-dialog {
-  padding: 0;
-}
-
-.item-dialog-container {
-  display: flex;
-  gap: 15px;
-  min-height: 400px;
-  max-height: 500px;
-}
-
-.item-content-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 15px;
-  min-width: 0;
-}
-
-.dialog-description {
-  color: #d1d1d1;
-  margin-bottom: 15px;
-  font-size: 14px;
-}
-
-.item-list {
-  flex: 1;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.item-selection-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(189, 95, 255, 0.3);
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.item-selection-item:hover {
-  background: rgba(189, 95, 255, 0.15);
-  border-color: #BD5FFF;
-  transform: translateX(5px);
-}
-
-.item-icon {
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(189, 95, 255, 0.3);
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.item-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.item-name {
-  color: #ffffff;
-  font-weight: bold;
-  font-size: 14px;
-  margin-bottom: 5px;
-}
-
-.item-description {
-  color: #a0aec0;
-  font-size: 12px;
-  line-height: 1.4;
-  max-height: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.item-description h2,
-.item-description h3,
-.item-description h4 {
-  display: none;
-}
-
-.item-description p {
-  margin: 0;
-}
-</style>

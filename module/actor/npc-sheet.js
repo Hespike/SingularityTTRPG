@@ -1,24 +1,69 @@
 /**
- * NPC Character Sheet
- * @extends {foundry.appv1.sheets.ActorSheet}
+ * NPC Character Sheet (Application V2)
+ * @extends {foundry.applications.api.DocumentSheetV2}
  */
-export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
+const BaseActorSheetV2 = foundry.applications.api.ActorSheetV2 || foundry.applications.api.DocumentSheetV2;
+export class SingularityActorSheetNPC extends foundry.applications.api.HandlebarsApplicationMixin(
+  BaseActorSheetV2
+) {
+  static TEMPLATE = "systems/singularity/templates/actor-sheets/npc-sheet.html";
+
+  static DEFAULT_OPTIONS = foundry.utils.mergeObject(super.DEFAULT_OPTIONS, {
+    classes: ["singularity", "sheet", "actor", "npc"],
+    position: { width: 700, height: 800 },
+    window: { resizable: true },
+    tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "main" }],
+    scrollY: [".sheet-body"]
+  });
+
+  static PARTS = {
+    body: { template: "systems/singularity/templates/actor-sheets/npc-sheet.html" }
+  };
+
+  get actor() {
+    return this.document;
+  }
+
+  get title() {
+    return this.actor?.name || "Unnamed NPC";
+  }
+
   /** @override */
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ["singularity", "sheet", "actor", "npc"],
-      template: "systems/singularity/templates/actor-sheets/npc-sheet.html",
-      width: 700,
-      height: 800,
-      resizable: true,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "main" }],
-      scrollY: [".sheet-body"]
-    });
+  getTitle() {
+    return this.title;
+  }
+
+  /** @override */
+  async _prepareContext(options = {}) {
+    return this.getData(options);
+  }
+
+  /** @override */
+  async _onRender(context, options) {
+    if (super._onRender) {
+      await super._onRender(context, options);
+    }
+    if (this.element) {
+      if (!this._singularitySized) {
+        this.setPosition({ width: 700, height: 800 });
+        this._singularitySized = true;
+      }
+      const $html = this.element instanceof jQuery ? this.element : $(this.element);
+      this.activateListeners($html);
+      this._activateTab($html, "main");
+    }
   }
 
   /** @override */
   getData() {
-    const context = super.getData();
+    const context = {
+      actor: this.actor,
+      system: this.actor?.system || {},
+      data: this.actor?.system || {},
+      items: this.actor?.items || [],
+      effects: this.actor?.effects || [],
+      cssClass: "singularity sheet actor npc"
+    };
     const actorData = context.actor;
 
     // Ensure name is never empty to prevent validation errors
@@ -260,7 +305,16 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
 
   /** @override */
   activateListeners(html) {
-    super.activateListeners(html);
+    if (super.activateListeners) {
+      super.activateListeners(html);
+    }
+    html.find(".sheet-tabs .item").on("click", (event) => {
+      event.preventDefault();
+      const tab = event.currentTarget.dataset.tab;
+      if (tab) {
+        this._activateTab(html, tab);
+      }
+    });
 
     // Everything below here is only needed if the sheet is editable
     if (!this.isEditable) return;
@@ -356,6 +410,15 @@ export class SingularityActorSheetNPC extends foundry.appv1.sheets.ActorSheet {
         this.actor.update({ name: "Unnamed NPC" });
       }
     });
+  }
+
+  _activateTab(html, tabName) {
+    const $tabs = html.find(".sheet-tabs .item");
+    const $panes = html.find(".sheet-body .tab");
+    $tabs.removeClass("active");
+    $panes.removeClass("active");
+    html.find(`.sheet-tabs .item[data-tab="${tabName}"]`).addClass("active");
+    html.find(`.sheet-body .tab[data-tab="${tabName}"]`).addClass("active");
   }
 
   /** @override */
