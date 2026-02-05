@@ -233,7 +233,16 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
       }
       
       const abilityScore = calculatedAbilityScores[attack.ability] || 0;
-      const attackBonus = (attack.baseAttackBonus || 0) + abilityScore;
+      // If this is a talent attack (Blast, etc.) and the attack stores a baseAttackBonus,
+      // treat that as the talent competence bonus.
+      let talentCompetenceBonus = 0;
+      let talentCompetenceRank = "Novice";
+      if (isTalentAttack && (attack.baseAttackBonus || attack.baseAttackBonus === 0)) {
+        talentCompetenceBonus = Number(attack.baseAttackBonus) || 0;
+        const rankMap = { 0: "Novice", 4: "Apprentice", 8: "Competent", 12: "Masterful", 16: "Legendary" };
+        talentCompetenceRank = rankMap[talentCompetenceBonus] || "Novice";
+      }
+      const attackBonus = (talentCompetenceBonus || (attack.baseAttackBonus || 0)) + abilityScore;
       const damageBonus = abilityScore;
       
       let damageFormula = "";
@@ -250,11 +259,20 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
       }
       
       const isCustom = attack.isCustom;
+      const breakdownParts = [];
+      if (talentCompetenceBonus > 0) {
+        breakdownParts.push(`+${talentCompetenceBonus} (${talentCompetenceRank})`);
+      } else if (attack.baseAttackBonus) {
+        breakdownParts.push(`+${attack.baseAttackBonus}`);
+      } else {
+        breakdownParts.push(`+0 (Novice)`);
+      }
+      breakdownParts.push(`${abilityScore >= 0 ? '+' : ''}${abilityScore} (${attack.ability})`);
       return {
         ...attack,
         calculatedAttackBonus: attackBonus,
         calculatedDamage: damageFormula,
-        attackBonusBreakdown: `${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})`,
+        attackBonusBreakdown: breakdownParts.join(' '),
         canDelete: isCustom === true
           ? true
           : isCustom === false

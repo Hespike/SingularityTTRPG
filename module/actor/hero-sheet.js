@@ -1618,6 +1618,20 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             weaponCompetenceBonus = 0; // Novice = +0
           }
         }
+        // If this is a talent-based attack (e.g., Blast) and it stores a baseAttackBonus,
+        // treat that stored baseAttackBonus as the talent competence instead of a separate base bonus.
+        if (isTalentAttack && (attack.baseAttackBonus || attack.baseAttackBonus === 0)) {
+          const rankBonuses = {
+            "Novice": 0,
+            "Apprentice": 4,
+            "Competent": 8,
+            "Masterful": 12,
+            "Legendary": 16
+          };
+          const reverseMap = Object.fromEntries(Object.entries(rankBonuses).map(([k, v]) => [String(v), k]));
+          weaponCompetenceBonus = Number(attack.baseAttackBonus) || 0;
+          weaponCompetenceRank = reverseMap[String(weaponCompetenceBonus)] || weaponCompetenceRank;
+        }
         // Check weapon categories for Weapon Training talents
         // For dual-mode weapons, only check categories relevant to the current mode
         else if (weaponCategories.length > 0) {
@@ -1792,7 +1806,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           if (deadeyeBonus > 0) {
             parts.push(`+${deadeyeBonus} (Deadeye)`);
           }
-          if (attack.baseAttackBonus > 0) {
+          if (attack.baseAttackBonus > 0 && !isTalentAttack) {
             parts.push(`+${attack.baseAttackBonus}`);
           }
           if (currentAbilityScore !== 0) {
