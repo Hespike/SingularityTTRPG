@@ -323,6 +323,30 @@ Hooks.once("init", function() {
       }
     },
     {
+      id: "climbing",
+      label: "Climbing",
+      icon: "icons/svg/falling.svg",
+      flags: {
+        core: { statusId: "climbing" },
+        singularity: {
+          hasValue: false,
+          description: "Climbing surfaces. -5 penalty to all ranged attack rolls while Climbing."
+        }
+      }
+    },
+    {
+      id: "flying",
+      label: "Flying",
+      icon: "icons/svg/wing.svg",
+      flags: {
+        core: { statusId: "flying" },
+        singularity: {
+          hasValue: false,
+          description: "Currently flying. -5 penalty to all ranged attack rolls while Flying."
+        }
+      }
+    },
+    {
       id: "deafened",
       label: "Deafened",
       icon: "icons/svg/deaf.svg",

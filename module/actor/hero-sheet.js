@@ -6658,6 +6658,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const fatiguedEffect = this.actor?.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
     const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
     const blindedPenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded") ? 10 : 0;
+    // Restricted ranged combat penalty: -5 for Climbing or Flying when making ranged attacks
+    let restrictedRangedPenalty = 0;
+    let restrictedRangedSource = null;
+    if (isRangedAttack) {
+      if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "climbing")) {
+        restrictedRangedPenalty = 5;
+        restrictedRangedSource = "Climbing";
+      } else if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "flying")) {
+        restrictedRangedPenalty = 5;
+        restrictedRangedSource = "Flying";
+      }
+    }
     let attackBonus = 0;
     if (attack.baseAttackBonus !== undefined && attack.ability) {
       // New format: baseAttackBonus + weapon competence bonus + current ability score + Deadeye bonus
@@ -6682,6 +6694,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     if (blindedPenalty > 0) {
       attackBonus -= blindedPenalty;
+    }
+    if (restrictedRangedPenalty > 0) {
+      attackBonus -= restrictedRangedPenalty;
     }
 
     const dialogContent = `
@@ -6762,6 +6777,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const proneText = pronePenalty > 0 ? ` (includes -${pronePenalty} Prone)` : "";
             const fatiguedText = fatiguedPenalty > 0 ? ` (includes -${fatiguedPenalty} Fatigued)` : "";
             const blindedText = blindedPenalty > 0 ? ` (includes -${blindedPenalty} Blinded)` : "";
+            const restrictedText = restrictedRangedPenalty > 0 ? ` (includes -${restrictedRangedPenalty} ${restrictedRangedSource})` : "";
             const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
             let acComparison = "";
             const targets = Array.from(game.user.targets);
@@ -6792,7 +6808,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
               }
             }
             const acLine = acComparison ? `<br>${acComparison}` : "";
-            const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText})${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}</div>`;
+            const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText}${restrictedText})${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}</div>`;
             
             const message = await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),

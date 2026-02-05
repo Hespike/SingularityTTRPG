@@ -544,11 +544,24 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
     const blindedPenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded") ? 10 : 0;
     const isRangedAttack = attack.type === "ranged" || attack.weaponMode === "thrown";
+    // Restricted ranged combat penalty: -5 for Climbing or Flying when making ranged attacks
+    let restrictedRangedPenalty = 0;
+    let restrictedRangedSource = null;
+    if (isRangedAttack) {
+      if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "climbing")) {
+        restrictedRangedPenalty = 5;
+        restrictedRangedSource = "Climbing";
+      } else if (this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "flying")) {
+        restrictedRangedPenalty = 5;
+        restrictedRangedSource = "Flying";
+      }
+    }
     if (isRangedAttack && this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded")) {
       ui.notifications.warn("Blinded: ranged attacks are impossible.");
       return;
     }
-    const attackBonus = (attack.baseAttackBonus || 0) + abilityScore - fatiguedPenalty - blindedPenalty;
+    let attackBonus = (attack.baseAttackBonus || 0) + abilityScore - fatiguedPenalty - blindedPenalty;
+    if (restrictedRangedPenalty > 0) attackBonus -= restrictedRangedPenalty;
 
     const dialogContent = `
       <form class="singularity-roll-dialog">
@@ -610,6 +623,7 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
 
             const fatiguedText = fatiguedPenalty ? ` - ${fatiguedPenalty} (Fatigued)` : "";
             const blindedText = blindedPenalty ? " - 10 (Blinded)" : "";
+            const restrictedText = restrictedRangedPenalty ? ` - ${restrictedRangedPenalty} (${restrictedRangedSource})` : "";
             const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
             const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
@@ -642,7 +656,7 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
               }
             }
             const acLine = acComparison ? `<br>${acComparison}` : "";
-            const flavor = `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedText}${blindedText}${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}`;
+            const flavor = `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedText}${blindedText}${restrictedText}${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}`;
 
             roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
