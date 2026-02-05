@@ -1927,20 +1927,21 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  justify-content: center;
 }
 
 .skill-list .skill .skill-other-bonus {
-  width: 100%;
-  flex: 1 1 auto;
-  background: rgba(255, 255, 255, 0.1) !important;
-  border: 1px solid rgba(189, 95, 255, 0.3) !important;
-  color: #ffffff !important;
-  padding: 3px 5px;
-  border-radius: 3px;
-  font-size: 12px;
-  caret-color: #BD5FFF;
+  width: 3.2em;
+  flex: 0 0 auto;
+  background: transparent !important;
+  border: none !important;
+  color: #BD5FFF !important;
+  padding: 0;
+  border-radius: 0;
+  font-size: 13px;
+  font-weight: bold;
   text-align: center;
-  box-sizing: border-box;
+  box-sizing: content-box;
 }
 
 .skill-list .skill .skill-other-bonus:focus {
@@ -1955,6 +1956,12 @@
   color: #BD5FFF;
   font-size: 13px;
   font-weight: bold;
+  text-align: center;
+}
+
+.skill-other-bonus-locked, .skill-list .skill .skill-other-bonus {
+  display: inline-block;
+  min-width: 3.2em;
   text-align: center;
 }
 

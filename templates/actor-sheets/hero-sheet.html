@@ -411,7 +411,7 @@
               {{#if skill.lockedOtherBonuses}}
               <span class="skill-other-bonus-locked" title="Other bonus from {{skill.lockedSource}} (locked)">{{skill.otherBonuses}}</span>
               {{else}}
-              <input type="number" class="skill-other-bonus" data-skill="{{skillName}}" value="{{#if skill.otherBonuses}}{{skill.otherBonuses}}{{else}}0{{/if}}" placeholder="0" min="0" step="1"/>
+              <span class="skill-other-bonus" data-skill="{{skillName}}">{{#if skill.otherBonuses}}{{skill.otherBonuses}}{{else}}0{{/if}}</span>
               {{/if}}
               {{#if skill.noisyPenalty}}
               <span class="skill-noisy-penalty" title="Noisy armor penalty">-{{skill.noisyPenalty}}</span>
