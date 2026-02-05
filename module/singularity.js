@@ -1141,7 +1141,7 @@ Hooks.once("ready", async function() {
             { name: "Unarmed Strike", attackBonus: 3, damage: "1d4+3", damageType: "kinetic", range: "Melee", ability: "might" }
           ],
           items: [
-            { name: "Enhanced Vitality", type: "talent", description: "+2 Max HP per Prime Level" },
+            { name: "Enhanced Vitality", type: "talent", description: "+1 Max HP per Prime Level" },
             { name: "Impact Control", type: "talent", description: "Half damage from falling" }
           ],
           backstory: "Omega cannot remember her life before the lab. She is unsure if she was ever a child or if her life began as an adult subject. Raised by the Church of Singularity, she viewed the scientists as her only family; they experimented on her cosmic potential constantly but never with malice. Though their true goals remain a mystery to her, she has entered the world with a simple, driven purpose: she helps whoever she can, acting as the benevolent force she was raised to be.",

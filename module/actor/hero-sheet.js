@@ -1225,7 +1225,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       // Add Enhanced Vitality bonus
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
     } else if (powersetName === "Paragon") {
       // Paragon HP: (12 + Endurance) × Paragon level
@@ -1234,7 +1234,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       // Add Enhanced Vitality bonus
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
     } else if (powersetName === "Gadgeteer") {
       // Gadgeteer HP: (8 + Endurance) × Gadgeteer level
@@ -1243,7 +1243,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       // Add Enhanced Vitality bonus
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
     } else if (powersetName === "Marksman") {
       // Marksman HP: (8 + Endurance) × Marksman level
@@ -1252,7 +1252,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       // Add Enhanced Vitality bonus
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
     } else if (hasEnhancedVitality) {
       // For characters without powerset but with Enhanced Vitality: use stored max HP only.
@@ -1374,7 +1374,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     } else {
       const storedMax = safeCombat.hp.max || 0;
       hpBreakdown.baseHp = hasEnhancedVitality
-        ? Math.max(0, storedMax - 2 * primeLevel)
+        ? Math.max(0, storedMax - primeLevel)
         : storedMax;
       hpBreakdown.sources.push({ 
         name: `Base HP`, 
@@ -1386,9 +1386,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     
     // Add Enhanced Vitality bonus if applicable
     if (hasEnhancedVitality) {
-      hpBreakdown.enhancedVitalityBonus = 2 * primeLevel;
+      hpBreakdown.enhancedVitalityBonus = primeLevel;
       hpBreakdown.sources.push({ 
-        name: `Enhanced Vitality (+2 per Prime Level)`, 
+        name: `Enhanced Vitality (+1 per Prime Level)`, 
         value: hpBreakdown.enhancedVitalityBonus,
         perLevel: false
       });
@@ -4863,7 +4863,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             ? `Maximum HP is calculated by multiplying (Base HP per Level + Endurance) by your powerset level.` 
             : `Maximum HP is based on your base HP value.`}
           ${breakdown.enhancedVitalityBonus > 0 
-            ? `Enhanced Vitality adds +2 per Prime Level as a flat bonus.` 
+            ? `Enhanced Vitality adds +1 per Prime Level as a flat bonus.` 
             : ''}
         </p>
       </div>
@@ -7737,25 +7737,25 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
       calculatedMaxHp = (14 + enduranceContribution) * bastionLevel;
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
     } else if (powersetName === "Paragon") {
       const paragonLevel = primeLevel;
       calculatedMaxHp = (12 + enduranceScore) * paragonLevel;
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
     } else if (powersetName === "Gadgeteer") {
       const gadgeteerLevel = primeLevel;
       calculatedMaxHp = (8 + enduranceScore) * gadgeteerLevel;
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
     } else if (powersetName === "Marksman") {
       const marksmanLevel = primeLevel;
       calculatedMaxHp = (8 + enduranceScore) * marksmanLevel;
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
     } else if (hasEnhancedVitality) {
       calculatedMaxHp = actorData.system.combat?.hp?.max || 0;
@@ -8477,10 +8477,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const primeLevel = self.actor.system.basic?.primeLevel || 1;
         const currentMax = self.actor.system.combat?.hp?.max ?? 0;
         await self.actor.update({
-          "system.combat.hp.max": currentMax + 2 * primeLevel,
+          "system.combat.hp.max": currentMax + primeLevel,
           "system.combat.hp.value": Math.min(
             self.actor.system.combat?.hp?.value ?? currentMax,
-            currentMax + 2 * primeLevel
+            currentMax + primeLevel
           )
         });
       }

@@ -115,7 +115,7 @@ export class SingularityActor extends Actor {
     // Calculate max HP for Bastion characters
     // Formula: (14 + Endurance) × Bastion level
     // If Ironbound is selected: (14 + Endurance × 2) × Bastion level
-    // Enhanced Vitality adds: +2 × Prime Level
+    // Enhanced Vitality adds: +1 × Prime Level
     if (powersetName === "Bastion") {
       const bastionLevel = primeLevel;
       
@@ -132,7 +132,7 @@ export class SingularityActor extends Actor {
       
       // Add Enhanced Vitality bonus
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
       
       // Update stored max HP and ensure current HP doesn't exceed it
@@ -148,7 +148,7 @@ export class SingularityActor extends Actor {
       
       // Add Enhanced Vitality bonus
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
       
       // Update stored max HP and ensure current HP doesn't exceed it
@@ -163,7 +163,7 @@ export class SingularityActor extends Actor {
       
       // Add Enhanced Vitality bonus if applicable
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
       
       systemData.combat.hp.max = calculatedMaxHp;
@@ -177,7 +177,7 @@ export class SingularityActor extends Actor {
       
       // Add Enhanced Vitality bonus if applicable
       if (hasEnhancedVitality) {
-        calculatedMaxHp += 2 * primeLevel;
+        calculatedMaxHp += primeLevel;
       }
       
       systemData.combat.hp.max = calculatedMaxHp;
@@ -187,10 +187,10 @@ export class SingularityActor extends Actor {
     } else {
       // For non-Bastion characters, add Enhanced Vitality bonus if selected
       if (hasEnhancedVitality) {
-        const enhancedVitalityBonus = 2 * primeLevel;
+        const enhancedVitalityBonus = primeLevel;
         const baseMaxHp = systemData.combat.hp.max || 0;
         const calculatedMaxHp = baseMaxHp + enhancedVitalityBonus;
-        
+
         systemData.combat.hp.max = calculatedMaxHp;
         if (systemData.combat.hp.value > calculatedMaxHp) {
           systemData.combat.hp.value = calculatedMaxHp;
