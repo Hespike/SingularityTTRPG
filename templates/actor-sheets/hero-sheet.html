@@ -998,7 +998,7 @@
                         <option value="charm" {{#if (eq actor.system.progression.level1.humanAbilityBoost "charm")}}selected{{/if}}>Charm</option>
                       </select>
                     </div>
-                    <div class="progression-slot talent-slot" data-level="1" data-slot-type="humanGenericTalent" data-drop-zone="progression">
+                    <div class="progression-slot talent-slot clickable-slot" data-level="1" data-slot-type="humanGenericTalent" data-drop-zone="progression">
                       {{#if (or actor.system.progression.level1.humanGenericTalent actor.system.progression.level1.humanGenericTalentName)}}
                         <div class="slot-item" data-item-id="{{actor.system.progression.level1.humanGenericTalent}}">
                           {{#if actor.system.progression.level1.humanGenericTalentImg}}
@@ -1072,7 +1072,7 @@
                         <option value="charm" {{#if (eq actor.system.progression.level1.terranAbilityBoost "charm")}}selected{{/if}}>Charm</option>
                       </select>
                     </div>
-                    <div class="progression-slot talent-slot" data-level="1" data-slot-type="terranGenericTalent" data-drop-zone="progression">
+                    <div class="progression-slot talent-slot clickable-slot" data-level="1" data-slot-type="terranGenericTalent" data-drop-zone="progression">
                       {{#if (or actor.system.progression.level1.terranGenericTalent actor.system.progression.level1.terranGenericTalentName)}}
                         <div class="slot-item" data-item-id="{{actor.system.progression.level1.terranGenericTalent}}">
                           {{#if actor.system.progression.level1.terranGenericTalentImg}}

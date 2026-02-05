@@ -1255,11 +1255,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         calculatedMaxHp += 2 * primeLevel;
       }
     } else if (hasEnhancedVitality) {
-      // For characters without powerset but with Enhanced Vitality, calculate HP
-      // Use stored base max HP and add Enhanced Vitality bonus
-      const baseMaxHp = safeCombat.hp.max || 0;
-      const enhancedVitalityBonus = 2 * primeLevel;
-      calculatedMaxHp = baseMaxHp + enhancedVitalityBonus;
+      // For characters without powerset but with Enhanced Vitality: use stored max HP only.
+      // The +2/level bonus is applied once when the talent is selected (no re-add here to avoid loop).
+      calculatedMaxHp = safeCombat.hp.max || 0;
     } else {
       // For characters without powerset and without Enhanced Vitality, use stored value
       calculatedMaxHp = safeCombat.hp.max || 0;
@@ -1271,24 +1269,6 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Keep actor max HP in sync with calculated value for token bars
     if (this.actor?.isOwner && this.actor.system?.combat?.hp?.max !== calculatedMaxHp) {
       try {
-        console.log(
-          "Singularity | Max HP mismatch:",
-          this.actor.name,
-          "stored=",
-          this.actor.system?.combat?.hp?.max,
-          "calculated=",
-          calculatedMaxHp,
-          "powerset=",
-          powersetName,
-          "endurance=",
-          enduranceScore,
-          "primeLevel=",
-          primeLevel,
-          "enhancedVitality=",
-          hasEnhancedVitality,
-          "ironbound=",
-          hasIronbound
-        );
         await this.actor.update({
           "system.combat.hp.max": calculatedMaxHp,
           "system.combat.hp.value": Math.min(this.actor.system?.combat?.hp?.value ?? 0, calculatedMaxHp)
@@ -1392,7 +1372,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       });
       hpBreakdown.formula = `(8 + Endurance) × ${marksmanLevel}`;
     } else {
-      hpBreakdown.baseHp = safeCombat.hp.max || 0;
+      const storedMax = safeCombat.hp.max || 0;
+      hpBreakdown.baseHp = hasEnhancedVitality
+        ? Math.max(0, storedMax - 2 * primeLevel)
+        : storedMax;
       hpBreakdown.sources.push({ 
         name: `Base HP`, 
         value: hpBreakdown.baseHp,
@@ -2522,12 +2505,14 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Handle clicks on progression slot items to show details (but not on delete button)
     html.on("click", ".progression-slot .slot-item", this._onProgressionItemClick.bind(this));
     
-    // Handle clicks on talent progression slots to open talent selection dialog
-    html.on("click", ".progression-slot[data-slot-type='genericTalent'], .progression-slot[data-slot-type='humanGenericTalent'], .progression-slot[data-slot-type='terranGenericTalent'], .progression-slot[data-slot-type='bastionTalent'], .progression-slot[data-slot-type='paragonTalent'], .progression-slot[data-slot-type='gadgeteerTalent'], .progression-slot[data-slot-type='marksmanTalent']", this._onTalentSlotClick.bind(this));
+    // Handle clicks on talent progression slots to open talent selection dialog (off first to prevent duplicate modals)
+    const talentSlotSelector = ".progression-slot[data-slot-type='genericTalent'], .progression-slot[data-slot-type='humanGenericTalent'], .progression-slot[data-slot-type='terranGenericTalent'], .progression-slot[data-slot-type='bastionTalent'], .progression-slot[data-slot-type='paragonTalent'], .progression-slot[data-slot-type='gadgeteerTalent'], .progression-slot[data-slot-type='marksmanTalent']";
+    html.off("click", talentSlotSelector);
+    html.on("click", talentSlotSelector, this._onTalentSlotClick.bind(this));
     
-    // Handle clicks on phenotype, subtype, and powerset progression slots
-    html.off("click", ".progression-slot[data-slot-type='phenotype']");
-    html.off("click", ".progression-slot[data-slot-type='subtype']");
+    // Handle clicks on phenotype, subtype, background, powerset (off first to prevent duplicate modals)
+    const itemSlotSelector = ".progression-slot[data-slot-type='phenotype'], .progression-slot[data-slot-type='subtype'], .progression-slot[data-slot-type='background'], .progression-slot[data-slot-type='powerset']";
+    html.off("click", itemSlotSelector);
     html.on("click", ".progression-slot[data-slot-type='phenotype']", this._onPhenotypeSlotClick.bind(this));
     html.on("click", ".progression-slot[data-slot-type='subtype']", this._onSubtypeSlotClick.bind(this));
     html.on("click", ".progression-slot[data-slot-type='background']", this._onBackgroundSlotClick.bind(this));
@@ -7773,9 +7758,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         calculatedMaxHp += 2 * primeLevel;
       }
     } else if (hasEnhancedVitality) {
-      const baseMaxHp = actorData.system.combat?.hp?.max || 0;
-      const enhancedVitalityBonus = 2 * primeLevel;
-      calculatedMaxHp = baseMaxHp + enhancedVitalityBonus;
+      calculatedMaxHp = actorData.system.combat?.hp?.max || 0;
     } else {
       calculatedMaxHp = actorData.system.combat?.hp?.max || 0;
     }
@@ -7983,6 +7966,11 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     event.preventDefault();
     event.stopPropagation();
     
+    // Don't open dialog if a talent selection dialog is already open (prevents multiple modals)
+    if (this._talentSelectionDialogOpen) {
+      return;
+    }
+    
     // Don't open dialog if clicking the delete button
     if ($(event.target).closest(".slot-delete").length) {
       return;
@@ -8005,11 +7993,17 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       return;
     }
     
-    // Open talent selection dialog
+    // Open talent selection dialog (pass the slot we clicked so the chosen talent goes here)
     await this._openTalentSelectionDialog(level, slotType);
   }
 
   async _openTalentSelectionDialog(level, slotType) {
+    // Prevent opening a second talent dialog while one is already open
+    if (this._talentSelectionDialogOpen) {
+      return;
+    }
+    this._talentSelectionDialogOpen = true;
+
     // Get talents from the talents compendium
     const talentsPack = game.packs.get("singularity.talents");
     if (!talentsPack) {
@@ -8393,37 +8387,123 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             dialogTitle = `Select Marksman Talent (Level ${level})`;
           }
     
-    // Create dialog with explicit title - use a unique ID to track it
     const dialogId = `talent-dialog-${Date.now()}`;
-    
-    const renderTalentDialog = (html) => {
-        console.log('Singularity | renderTalentDialog called', { dialogId, slotType, level });
-        // Store references for use in callbacks
-        const self = this;
-        const originalLevel = level;
+    const self = this;
 
-        // Global debug: listen for any clicks on talent items at document level (temporary)
-        try {
-          $(document).off('click.singularityTalentDebug').on('click.singularityTalentDebug', '.talent-item', function (e) {
-            try { console.log('Singularity DEBUG | document captured click on', $(this).data('talent-id')); } catch (err) { /* ignore */ }
-          });
-
-          // Native capturing listener (in case delegated or jQuery handlers are blocked)
-          try {
-            document.removeEventListener('pointerdown', window.__singularityPointerHandler, true);
-            window.__singularityPointerHandler = function(e) {
-              const el = e.target && e.target.closest && e.target.closest('.talent-item');
-              if (el) {
-                try { console.log('Singularity CAPTURE | pointerdown on', el.dataset.talentId); } catch (err) { /* ignore */ }
-              }
-            };
-            document.addEventListener('pointerdown', window.__singularityPointerHandler, true);
-          } catch (err) {
-            /* ignore */
-          }
-        } catch (err) {
-          /* ignore */
+    // Build click handler that closes over level/slotType/pack (same pattern as item-selection bindItemSelection)
+    const makeTalentClickHandler = (dialogRef) => async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const itemEl = event.currentTarget;
+      const talentId = itemEl.getAttribute("data-talent-id");
+      if (!talentId) return;
+      const talentUuid = `Compendium.singularity.talents.${talentId}`;
+      let talent;
+      try {
+        talent = await talentsPack.getDocument(talentId);
+      } catch (err) {
+        console.error("Singularity | Error fetching talent document:", err);
+      }
+      if (!talent) {
+        ui.notifications.error("Talent not found!");
+        return;
+      }
+      const talentName = (talent.name || "").trim();
+      const normalizedName = talentName.toLowerCase();
+      if (selectedTalents.has(normalizedName)) {
+        const canRepeat = normalizedName.includes("saving throw") && normalizedName.includes("apprentice") ||
+          normalizedName.includes("skill training") && normalizedName.includes("apprentice") ||
+          normalizedName.includes("weapon training") || normalizedName.includes("blast");
+        if (!canRepeat) {
+          ui.notifications.warn(`You have already selected "${talentName}".`);
+          return;
         }
+      }
+      const levelKey = `level${level}`;
+      const updateData = {
+        [`system.progression.${levelKey}.${slotType}`]: talentUuid,
+        [`system.progression.${levelKey}.${slotType}Name`]: talent.name,
+        [`system.progression.${levelKey}.${slotType}Img`]: talent.img || "icons/svg/mystery-man.svg"
+      };
+      try {
+        await self.actor.update(updateData);
+        ui.notifications.info(`Selected talent "${talent.name}" added to progression.`);
+      } catch (err) {
+        console.error("Singularity | Failed to update actor with talent:", err);
+        ui.notifications.error("Failed to apply talent. See console for details.");
+        return;
+      }
+      if (slotType === "paragonTalent") {
+        const talentNameLower = talent.name.toLowerCase();
+        const skills = foundry.utils.deepClone(self.actor.system.skills || {});
+        let skillsUpdated = false;
+        if (talentNameLower.includes("dominating") && talentNameLower.includes("presence")) {
+          if (!skills["Intimidation"] || skills["Intimidation"].lockedSource !== "Dominating Presence") {
+            skills["Intimidation"] = { rank: "Novice", ability: "charm", otherBonuses: 4, lockedOtherBonuses: true, lockedSource: "Dominating Presence" };
+            skillsUpdated = true;
+          }
+        }
+        if (talentNameLower.includes("noble") && talentNameLower.includes("presence")) {
+          if (!skills["Persuasion"] || skills["Persuasion"].lockedSource !== "Noble Presence") {
+            skills["Persuasion"] = { rank: "Novice", ability: "charm", otherBonuses: 4, lockedOtherBonuses: true, lockedSource: "Noble Presence" };
+            skillsUpdated = true;
+          }
+        }
+        if (skillsUpdated) await self.actor.update({ "system.skills": skills });
+      }
+      if (talent.name === "Blast (Apprentice)" || talent.name?.includes("Blast")) {
+        setTimeout(() => self._showBlastAttackDialog(), 100);
+      }
+      if (talent.name?.toLowerCase().includes("initiative training")) {
+        let newRank = "Novice";
+        if (talent.name.toLowerCase().includes("apprentice")) newRank = "Apprentice";
+        else if (talent.name.toLowerCase().includes("competent")) newRank = "Competent";
+        else if (talent.name.toLowerCase().includes("masterful")) newRank = "Masterful";
+        else if (talent.name.toLowerCase().includes("legendary")) newRank = "Legendary";
+        const initiative = foundry.utils.deepClone(self.actor.system.combat.initiative || { rank: "Novice", otherBonuses: 0 });
+        initiative.rank = newRank;
+        await self.actor.update({ "system.combat.initiative": initiative });
+        ui.notifications.info(`Initiative proficiency set to ${newRank}!`);
+      }
+      const talentNameLower = (talent.name || "").toLowerCase();
+      if (talentNameLower.includes("bastion") && talentNameLower.includes("resistance")) {
+        setTimeout(() => self._showBastionResistanceDialog(), 100);
+      }
+      if (talentNameLower.includes("enlarged") && talentNameLower.includes("presence")) {
+        const currentSize = self.actor.system.basic.size || "Medium";
+        if (currentSize !== "Large") await self.actor.update({ "system.basic.size": "Large" });
+      }
+      if (talentNameLower.includes("enhanced vitality")) {
+        const primeLevel = self.actor.system.basic?.primeLevel || 1;
+        const currentMax = self.actor.system.combat?.hp?.max ?? 0;
+        await self.actor.update({
+          "system.combat.hp.max": currentMax + 2 * primeLevel,
+          "system.combat.hp.value": Math.min(
+            self.actor.system.combat?.hp?.value ?? currentMax,
+            currentMax + 2 * primeLevel
+          )
+        });
+      }
+      self._talentSelectionDialogOpen = false;
+      $(document.body).off("click.singularityTalent");
+      if (dialogRef?.close) dialogRef.close();
+      self.render();
+    };
+
+    const bindTalentSelection = (dialogInstance) => {
+      const root = dialogInstance?.element?.shadowRoot ?? dialogInstance?.element;
+      const container = root instanceof HTMLElement ? root : (root?.length ? root[0] : null);
+      const items = container?.querySelectorAll?.(".talent-item") || [];
+      items.forEach((itemEl) => {
+        if (itemEl.dataset?.boundTalent === "true") return;
+        itemEl.dataset.boundTalent = "true";
+        itemEl.addEventListener("click", makeTalentClickHandler(dialogInstance));
+      });
+      return items.length > 0;
+    };
+
+    const renderTalentDialog = (html, dialogInstance) => {
+        const originalLevel = level;
         
         // Immediately fix the title in the HTML before Foundry can change it
         const $html = $(html);
@@ -8492,7 +8572,6 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         
         // Helper function to update talent list
         const updateTalentList = async (selectedLevel) => {
-          console.log('Singularity | updateTalentList', { selectedLevel, totalIndexed: index.size });
           // Get all talents for the selected level
           const talentsByLevel = {};
           let allTalents = Array.from(index.values());
@@ -8607,7 +8686,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           } else {
             filteredTalents.forEach(talent => {
               const talentItem = $(`
-                <div class="talent-item" data-talent-id="${talent._id}" data-talent-level="${talent.level}" role="button" tabindex="0" onclick="console.log('INLINE click', this.dataset.talentId); this.classList.toggle('singularity-clicked-test');" onpointerdown="console.log('INLINE pointerdown', this.dataset.talentId); this.classList.add('singularity-pressed-test');">
+                <div class="talent-item" data-talent-id="${talent._id}" data-talent-level="${talent.level}" role="button" tabindex="0">
                   <img class="talent-icon" src="${talent.img || 'icons/svg/mystery-man.svg'}" alt="${talent.name}" onerror="this.src='icons/svg/mystery-man.svg'">
                   <div class="talent-info">
                     <div class="talent-name">${talent.name}</div>
@@ -8618,177 +8697,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             });
           }
           
-          // Re-attach click handlers to new items
-          attachTalentClickHandlers(html, originalLevel, slotType, talentsPack, dialog, self);
-        };
-        
-        // Helper function to attach click handlers
-        const attachTalentClickHandlers = (html, slotLevel, slotType, pack, dialog, self) => {
-          // Bind to the rendered dialog container to ensure events reach the live DOM
-          const dialogContainer = (dialog && dialog.element && dialog.element.length) ? dialog.element : $(`.window-app[data-dialog-id="${dialogId}"]`);
-          console.log("Singularity | Attach handlers - dialogContainer length:", dialogContainer && dialogContainer.length, "htmlItems:", html.find('.talent-item').length, slotType, slotLevel);
-
-          const container = dialogContainer.length ? dialogContainer : html;
-
-          container.off("click", ".talent-item").on("click", ".talent-item", async (event) => {
-            console.log('Singularity | talent click event', event.currentTarget, 'containerLen', container.length);
-            const talentId = $(event.currentTarget).data("talent-id");
-            console.log('Singularity | clicked talent id', talentId);
-            const talentUuid = `Compendium.singularity.talents.${talentId}`;
-            
-            // Get the full talent document
-            let talent;
-            try {
-              talent = await pack.getDocument(talentId);
-            } catch (err) {
-              console.error("Singularity | Error fetching talent document:", err);
-            }
-
-            if (!talent) {
-              ui.notifications.error("Talent not found!");
-              return;
-            }
-            
-            // Check if this talent is already selected
-            const talentName = talent.name || "";
-            const normalizedName = talentName.toLowerCase().trim();
-            const isSelected = selectedTalents.has(normalizedName);
-            
-            if (isSelected) {
-              // Check if this is a repeatable talent with variations
-              const canRepeatWithVariations = 
-                normalizedName.includes("saving throw") && normalizedName.includes("apprentice") ||
-                normalizedName.includes("skill training") && normalizedName.includes("apprentice") ||
-                normalizedName.includes("weapon training") ||
-                normalizedName.includes("blast");
-              
-              if (!canRepeatWithVariations) {
-                ui.notifications.warn(`You have already selected "${talentName}".`);
-                return;
-              }
-              
-              // For repeatable talents, continue - the variation will be checked in their respective dialogs
-              // (e.g., Blast checks damage type, Saving Throw checks ability)
-            }
-            
-            // Update the progression slot (use original slot level, not filtered level)
-            const levelKey = `level${slotLevel}`;
-            const updateData = {
-              [`system.progression.${levelKey}.${slotType}`]: talentUuid,
-              [`system.progression.${levelKey}.${slotType}Name`]: talent.name,
-              [`system.progression.${levelKey}.${slotType}Img`]: talent.img || "icons/svg/mystery-man.svg"
-            };
-            
-            try {
-              await self.actor.update(updateData);
-              ui.notifications.info(`Selected talent "${talent.name}" added to progression.`);
-            } catch (err) {
-              console.error("Singularity | Failed to update actor with talent:", err);
-              ui.notifications.error("Failed to apply talent. See console for details.");
-              return; // stop further processing
-            }
-            
-            // If this is a Paragon talent that grants skill bonuses, add the skill
-            if (slotType === "paragonTalent") {
-              const talentNameLower = talent.name.toLowerCase();
-              const skills = foundry.utils.deepClone(self.actor.system.skills || {});
-              let skillsUpdated = false;
-              
-              // If selecting Dominating Presence, add Intimidation skill
-              if (talentNameLower.includes("dominating") && talentNameLower.includes("presence")) {
-                if (!skills["Intimidation"] || skills["Intimidation"].lockedSource !== "Dominating Presence") {
-                  skills["Intimidation"] = {
-                    rank: "Novice",
-                    ability: "charm",
-                    otherBonuses: 4, // +4 bonus while flying
-                    lockedOtherBonuses: true,
-                    lockedSource: "Dominating Presence"
-                  };
-                  skillsUpdated = true;
-                }
-              }
-              
-              // If selecting Noble Presence, add Persuasion skill
-              if (talentNameLower.includes("noble") && talentNameLower.includes("presence")) {
-                if (!skills["Persuasion"] || skills["Persuasion"].lockedSource !== "Noble Presence") {
-                  skills["Persuasion"] = {
-                    rank: "Novice",
-                    ability: "charm",
-                    otherBonuses: 4, // +4 bonus while flying
-                    lockedOtherBonuses: true,
-                    lockedSource: "Noble Presence"
-                  };
-                  skillsUpdated = true;
-                }
-              }
-              
-              if (skillsUpdated) {
-                await self.actor.update({ "system.skills": skills });
-              }
-            }
-            
-            // If this is the Blast talent, show attack configuration dialog
-            if (talent.name === "Blast (Apprentice)" || talent.name.includes("Blast")) {
-              // Wait a moment for the update to complete, then show the Blast configuration dialog
-              setTimeout(() => {
-                self._showBlastAttackDialog();
-              }, 100);
-            }
-            
-            // If this is Initiative Training, update initiative rank
-            if (talent.name && talent.name.toLowerCase().includes("initiative training")) {
-              let newRank = "Novice";
-              if (talent.name.toLowerCase().includes("apprentice")) {
-                newRank = "Apprentice";
-              } else if (talent.name.toLowerCase().includes("competent")) {
-                newRank = "Competent";
-              } else if (talent.name.toLowerCase().includes("masterful")) {
-                newRank = "Masterful";
-              } else if (talent.name.toLowerCase().includes("legendary")) {
-                newRank = "Legendary";
-              }
-              
-              const initiative = foundry.utils.deepClone(self.actor.system.combat.initiative || { rank: "Novice", otherBonuses: 0 });
-              initiative.rank = newRank;
-              
-              await self.actor.update({ "system.combat.initiative": initiative });
-              ui.notifications.info(`Initiative proficiency set to ${newRank}!`);
-            }
-            
-            // If this is Bastion's Resistance, show resistance selection dialog
-            const talentNameLower = (talent.name || "").toLowerCase();
-            if (talentNameLower.includes("bastion") && talentNameLower.includes("resistance")) {
-              // Wait a moment for the update to complete, then show the resistance selection dialog
-              setTimeout(() => {
-                self._showBastionResistanceDialog();
-              }, 100);
-            }
-            
-            // If this is Saving Throw Training (Apprentice), no dialog needed - user can select from dropdown in progression table
-            
-            // If this is Enlarged Presence, set size to Large
-            if (talentNameLower.includes("enlarged") && talentNameLower.includes("presence")) {
-              const currentSize = self.actor.system.basic.size || "Medium";
-              // Only update if not already Large (to preserve if it was manually set)
-              if (currentSize !== "Large") {
-                await self.actor.update({ "system.basic.size": "Large" });
-              }
-            }
-            
-            self.render();
-            
-            // Close the dialog
-            dialog.close();
-          });
-
-          // For extra debugging, listen for pointerdown as well
-          container.off("pointerdown", ".talent-item").on("pointerdown", ".talent-item", (e) => {
-            try {
-              console.log('Singularity | pointerdown on talent', $(e.currentTarget).data('talent-id'));
-            } catch (err) {
-              /* ignore */
-            }
-          });
+          // Re-bind click handlers to new items (same pattern as item-selection)
+          if (dialogInstance) bindTalentSelection(dialogInstance);
         };
         
         // Handle level filter changes
@@ -8797,44 +8707,56 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           await updateTalentList(selectedLevel);
         });
         
-        // Attach initial click handlers
-        attachTalentClickHandlers(html, originalLevel, slotType, talentsPack, dialog, self);
+        // Bind talent item clicks from dialog root (same as bindItemSelection for background/phenotype/etc.)
+        if (dialogInstance) bindTalentSelection(dialogInstance);
       };
     
+    const clearDialogFlag = () => {
+      self._talentSelectionDialogOpen = false;
+      $(document.body).off("click.singularityTalent");
+    };
+    const dialogRef = {};
     const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
-    const dialogOptions = DialogClass?.name === "DialogV2"
-      ? {
-          title: dialogTitle,
-          content: content,
-          buttons: [
-            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
-          ],
-          default: "cancel",
-          render: (_app, html) => renderTalentDialog(html)
-        }
-      : {
-          title: dialogTitle,
-          content: content,
-          buttons: {
+    const dialogOptions = {
+      title: dialogTitle,
+      content: content,
+      buttons: DialogClass?.name === "DialogV2"
+        ? [
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: clearDialogFlag }
+          ]
+        : {
             cancel: {
               icon: '<i class="fas fa-times"></i>',
-              label: "Cancel"
+              label: "Cancel",
+              callback: clearDialogFlag
             }
           },
-          default: "cancel",
-          render: renderTalentDialog
-        };
-    
+      default: "cancel",
+      render: DialogClass?.name === "DialogV2"
+        ? (_app, html) => renderTalentDialog(html, dialogRef.current)
+        : (html) => renderTalentDialog(html, dialogRef.current)
+    };
     const dialog = new DialogClass(dialogOptions);
+    dialogRef.current = dialog;
     
-    // Store the correct title on the dialog IMMEDIATELY after creation
-    dialog._singularityDialogTitle = dialogTitle;
-    // Also store it in the data object
-    if (dialog.data) {
-      dialog.data.title = dialogTitle;
+    const origClose = dialog.close?.bind(dialog);
+    if (typeof origClose === "function") {
+      dialog.close = (...args) => {
+        clearDialogFlag();
+        return origClose(...args);
+      };
     }
     
-    dialog.render(true);
+    dialog._singularityDialogTitle = dialogTitle;
+    if (dialog.data) dialog.data.title = dialogTitle;
+    
+    await dialog.render(true);
+    const tryBind = () => bindTalentSelection(dialog);
+    if (!tryBind()) {
+      setTimeout(tryBind, 50);
+      setTimeout(tryBind, 150);
+      setTimeout(tryBind, 300);
+    }
   }
 
   async _onPhenotypeSlotClick(event) {
@@ -8947,6 +8869,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
   }
 
   async _openItemSelectionDialog(level, slotType, compendiumName, itemTypeLabel, filterPhenotype = null) {
+    // Prevent opening a second item-selection dialog (fixes multiple cancel to close)
+    if (this._itemSelectionDialogOpen) {
+      return;
+    }
+    this._itemSelectionDialogOpen = true;
+
     // Get items from the compendium
     const pack = game.packs.get(`singularity.${compendiumName}`);
     if (!pack) {
@@ -9072,8 +9000,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         // If Bastion is selected, apply Bastion benefits
         if (item.name === "Bastion") {
           await this.actor.update(updateData);
-          // Apply other Bastion benefits (AC bonus, armor training, etc.)
           await this._applyBastionBenefits();
+          this._itemSelectionDialogOpen = false;
           this._preferredTab = "progression";
           this.render(true);
           dialog.close();
@@ -9083,16 +9011,19 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       await this.actor.update(updateData);
       
+      this._itemSelectionDialogOpen = false;
       this._preferredTab = "progression";
       this.render(true);
-      
-      // Close the dialog
       dialog.close();
     };
 
+    const self = this;
+    const clearItemDialogFlag = () => {
+      self._itemSelectionDialogOpen = false;
+    };
     const bindItemSelection = (dialogInstance) => {
-      const root = dialogInstance?.element?.shadowRoot || dialogInstance?.element;
-      const container = root instanceof HTMLElement ? root : null;
+      const root = dialogInstance?.element?.shadowRoot ?? dialogInstance?.element;
+      const container = root instanceof HTMLElement ? root : (root?.length ? root[0] : null);
       const items = container?.querySelectorAll?.(".item-selection-item") || [];
       if (!items.length) return false;
       items.forEach((itemEl) => {
@@ -9114,7 +9045,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           title: dialogTitle,
           content: content,
           buttons: [
-            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: clearItemDialogFlag }
           ],
           default: "cancel",
           render: (_app, _html) => {
@@ -9122,7 +9053,6 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const $root = root instanceof jQuery ? root : $(root);
             const $html = $root.length ? $root : $(_html);
             
-            // Add data attribute to identify this dialog
             const dialogElement = $html.closest('.window-app');
             if (dialogElement.length) {
               dialogElement.attr('data-dialog-id', dialogId);
@@ -9136,7 +9066,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             cancel: {
               icon: '<i class="fas fa-times"></i>',
               label: "Cancel",
-              callback: () => {}
+              callback: clearItemDialogFlag
             }
           },
           default: "cancel",
@@ -9231,14 +9161,17 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     };
     
-    // Store the correct title on the dialog IMMEDIATELY after creation
     dialogOptions.position = { width: 520, height: "auto" };
     dialogOptions.window = { resizable: true };
     const dialog = new DialogClass(dialogOptions);
     dialog._singularityDialogTitle = dialogTitle;
-    // Also store it in the data object
-    if (dialog.data) {
-      dialog.data.title = dialogTitle;
+    if (dialog.data) dialog.data.title = dialogTitle;
+    const origItemClose = dialog.close?.bind(dialog);
+    if (typeof origItemClose === "function") {
+      dialog.close = (...args) => {
+        clearItemDialogFlag();
+        return origItemClose(...args);
+      };
     }
     
     await dialog.render(true);
