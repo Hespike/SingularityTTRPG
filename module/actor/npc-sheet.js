@@ -319,6 +319,23 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     // Everything below here is only needed if the sheet is editable
     if (!this.isEditable) return;
 
+    // Prevent default form submit to avoid unexpected reloads
+    html.on('submit', 'form', (ev) => {
+      ev.preventDefault();
+      return false;
+    });
+
+    // Inline immediate-save for critical fields (name, HP) to avoid form submit issues
+    html.on('change', 'input[name="name"], input[name="system.combat.hp.value"], input[name="system.combat.hp.max"]', this._onInlineFieldChange.bind(this));
+    // Inline immediate-save for initiative rank
+    html.on('change', 'select[name="system.combat.initiative.rank"]', this._onInlineSelectChange.bind(this));
+    html.on('keydown', 'input[name="name"], input[name="system.combat.hp.value"], input[name="system.combat.hp.max"]', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        ev.currentTarget.blur();
+      }
+    });
+
     // Add/Delete special ability
     html.find(".add-special-ability").click(this._onAddSpecialAbility.bind(this));
     html.find(".delete-special-ability").click(this._onDeleteSpecialAbility.bind(this));
@@ -412,6 +429,40 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     });
   }
 
+  async _onInlineFieldChange(event) {
+    try {
+      event.preventDefault();
+      const input = event.currentTarget;
+      const name = input.name;
+      let value = input.type === 'number' ? (input.value === '' ? 0 : Number(input.value)) : input.value;
+      const data = {};
+      data[name] = value;
+      const updateData = foundry.utils.expandObject(data);
+      console.log('Singularity | NPC inline update', updateData);
+      await this.actor.update(updateData);
+      setTimeout(() => this.render(true), 50);
+    } catch (err) {
+      console.warn('Singularity | Failed inline update on NPC field:', err);
+    }
+  }
+
+  async _onInlineSelectChange(event) {
+    try {
+      event.preventDefault();
+      const select = event.currentTarget;
+      const name = select.name;
+      const value = select.value;
+      const data = {};
+      data[name] = value;
+      const updateData = foundry.utils.expandObject(data);
+      console.log('Singularity | NPC inline select update', updateData);
+      await this.actor.update(updateData);
+      setTimeout(() => this.render(true), 50);
+    } catch (err) {
+      console.warn('Singularity | Failed inline select update on NPC field:', err);
+    }
+  }
+
   _activateTab(html, tabName) {
     const $tabs = html.find(".sheet-tabs .item");
     const $panes = html.find(".sheet-body .tab");
@@ -452,20 +503,61 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
       }
     }
 
-    // Use the default Foundry form submission which handles merging automatically
-    return super._updateObject(event, formData);
+    // Log the formData for debugging and explicitly update the actor to ensure values persist
+    try {
+      console.log("Singularity | NPC _updateObject called. formData:", formData);
+      // Expand dotted form keys (e.g. "system.combat.hp.max") into a nested object
+      const updateData = foundry.utils.expandObject(formData);
+      console.log("Singularity | NPC _updateObject updateData:", updateData);
+      const updated = await this.actor.update(updateData);
+      console.log("Singularity | NPC actor updated:", updated);
+      // Re-render sheet after a short delay to ensure fresh data is shown
+      setTimeout(() => this.render(true), 50);
+      return;
+    } catch (err) {
+      console.warn("Singularity | Failed to update NPC actor from sheet, falling back to super:", err);
+      return super._updateObject(event, formData);
+    }
   }
 
   _onAddSpecialAbility(event) {
     event.preventDefault();
-    const name = prompt("Enter special ability name:");
-    if (!name) return;
-    const description = prompt("Enter description:");
-
-    const abilities = foundry.utils.deepClone(this.actor.system.specialAbilities || []);
-    abilities.push({ name: name, description: description || "" });
-
-    this.actor.update({ "system.specialAbilities": abilities });
+    const content = `
+      <form>
+        <div class="form-group">
+          <label>Ability Name</label>
+          <input type="text" name="abilityName" />
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="abilityDescription"></textarea>
+        </div>
+      </form>
+    `;
+    new Dialog({
+      title: "Add Special Ability",
+      content,
+      buttons: {
+        add: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Add",
+          callback: async (html) => {
+            const name = html.find('[name="abilityName"]').val()?.trim();
+            const description = html.find('[name="abilityDescription"]').val()?.trim() || "";
+            if (!name) return ui.notifications.warn("Ability name is required.");
+            const abilities = foundry.utils.deepClone(this.actor.system.specialAbilities || []);
+            abilities.push({ name, description });
+            await this.actor.update({ "system.specialAbilities": abilities });
+            this.render();
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "add"
+    }).render(true);
   }
 
   _onDeleteSpecialAbility(event) {
@@ -479,13 +571,37 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
 
   _onAddTrait(event) {
     event.preventDefault();
-    const name = prompt("Enter trait name:");
-    if (!name) return;
-
-    const traits = foundry.utils.deepClone(this.actor.system.traits || []);
-    traits.push(name);
-
-    this.actor.update({ "system.traits": traits });
+    const content = `
+      <form>
+        <div class="form-group">
+          <label>Trait Name</label>
+          <input type="text" name="traitName" />
+        </div>
+      </form>
+    `;
+    new Dialog({
+      title: "Add Trait",
+      content,
+      buttons: {
+        add: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Add",
+          callback: async (html) => {
+            const name = html.find('[name="traitName"]').val()?.trim();
+            if (!name) return ui.notifications.warn("Trait name is required.");
+            const traits = foundry.utils.deepClone(this.actor.system.traits || []);
+            traits.push(name);
+            await this.actor.update({ "system.traits": traits });
+            this.render();
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel"
+        }
+      },
+      default: "add"
+    }).render(true);
   }
 
   _onDeleteTrait(event) {
@@ -658,10 +774,35 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
             const acLine = acComparison ? `<br>${acComparison}` : "";
             const flavor = `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedText}${blindedText}${restrictedText}${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}`;
 
-            roll.toMessage({
+            const message = await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
               flavor
             });
+            // If this was a success or extreme success vs a target, open the Roll Damage dialog automatically
+            try {
+              const targets = Array.from(game.user.targets);
+              if (targets.length > 0) {
+                const targetToken = targets[0];
+                const targetActor = targetToken.actor;
+                const getTargetAc = async (actor) => {
+                  if (!actor) return null;
+                  if (actor.type === "hero" && actor.sheet?.getData) {
+                    const sheetData = await actor.sheet.getData();
+                    return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                  }
+                  return actor.system?.combat?.ac ?? null;
+                };
+                const targetAC = await getTargetAc(targetActor);
+                if (targetAC !== null) {
+                  const difference = roll.total - targetAC;
+                  if (difference >= 0) {
+                    await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId } } });
+                  }
+                }
+              }
+            } catch (err) {
+              console.warn("Singularity | Failed to open Roll Damage dialog for NPC:", err);
+            }
           }
         },
         cancel: {

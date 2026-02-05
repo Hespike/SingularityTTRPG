@@ -17,12 +17,18 @@ const syncTokenHpBars = async (actor) => {
     const updates = [];
     for (const token of scene.tokens) {
       if (token.actorId !== actor.id) continue;
+      // Only update linked tokens (unlinked tokens intentionally have independent HP)
       if (!token.actorLink) continue;
-      if (!token.bar1 || token.bar1.attribute !== "combat.hp") continue;
-      if (token.bar1.value === value && token.bar1.max === max) continue;
+      const currentBar = token.bar1 || {};
+      const currentValue = currentBar.value ?? null;
+      const currentMax = currentBar.max ?? null;
+      const currentAttr = currentBar.attribute ?? null;
+      // If already matching and attribute is correct, skip
+      if (currentValue === value && currentMax === max && currentAttr === "combat.hp") continue;
+      // Ensure the token's bar attribute points to our system HP path and set values
       updates.push({
         _id: token.id,
-        bar1: { ...token.bar1, value, max }
+        bar1: { attribute: "combat.hp", value, max }
       });
     }
     if (updates.length) {
@@ -477,6 +483,48 @@ Hooks.once("init", function() {
     }
     return el;
   };
+
+  // Add a chat message renderer to allow heroes to roll damage from attack messages
+  Hooks.on("renderChatMessageHTML", (message, html, data) => {
+    try {
+      // Normalize html to a jQuery object for compatibility with existing code
+      const $html = html instanceof jQuery ? html : $(html);
+      const attackFlag = message.getFlag("singularity", "attackRoll");
+      if (!attackFlag) return;
+      const actorId = message.speaker?.actor;
+      if (!actorId) return;
+      const actor = game.actors.get(actorId);
+      if (!actor || actor.type !== "hero") return;
+
+      // Find a place to append a Roll Damage button (prefer .roll-flavor)
+      const $flavor = $html.find('.roll-flavor').first().length ? $html.find('.roll-flavor').first() : $html.find('.message-content').first();
+      if (!$flavor.length) return;
+
+      // Add button if not present
+      if ($flavor.find('.singularity-roll-damage').length === 0) {
+        const attackId = attackFlag.attackId;
+        const btnHtml = `<div class="chat-card-buttons" style="margin-top: 6px;"><button class="singularity-roll-damage" data-attack-id="${attackId}" data-actor-id="${actorId}" style="padding:4px 8px; font-size:11px;">Roll Damage</button></div>`;
+        $flavor.append(btnHtml);
+      }
+
+      // Delegate click handler (idempotent)
+      $flavor.off('click.singularity-roll-damage').on('click.singularity-roll-damage', '.singularity-roll-damage', async (ev) => {
+        ev.preventDefault();
+        const attackId = ev.currentTarget.dataset.attackId;
+        const actorId = ev.currentTarget.dataset.actorId;
+        const actor = game.actors.get(actorId);
+        if (!actor) return;
+        try {
+          // Call the Hero sheet damage handler with a minimal event-like object
+          await SingularityActorSheetHero.prototype._onRollDamage.call({ actor }, { preventDefault: () => {}, currentTarget: { dataset: { attackId } } });
+        } catch (err) {
+          console.warn("Singularity | Failed to open Roll Damage from chat:", err);
+        }
+      });
+    } catch (err) {
+      console.warn("Singularity | renderChatMessageHTML hook failed:", err);
+    }
+  });
 
   const updateStatusSummary = (token) => {
     const el = ensureStatusSummary();

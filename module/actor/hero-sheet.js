@@ -2379,7 +2379,23 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
     // Everything below here is only needed if the sheet is editable
     if (!this.isEditable) return;
+    // Prevent default form submit to avoid unexpected reloads
+    html.on('submit', 'form', (ev) => {
+      ev.preventDefault();
+      return false;
+    });
 
+    // Inline immediate-save for critical fields (name, HP) to avoid form submit issues
+    html.on('change', 'input[name="name"], input[name="system.combat.hp.value"], input[name="system.combat.hp.max"]', this._onInlineFieldChange.bind(this));
+    // Inline immediate-save for initiative rank
+    html.on('change', 'select[name="system.combat.initiative.rank"]', this._onInlineSelectChange.bind(this));
+    html.on('keydown', 'input[name="name"], input[name="system.combat.hp.value"], input[name="system.combat.hp.max"]', (ev) => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        ev.currentTarget.blur();
+      }
+    });
+ 
     // Add skill
     html.find(".add-skill").click(this._onAddSkill.bind(this));
     
@@ -2593,6 +2609,42 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     html.find(`.sheet-body .tab[data-tab="${tabName}"]`).addClass("active");
   }
 
+  async _onInlineFieldChange(event) {
+    try {
+      event.preventDefault();
+      const input = event.currentTarget;
+      const name = input.name;
+      let value = input.type === 'number' ? (input.value === '' ? 0 : Number(input.value)) : input.value;
+      // Build update data and expand
+      const data = {};
+      data[name] = value;
+      const updateData = foundry.utils.expandObject(data);
+      console.log('Singularity | Hero inline update', updateData);
+      await this.actor.update(updateData);
+      // re-render slightly later
+      setTimeout(() => this.render(true), 50);
+    } catch (err) {
+      console.warn('Singularity | Failed inline update on hero field:', err);
+    }
+  }
+
+  async _onInlineSelectChange(event) {
+    try {
+      event.preventDefault();
+      const select = event.currentTarget;
+      const name = select.name;
+      const value = select.value;
+      const data = {};
+      data[name] = value;
+      const updateData = foundry.utils.expandObject(data);
+      console.log('Singularity | Hero inline select update', updateData);
+      await this.actor.update(updateData);
+      setTimeout(() => this.render(true), 50);
+    } catch (err) {
+      console.warn('Singularity | Failed inline select update on hero field:', err);
+    }
+  }
+
   /** @override */
   async _updateObject(event, formData) {
     // Exclude inline-edit fields from form submission - they handle their own updates
@@ -2662,8 +2714,19 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
 
-    // Use the default Foundry form submission which handles merging automatically
-    return super._updateObject(event, formData);
+    // Expand dotted form keys and explicitly update the actor to ensure values persist
+    try {
+      console.log("Singularity | Hero _updateObject formData:", formData);
+      const updateData = foundry.utils.expandObject(formData);
+      console.log("Singularity | Hero _updateObject updateData:", updateData);
+      const updated = await this.actor.update(updateData);
+      console.log("Singularity | Hero actor updated:", updated);
+      setTimeout(() => this.render(true), 50);
+      return;
+    } catch (err) {
+      console.warn("Singularity | Failed to update Hero actor from sheet, falling back to super:", err);
+      return super._updateObject(event, formData);
+    }
   }
 
   async _onAddSkill(event) {
@@ -6821,6 +6884,17 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
               attackId: attackId,
               attackName: attack.name
             });
+            // If this was a success or extreme success vs a target, open the Roll Damage dialog automatically
+            if (targetAC !== null) {
+              const difference = roll.total - targetAC;
+              if (difference >= 0) {
+                try {
+                  await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId } } });
+                } catch (err) {
+                  console.warn("Singularity | Failed to open Roll Damage dialog:", err);
+                }
+              }
+            }
               }
             },
             {
