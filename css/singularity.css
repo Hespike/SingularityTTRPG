@@ -4143,6 +4143,7 @@ button.weapon-attack:hover {
 /* Supersonic Moment Section */
 .supersonic-moment-section {
   margin-top: 20px;
+  margin-bottom: 25px;
   padding: 15px;
   background: rgba(30, 33, 45, 0.5);
   border: 1px solid rgba(189, 95, 255, 0.3);

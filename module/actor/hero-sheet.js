@@ -7326,7 +7326,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     
     await this.actor.update({ "system.combat.supersonicMoment": supersonicData });
-    this.render();
+    // Don't call render() to preserve current tab state
   }
 
   async _onSupersonicDistanceChange(event) {
@@ -7336,7 +7336,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     supersonicData.distance = Math.max(0, distance); // Ensure non-negative
     
     await this.actor.update({ "system.combat.supersonicMoment": supersonicData });
-    this.render();
+    // Don't call render() to preserve current tab state
   }
 
   async _onDeadeyeToggle(event) {
@@ -7344,7 +7344,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const isActive = event.currentTarget.checked;
     
     await this.actor.update({ "system.combat.deadeye": { active: isActive } });
-    this.render();
+    // Don't call render() to preserve current tab state
   }
 
   async _onEnoughPrepTimeToggle(event) {
@@ -7359,7 +7359,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     
     await this.actor.update({ "system.combat.enoughPrepTime": enoughPrepTimeData });
-    this.render();
+    // Don't call render() to preserve current tab state
   }
 
   async _onEnoughPrepTimeEnemyChange(event) {
@@ -7369,7 +7369,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     enoughPrepTimeData.enemyName = enemyName;
     
     await this.actor.update({ "system.combat.enoughPrepTime": enoughPrepTimeData });
-    this.render();
+    // Don't call render() to preserve current tab state
   }
 
   async _onAddGadget(event) {
