@@ -25,7 +25,24 @@
       </div>
       <div class="form-group">
         <label>Damage Type</label>
-        <input type="text" name="system.basic.damageType" value="{{system.basic.damageType}}" placeholder="kinetic"/>
+        <select name="system.basic.damageType" {{#if weaponDamageTypeLocked}}disabled{{/if}}>
+          <option value="Acid" {{#if (eq system.basic.damageType "Acid")}}selected{{/if}}>Acid</option>
+          <option value="Chaos" {{#if (eq system.basic.damageType "Chaos")}}selected{{/if}}>Chaos</option>
+          <option value="Cold" {{#if (eq system.basic.damageType "Cold")}}selected{{/if}}>Cold</option>
+          <option value="Fire" {{#if (eq system.basic.damageType "Fire")}}selected{{/if}}>Fire</option>
+          <option value="Kinetic" {{#if (eq system.basic.damageType "Kinetic")}}selected{{/if}}>Kinetic</option>
+          <option value="Lightning" {{#if (eq system.basic.damageType "Lightning")}}selected{{/if}}>Lightning</option>
+          <option value="Necrotic" {{#if (eq system.basic.damageType "Necrotic")}}selected{{/if}}>Necrotic</option>
+          <option value="Photonic" {{#if (eq system.basic.damageType "Photonic")}}selected{{/if}}>Photonic</option>
+          <option value="Poison" {{#if (eq system.basic.damageType "Poison")}}selected{{/if}}>Poison</option>
+          <option value="Psychic" {{#if (eq system.basic.damageType "Psychic")}}selected{{/if}}>Psychic</option>
+          <option value="Radiant" {{#if (eq system.basic.damageType "Radiant")}}selected{{/if}}>Radiant</option>
+          <option value="Sonic" {{#if (eq system.basic.damageType "Sonic")}}selected{{/if}}>Sonic</option>
+          <option value="Energy" {{#if (eq system.basic.damageType "Energy")}}selected{{/if}}>Energy</option>
+        </select>
+        {{#if weaponDamageTypeLocked}}
+        <p style="font-size: 11px; color: #a0aec0; margin-top: 5px;">Locked by damage type conversion modification.</p>
+        {{/if}}
       </div>
       <div class="form-group">
         <label>Range</label>
@@ -43,6 +60,29 @@
         <label>Weapon Categories (comma-separated)</label>
         <input type="text" name="system.basic.categories" value="{{system.basic.categories}}" placeholder="e.g., Light Melee Weapons, Thrown Weapons"/>
         <p style="font-size: 11px; color: #a0aec0; margin-top: 5px;">Used for competence matching. Separate multiple categories with commas.</p>
+      </div>
+      <div class="form-group">
+        <label>Modifications</label>
+        <div class="mods-row">
+          <button type="button" class="weapon-add-mod">Add Modification</button>
+        </div>
+        <div class="mods-list">
+          {{#if system.basic.modifications}}
+          {{#each system.basic.modifications as |mod|}}
+          <div class="mod-item">
+            <div class="mod-info">
+              <span class="mod-name">{{mod.displayName}}</span>
+              {{#if mod.displayDetail}}
+              <span class="mod-detail">{{mod.displayDetail}}</span>
+              {{/if}}
+            </div>
+            <button type="button" class="weapon-remove-mod" data-mod-id="{{mod.id}}">Remove</button>
+          </div>
+          {{/each}}
+          {{else}}
+          <div class="mod-empty">No modifications applied.</div>
+          {{/if}}
+        </div>
       </div>
     {{/if}}
 
@@ -86,6 +126,29 @@
             <span>Sealed</span>
             <input type="text" class="armor-trait-input" name="armorTraitSealed" value="{{system.basic.traitsSealedValue}}" placeholder="Time"/>
           </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Modifications</label>
+        <div class="mods-row">
+          <button type="button" class="armor-add-mod">Add Modification</button>
+        </div>
+        <div class="mods-list">
+          {{#if system.basic.modifications}}
+          {{#each system.basic.modifications as |mod|}}
+          <div class="mod-item">
+            <div class="mod-info">
+              <span class="mod-name">{{mod.displayName}}</span>
+              {{#if mod.displayDetail}}
+              <span class="mod-detail">{{mod.displayDetail}}</span>
+              {{/if}}
+            </div>
+            <button type="button" class="armor-remove-mod" data-mod-id="{{mod.id}}">Remove</button>
+          </div>
+          {{/each}}
+          {{else}}
+          <div class="mod-empty">No modifications applied.</div>
+          {{/if}}
         </div>
       </div>
     {{/if}}

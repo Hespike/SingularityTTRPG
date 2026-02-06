@@ -770,8 +770,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const skillsWithBonus = {};
     const lockedTrainingSkills = {};
     
-    const equippedArmorForNoisy = actorData.items?.find(i => i.type === "armor" && i.system?.basic?.equipped === true);
+    const equippedArmorForNoisy = actorData.items?.find(i => i.type === "armor" && i.system?.basic?.equipped);
     const traits = equippedArmorForNoisy?.system?.basic?.traits || equippedArmorForNoisy?.system?.basic?.properties || [];
+    const armorMods = equippedArmorForNoisy?.system?.basic?.modifications || [];
+    const silenceReduction = Array.isArray(armorMods)
+      ? armorMods.filter(mod => mod?.type === "silence").reduce((total, mod) => total + (Number(mod.value) || 0), 0)
+      : 0;
     const traitList = Array.isArray(traits) ? traits : String(traits || "").split(",").map(t => t.trim());
     let noisyPenalty = 0;
     let stealthyBonus = 0;
@@ -791,6 +795,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
 
+    noisyPenalty = Math.max(0, noisyPenalty - silenceReduction);
     const armorStealthModifier = stealthyBonus - noisyPenalty;
     const hasArmorStealthModifier = stealthyBonus > 0 || noisyPenalty > 0;
     // If wearing armor with Stealthy/Noisy, add or update Stealth skill with armor modifier
@@ -1188,6 +1193,17 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
       return resistanceCopy;
     });
+    if (equippedArmorForNoisy?.system?.basic?.modifications) {
+      const armorResistanceMods = equippedArmorForNoisy.system.basic.modifications
+        .filter(mod => mod?.type === "resistance" && mod.damageType)
+        .map(mod => ({
+          type: mod.damageType,
+          value: Number(mod.value) || 3,
+          calculatedValue: Number(mod.value) || 3,
+          source: `Armor Mod: ${equippedArmorForNoisy.name}`
+        }));
+      calculatedResistances.push(...armorResistanceMods);
+    }
     context.resistances = calculatedResistances;
     context.weaknesses = actorData.system.weaknesses || [];
     context.immunities = actorData.system.immunities || [];
@@ -1616,6 +1632,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
         const isWeaponAttack = Boolean(attack.weaponId) || Boolean(matchingWeapon);
         const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
+        attackCopy.isUnarmed = Boolean(isUnarmed);
         const isTalentAttack = attack.isTalentAttack === true || (attack.name && attack.name.toLowerCase() === "blast");
         if (isTalentAttack) {
           attackCopy.isTalentAttack = true;
@@ -4471,8 +4488,22 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           }
           
           // Check if player has enough credits
-          const currentCredits = this.actor.system.equipment?.credits || 0;
-          const weaponPrice = weapon.system.basic?.price || 0;
+          const actorCredits = this.actor?.system?.equipment?.credits;
+          let currentCredits = Number(actorCredits);
+          if (Number.isNaN(currentCredits)) {
+            currentCredits = 0;
+          }
+          if (this.element) {
+            const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+            const inputVal = $sheet.find('input[name="system.equipment.credits"]').val();
+            if (inputVal !== undefined && inputVal !== null && inputVal !== "") {
+              const parsed = Number(String(inputVal).replace(/,/g, "").trim());
+              if (!Number.isNaN(parsed)) {
+                currentCredits = parsed;
+              }
+            }
+          }
+          const weaponPrice = Number(weapon.system.basic?.price) || 0;
           
           if (currentCredits < weaponPrice) {
             ui.notifications.warn(`You don't have enough credits! This weapon costs ${weaponPrice} credits, but you only have ${currentCredits}.`);

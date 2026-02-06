@@ -2745,6 +2745,80 @@ button.weapon-attack:hover {
   min-width: 90px;
 }
 
+.singularity.sheet.item .mods-row {
+  margin-top: 6px;
+}
+
+.singularity.sheet.item .mods-row .armor-add-mod {
+  background: rgba(189, 95, 255, 0.15);
+  border: 1px solid rgba(189, 95, 255, 0.4);
+  color: #d1d1d1;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.singularity.sheet.item .mods-row .armor-add-mod:hover {
+  background: rgba(189, 95, 255, 0.3);
+  border-color: rgba(189, 95, 255, 0.7);
+  color: #ffffff;
+}
+
+.singularity.sheet.item .mods-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.singularity.sheet.item .mod-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(189, 95, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(30, 33, 45, 0.6);
+}
+
+.singularity.sheet.item .mod-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #d1d1d1;
+  font-size: 13px;
+}
+
+.singularity.sheet.item .mod-name {
+  font-weight: 600;
+  color: #BD5FFF;
+}
+
+.singularity.sheet.item .mod-detail {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.singularity.sheet.item .armor-remove-mod {
+  background: rgba(255, 107, 107, 0.2);
+  border: 1px solid rgba(255, 107, 107, 0.6);
+  color: #ffb0b0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.singularity.sheet.item .armor-remove-mod:hover {
+  background: rgba(255, 107, 107, 0.35);
+  color: #ffffff;
+}
+
+.singularity.sheet.item .mod-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
 /* Select dropdown options styling - make them visible */
 .singularity.sheet.item .form-group select option {
   background: rgba(30, 33, 45, 0.95) !important;

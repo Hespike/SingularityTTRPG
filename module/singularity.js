@@ -5671,7 +5671,7 @@ const isAllDamageType = (value) => {
 const getCalculatedResistances = (actor) => {
   const resistances = actor?.system?.resistances || [];
   const primeLevel = actor?.system?.basic?.primeLevel || 1;
-  return resistances.map((resistance) => {
+  const calculated = resistances.map((resistance) => {
     const copy = { ...resistance };
     if (copy.value === null && copy.source === "Bastion's Resistance") {
       copy.calculatedValue = 2 * primeLevel;
@@ -5680,6 +5680,17 @@ const getCalculatedResistances = (actor) => {
     }
     return copy;
   });
+  const equippedArmor = actor?.items?.find(item => item.type === "armor" && item.system?.basic?.equipped);
+  const mods = equippedArmor?.system?.basic?.modifications || [];
+  const armorResistances = Array.isArray(mods)
+    ? mods.filter(mod => mod?.type === "resistance" && mod.damageType)
+        .map(mod => ({
+          type: mod.damageType,
+          calculatedValue: Number(mod.value) || 3,
+          source: `Armor Mod: ${equippedArmor?.name || "Armor"}`
+        }))
+    : [];
+  return calculated.concat(armorResistances);
 };
 const getDamageAdjustment = (actor, damageType) => {
   const normalizedType = normalizeDamageType(damageType);

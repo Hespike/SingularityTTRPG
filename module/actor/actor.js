@@ -464,6 +464,10 @@ export class SingularityActor extends Actor {
       if (damageMatch) {
         baseDamage = damageMatch[1];
       }
+      const weaponMods = weapon.system?.basic?.modifications || [];
+      const enhancementMod = this._getWeaponEnhancementMod(weaponMods);
+      baseDamage = this._applyWeaponDamageEnhancement(baseDamage, enhancementMod);
+      const damageType = this._getWeaponDamageType(weapon, weaponMods);
       
       // Extract thrown range from properties if available
       let thrownRange = "15 ft.";
@@ -490,7 +494,7 @@ export class SingularityActor extends Actor {
           baseAttackBonus: weapon.system?.basic?.attackBonus || 0,
           baseDamage: baseDamage,
           ability: "might",
-          damageType: weapon.system?.basic?.damageType || "kinetic",
+          damageType: damageType,
           range: "Melee",
           cost: weapon.system?.basic?.energyCost || 1,
           type: "melee",
@@ -517,7 +521,7 @@ export class SingularityActor extends Actor {
           baseAttackBonus: weapon.system?.basic?.attackBonus || 0,
           baseDamage: baseDamage,
           ability: "agility",
-          damageType: weapon.system?.basic?.damageType || "kinetic",
+          damageType: damageType,
           range: thrownRange,
           cost: weapon.system?.basic?.energyCost || 1,
           type: "ranged",
@@ -547,7 +551,7 @@ export class SingularityActor extends Actor {
           baseAttackBonus: weapon.system?.basic?.attackBonus || 0,
           baseDamage: baseDamage,
           ability: ability,
-          damageType: weapon.system?.basic?.damageType || "kinetic",
+          damageType: damageType,
           range: weapon.system?.basic?.range || (weaponType === "ranged" || hasThrownCategory ? thrownRange : "Melee"),
           cost: weapon.system?.basic?.energyCost || 1,
           type: weaponType,
@@ -585,6 +589,33 @@ export class SingularityActor extends Actor {
       
       return matchingWeapon !== undefined;
     });
+  }
+
+  _getWeaponEnhancementMod(mods) {
+    const enhancements = Array.isArray(mods) ? mods.filter(mod => mod?.type === "damage-enhancement") : [];
+    if (!enhancements.length) return null;
+    return enhancements.sort((a, b) => (Number(b.tier) || 0) - (Number(a.tier) || 0))[0];
+  }
+
+  _applyWeaponDamageEnhancement(damage, enhancementMod) {
+    if (!enhancementMod || !damage) return damage;
+    const match = String(damage).match(/(\d+)\s*d\s*(\d+)/i);
+    if (!match) return damage;
+    const dice = Number(match[1]);
+    const die = Number(match[2]);
+    if (!dice || !die) return damage;
+    const addDice = die <= 6
+      ? Number(enhancementMod.addDiceSmall ?? 2)
+      : Number(enhancementMod.addDiceLarge ?? 1);
+    const safeAdd = Number.isNaN(addDice) ? 0 : addDice;
+    const newDice = dice + safeAdd;
+    return String(damage).replace(match[0], `${newDice}d${die}`);
+  }
+
+  _getWeaponDamageType(weapon, mods) {
+    const modList = Array.isArray(mods) ? mods : (weapon?.system?.basic?.modifications || []);
+    const conversion = modList.find(mod => mod?.type === "damage-type-conversion" && mod?.damageType);
+    return conversion?.damageType || weapon?.system?.basic?.damageType || "kinetic";
   }
 
   /**
@@ -645,6 +676,9 @@ export class SingularityActor extends Actor {
 
     systemData.combat.ac = acBase + acBonus;
 
+    // Ensure Unarmed Strike attack exists for NPCs (matches heroes)
+    this._ensureUnarmedStrike(systemData);
+
     // Ensure equipped weapons are added as attacks (similar to heroes)
     this._ensureEquippedWeaponAttacks(systemData);
 
@@ -695,19 +729,26 @@ export class SingularityActor extends Actor {
    * Get noisy armor penalty to Stealth (Noisy (X))
    */
   _getNoisyPenalty() {
-    const armors = this.items.filter(item => item.type === "armor" && item.system?.basic?.equipped === true);
+    const armors = this.items.filter(item => item.type === "armor" && item.system?.basic?.equipped);
     let highest = 0;
     for (const armor of armors) {
       const traits = armor.system?.basic?.traits || armor.system?.basic?.properties || [];
+      const mods = armor.system?.basic?.modifications || [];
+      const silenceReduction = Array.isArray(mods)
+        ? mods.filter(mod => mod?.type === "silence").reduce((total, mod) => total + (Number(mod.value) || 0), 0)
+        : 0;
       const traitList = Array.isArray(traits) ? traits : String(traits).split(",").map(t => t.trim());
+      let armorNoisy = 0;
       for (const trait of traitList) {
         const match = String(trait).match(/Noisy\s*\((\d+)\)/i);
         if (match) {
-          highest = Math.max(highest, Number(match[1]));
+          armorNoisy = Math.max(armorNoisy, Number(match[1]));
         } else if (/^Noisy$/i.test(String(trait))) {
-          highest = Math.max(highest, 1);
+          armorNoisy = Math.max(armorNoisy, 1);
         }
       }
+      armorNoisy = Math.max(0, armorNoisy - silenceReduction);
+      highest = Math.max(highest, armorNoisy);
     }
     return highest;
   }
@@ -716,7 +757,7 @@ export class SingularityActor extends Actor {
    * Get stealthy armor bonus to Stealth (Stealthy (X))
    */
   _getStealthyBonus() {
-    const armors = this.items.filter(item => item.type === "armor" && item.system?.basic?.equipped === true);
+    const armors = this.items.filter(item => item.type === "armor" && item.system?.basic?.equipped);
     let highest = 0;
     for (const armor of armors) {
       const traits = armor.system?.basic?.traits || armor.system?.basic?.properties || [];

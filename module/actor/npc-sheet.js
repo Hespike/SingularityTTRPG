@@ -50,7 +50,11 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
       }
       const $html = this.element instanceof jQuery ? this.element : $(this.element);
       this.activateListeners($html);
-      this._activateTab($html, "main");
+      const tabToShow = this._preferredTab || "main";
+      this._activateTab($html, tabToShow);
+      if (this._scrollPositions?.[tabToShow] !== undefined) {
+        $html.find(`.tab.${tabToShow}`).scrollTop(this._scrollPositions[tabToShow]);
+      }
     }
   }
 
@@ -244,6 +248,14 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
       }
       const attackBonus = (talentCompetenceBonus || (attack.baseAttackBonus || 0)) + abilityScore;
       const damageBonus = abilityScore;
+
+      const weaponDamageType = matchingWeapon?.system?.basic?.damageType;
+      if (!attack.damageType && weaponDamageType) {
+        attack.damageType = weaponDamageType;
+      }
+      if (!attack.damageType) {
+        attack.damageType = "Kinetic";
+      }
       
       let damageFormula = "";
       if (attack.baseDamage) {
@@ -270,6 +282,7 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
       breakdownParts.push(`${abilityScore >= 0 ? '+' : ''}${abilityScore} (${attack.ability})`);
       return {
         ...attack,
+        isUnarmed: Boolean(isUnarmed),
         calculatedAttackBonus: attackBonus,
         calculatedDamage: damageFormula,
         attackBonusBreakdown: breakdownParts.join(' '),
@@ -348,6 +361,10 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     context.resistances = actorData.system.resistances || [];
     context.weaknesses = actorData.system.weaknesses || [];
     context.immunities = actorData.system.immunities || [];
+    context.damageTypes = [
+      "Acid", "Chaos", "Cold", "Fire", "Kinetic", "Lightning",
+      "Necrotic", "Photonic", "Poison", "Psychic", "Radiant", "Sonic", "Energy"
+    ];
 
     // Ensure combat AC is set (fallback to 10 if not calculated)
     if (!context.system) {
@@ -372,6 +389,7 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
       event.preventDefault();
       const tab = event.currentTarget.dataset.tab;
       if (tab) {
+        this._preferredTab = tab;
         this._activateTab(html, tab);
       }
     });
@@ -428,6 +446,7 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     // Attack and damage rolls
     html.find(".attack-roll").click(this._onRollAttack.bind(this));
     html.find(".damage-roll").click(this._onRollDamage.bind(this));
+    html.on("change", ".attack-damage-type", this._onAttackDamageTypeChange.bind(this));
 
     // Saving throw rolls and ranks
     html.find(".saving-throw-roll").click(this._onSavingThrowRoll.bind(this));
@@ -770,111 +789,225 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     `;
 
     const dialogTitle = `Roll Attack: ${attack.name}`;
-    const d = new Dialog({
-      title: dialogTitle,
-      content: dialogContent,
-      buttons: {
-        roll: {
-          icon: '<i class="fas fa-dice-d20"></i>',
-          label: "Roll Attack",
-          callback: async (html) => {
-            const bonus = parseFloat(html.find("#attack-bonus").val()) || 0;
-            const extra = html.find("#extra-modifier").val().trim() || "0";
-            const repeatedPenalty = parseFloat(html.find("#repeated-penalty").val()) || 0;
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const getDialogRoot = () => {
+      const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+      return el instanceof HTMLElement ? el : document;
+    };
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: [
+            {
+              action: "roll",
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Attack",
+              callback: async () => {
+                const root = getDialogRoot();
+                const bonus = parseFloat(root.querySelector("#attack-bonus")?.value) || 0;
+                const extra = String(root.querySelector("#extra-modifier")?.value ?? "0").trim() || "0";
+                const repeatedPenalty = parseFloat(root.querySelector("#repeated-penalty")?.value) || 0;
 
-            const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
-              target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
-            );
-            const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
-            let rollFormula = `${dieFormula} + ${bonus}`;
-            if (repeatedPenalty) {
-              rollFormula += ` + ${repeatedPenalty}`;
-            }
-            if (extra && extra !== "0") {
-              rollFormula += ` + ${extra}`;
-            }
-
-            const roll = new Roll(rollFormula);
-            await roll.evaluate();
-
-            const fatiguedText = fatiguedPenalty ? ` - ${fatiguedPenalty} (Fatigued)` : "";
-            const blindedText = blindedPenalty ? " - 10 (Blinded)" : "";
-            const restrictedText = restrictedRangedPenalty ? ` - ${restrictedRangedPenalty} (${restrictedRangedSource})` : "";
-            const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
-            const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
-            const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
-            let acComparison = "";
-            const targets = Array.from(game.user.targets);
-            if (targets.length > 0) {
-              const targetToken = targets[0];
-              const targetName = targetToken.name || targetToken.actor?.name || "Target";
-              const targetActor = targetToken.actor;
-              const getTargetAc = async (actor) => {
-                if (!actor) return null;
-                if (actor.type === "hero" && actor.sheet?.getData) {
-                  const sheetData = await actor.sheet.getData();
-                  return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
+                  target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
+                );
+                const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
+                let rollFormula = `${dieFormula} + ${bonus}`;
+                if (repeatedPenalty) {
+                  rollFormula += ` + ${repeatedPenalty}`;
                 }
-                return actor.system?.combat?.ac ?? null;
-              };
-              const targetAC = await getTargetAc(targetActor);
-              if (targetAC !== null) {
-                const difference = roll.total - targetAC;
-                if (difference >= 10) {
-                  acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${targetAC})</span>`;
-                } else if (difference >= 0) {
-                  acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${targetAC})</span>`;
-                } else if (difference >= -9) {
-                  acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
-                } else {
-                  acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                if (extra && extra !== "0") {
+                  rollFormula += ` + ${extra}`;
                 }
-              }
-            }
-            const acLine = acComparison ? `<br>${acComparison}` : "";
-            const flavor = `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedText}${blindedText}${restrictedText}${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}`;
 
-            const message = await roll.toMessage({
-              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-              flavor
-            });
-            // If this was a success or extreme success vs a target, open the Roll Damage dialog automatically
-            try {
-              const targets = Array.from(game.user.targets);
-              if (targets.length > 0) {
-                const targetToken = targets[0];
-                const targetActor = targetToken.actor;
-                const getTargetAc = async (actor) => {
-                  if (!actor) return null;
-                  if (actor.type === "hero" && actor.sheet?.getData) {
-                    const sheetData = await actor.sheet.getData();
-                    return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
-                  }
-                  return actor.system?.combat?.ac ?? null;
-                };
-                const targetAC = await getTargetAc(targetActor);
-                if (targetAC !== null) {
-                  const difference = roll.total - targetAC;
-                  if (difference >= 0) {
-                    await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId } } });
+                const roll = new Roll(rollFormula);
+                await roll.evaluate();
+
+                const fatiguedText = fatiguedPenalty ? ` - ${fatiguedPenalty} (Fatigued)` : "";
+                const blindedText = blindedPenalty ? " - 10 (Blinded)" : "";
+                const restrictedText = restrictedRangedPenalty ? ` - ${restrictedRangedPenalty} (${restrictedRangedSource})` : "";
+                const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
+                const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
+                const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+                let acComparison = "";
+                const targets = Array.from(game.user.targets);
+                if (targets.length > 0) {
+                  const targetToken = targets[0];
+                  const targetName = targetToken.name || targetToken.actor?.name || "Target";
+                  const targetActor = targetToken.actor;
+                  const getTargetAc = async (actor) => {
+                    if (!actor) return null;
+                    if (actor.type === "hero" && actor.sheet?.getData) {
+                      const sheetData = await actor.sheet.getData();
+                      return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                    }
+                    return actor.system?.combat?.ac ?? null;
+                  };
+                  const targetAC = await getTargetAc(targetActor);
+                  if (targetAC !== null) {
+                    const difference = roll.total - targetAC;
+                    if (difference >= 10) {
+                      acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${targetAC})</span>`;
+                    } else if (difference >= 0) {
+                      acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${targetAC})</span>`;
+                    } else if (difference >= -9) {
+                      acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                    } else {
+                      acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                    }
                   }
                 }
+                const acLine = acComparison ? `<br>${acComparison}` : "";
+                const flavor = `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedText}${blindedText}${restrictedText}${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}`;
+
+                await roll.toMessage({
+                  speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                  flavor
+                });
+                // If this was a success or extreme success vs a target, open the Roll Damage dialog automatically
+                try {
+                  const targets = Array.from(game.user.targets);
+                  if (targets.length > 0) {
+                    const targetToken = targets[0];
+                    const targetActor = targetToken.actor;
+                    const getTargetAc = async (actor) => {
+                      if (!actor) return null;
+                      if (actor.type === "hero" && actor.sheet?.getData) {
+                        const sheetData = await actor.sheet.getData();
+                        return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                      }
+                      return actor.system?.combat?.ac ?? null;
+                    };
+                    const targetAC = await getTargetAc(targetActor);
+                    if (targetAC !== null) {
+                      const difference = roll.total - targetAC;
+                      if (difference >= 0) {
+                        await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId } } });
+                      }
+                    }
+                  }
+                } catch (err) {
+                  console.warn("Singularity | Failed to open Roll Damage dialog for NPC:", err);
+                }
               }
-            } catch (err) {
-              console.warn("Singularity | Failed to open Roll Damage dialog for NPC:", err);
+            },
+            {
+              action: "cancel",
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
             }
-          }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: () => {}
+          ],
+          default: "roll"
         }
-      },
-      default: "roll"
-    });
+      : {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: {
+            roll: {
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Attack",
+              callback: async (html) => {
+                const $html = html instanceof jQuery ? html : $(html);
+                const bonus = parseFloat($html.find("#attack-bonus").val()) || 0;
+                const extra = $html.find("#extra-modifier").val().trim() || "0";
+                const repeatedPenalty = parseFloat($html.find("#repeated-penalty").val()) || 0;
 
-    await d.render(true);
+                const hasParalyzedTarget = Array.from(game.user?.targets || []).some(
+                  target => target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")
+                );
+                const dieFormula = hasParalyzedTarget ? "2d20kh" : "1d20";
+                let rollFormula = `${dieFormula} + ${bonus}`;
+                if (repeatedPenalty) {
+                  rollFormula += ` + ${repeatedPenalty}`;
+                }
+                if (extra && extra !== "0") {
+                  rollFormula += ` + ${extra}`;
+                }
+
+                const roll = new Roll(rollFormula);
+                await roll.evaluate();
+
+                const fatiguedText = fatiguedPenalty ? ` - ${fatiguedPenalty} (Fatigued)` : "";
+                const blindedText = blindedPenalty ? " - 10 (Blinded)" : "";
+                const restrictedText = restrictedRangedPenalty ? ` - ${restrictedRangedPenalty} (${restrictedRangedSource})` : "";
+                const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
+                const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
+                const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+                let acComparison = "";
+                const targets = Array.from(game.user.targets);
+                if (targets.length > 0) {
+                  const targetToken = targets[0];
+                  const targetName = targetToken.name || targetToken.actor?.name || "Target";
+                  const targetActor = targetToken.actor;
+                  const getTargetAc = async (actor) => {
+                    if (!actor) return null;
+                    if (actor.type === "hero" && actor.sheet?.getData) {
+                      const sheetData = await actor.sheet.getData();
+                      return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                    }
+                    return actor.system?.combat?.ac ?? null;
+                  };
+                  const targetAC = await getTargetAc(targetActor);
+                  if (targetAC !== null) {
+                    const difference = roll.total - targetAC;
+                    if (difference >= 10) {
+                      acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${targetAC})</span>`;
+                    } else if (difference >= 0) {
+                      acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${targetAC})</span>`;
+                    } else if (difference >= -9) {
+                      acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                    } else {
+                      acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                    }
+                  }
+                }
+                const acLine = acComparison ? `<br>${acComparison}` : "";
+                const flavor = `<b>${attack.name} - Attack</b><br>${dieFormula} + ${attack.baseAttackBonus || 0} (base) + ${abilityScore} (${attack.ability})${fatiguedText}${blindedText}${restrictedText}${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}`;
+
+                await roll.toMessage({
+                  speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                  flavor
+                });
+                // If this was a success or extreme success vs a target, open the Roll Damage dialog automatically
+                try {
+                  const targets = Array.from(game.user.targets);
+                  if (targets.length > 0) {
+                    const targetToken = targets[0];
+                    const targetActor = targetToken.actor;
+                    const getTargetAc = async (actor) => {
+                      if (!actor) return null;
+                      if (actor.type === "hero" && actor.sheet?.getData) {
+                        const sheetData = await actor.sheet.getData();
+                        return sheetData?.calculatedAc ?? actor.system?.combat?.ac ?? null;
+                      }
+                      return actor.system?.combat?.ac ?? null;
+                    };
+                    const targetAC = await getTargetAc(targetActor);
+                    if (targetAC !== null) {
+                      const difference = roll.total - targetAC;
+                      if (difference >= 0) {
+                        await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId } } });
+                      }
+                    }
+                  }
+                } catch (err) {
+                  console.warn("Singularity | Failed to open Roll Damage dialog for NPC:", err);
+                }
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "roll"
+        };
+
+    dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
   }
 
   async _onRollDamage(event) {
@@ -905,33 +1038,113 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
       damageFormula = "1d4";
     }
 
-    const roll = new Roll(damageFormula);
-    await roll.evaluate();
+    const dialogContent = `
+      <form class="singularity-roll-dialog">
+        <div class="roll-fields-row">
+          <div class="form-group-inline">
+            <label>Damage Formula:</label>
+            <input type="text" id="damage-formula" value="${damageFormula}" readonly class="readonly-input"/>
+          </div>
+          <div class="form-group-inline">
+            <label>Extra Modifier:</label>
+            <input type="text" id="extra-modifier" value="0" placeholder="0 or +1d6" class="editable-input"/>
+          </div>
+        </div>
+        <p class="help-text">Add any extra damage (e.g., +2, +1d6, -1). Base: ${damageFormula} (${attack.damageType}). Click "Roll Damage" to roll the formula + extra modifier.</p>
+      </form>
+    `;
 
-    const isIncorporeal = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
-    const hasCorporealTarget = isIncorporeal && Array.from(game.user?.targets || []).some(
-      target => !target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal")
-    );
-    const finalTotal = hasCorporealTarget ? Math.floor(roll.total / 2) : roll.total;
-    const incorporealText = hasCorporealTarget ? ` (half vs corporeal: ${finalTotal})` : "";
-    
-    const actionButtons = `<div class="chat-card-buttons" style="margin-top: 5px;">
-      <button type="button" class="apply-damage-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(40, 110, 70, 0.5); color: #ffffff; border: 1px solid rgba(40, 110, 70, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bullseye"></i> Apply Damage</button>
-      <button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px; margin-left: 6px;"><i class="fas fa-bolt"></i> Apply Critical (x2)</button>
-    </div>`;
-    const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType}) = <strong>${roll.total}</strong>${incorporealText}${actionButtons}</div>`;
-    
-    const message = await roll.toMessage({
-      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-      flavor: flavor
-    });
+    const dialogTitle = `Roll Damage: ${attack.name}`;
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const getDialogRoot = () => {
+      const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+      return el instanceof HTMLElement ? el : document;
+    };
+    const rollDamage = async (root) => {
+      const baseFormula = String(root.querySelector("#damage-formula")?.value ?? "").trim();
+      const extra = String(root.querySelector("#extra-modifier")?.value ?? "0").trim() || "0";
+      let rollFormula = baseFormula;
+      if (extra && extra !== "0") {
+        rollFormula += ` + ${extra}`;
+      }
 
-    await message.setFlag("singularity", "damageRoll", {
-      total: finalTotal,
-      formula: damageFormula,
-      damageType: attack.damageType,
-      attackName: attack.name
-    });
+      const roll = new Roll(rollFormula);
+      await roll.evaluate();
+
+      const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+      const isIncorporeal = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
+      const hasCorporealTarget = isIncorporeal && Array.from(game.user?.targets || []).some(
+        target => !target.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal")
+      );
+      const finalTotal = hasCorporealTarget ? Math.floor(roll.total / 2) : roll.total;
+      const incorporealText = hasCorporealTarget ? ` (half vs corporeal: ${finalTotal})` : "";
+      const actionButtons = `<div class="chat-card-buttons" style="margin-top: 5px;">
+        <button type="button" class="apply-damage-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(40, 110, 70, 0.5); color: #ffffff; border: 1px solid rgba(40, 110, 70, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bullseye"></i> Apply Damage</button>
+        <button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px; margin-left: 6px;"><i class="fas fa-bolt"></i> Apply Critical (x2)</button>
+      </div>`;
+      const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${baseFormula} (${attack.damageType})${extraText} = <strong>${roll.total}</strong>${incorporealText}${actionButtons}</div>`;
+      
+      const message = await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor: flavor
+      });
+
+      await message.setFlag("singularity", "damageRoll", {
+        total: finalTotal,
+        formula: rollFormula,
+        damageType: attack.damageType,
+        attackName: attack.name
+      });
+    };
+
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: [
+            {
+              action: "roll",
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Damage",
+              callback: async () => {
+                const root = getDialogRoot();
+                await rollDamage(root);
+              }
+            },
+            {
+              action: "cancel",
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel"
+            }
+          ],
+          default: "roll"
+        }
+      : {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: {
+            roll: {
+              icon: '<i class="fas fa-dice-d20"></i>',
+              label: "Roll Damage",
+              callback: async (html) => {
+                const $html = html instanceof jQuery ? html : $(html);
+                await rollDamage($html[0] || $html.get(0));
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => {}
+            }
+          },
+          default: "roll"
+        };
+
+    dialogOptions.position = { width: 560 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    dialog.render(true);
   }
 
   async _onSavingThrowRoll(event) {
@@ -1002,6 +1215,28 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     await this.actor.update({ "system.savingThrows": savingThrows });
   }
 
+  async _onAttackDamageTypeChange(event) {
+    event.preventDefault();
+    const attackId = event.currentTarget.dataset.attackId;
+    const damageType = event.currentTarget.value;
+    if (attackId === undefined || attackId === null) return;
+
+    const attacks = foundry.utils.deepClone(this.actor.system.attacks || []);
+    const index = Number(attackId);
+    if (!Number.isNaN(index) && attacks[index]) {
+      attacks[index].damageType = damageType;
+      await this.actor.update({ "system.attacks": attacks });
+
+      const weaponId = attacks[index].weaponId;
+      if (weaponId) {
+        const weapon = this.actor.items.get(weaponId);
+        if (weapon) {
+          await weapon.update({ "system.basic.damageType": damageType });
+        }
+      }
+    }
+  }
+
   async _onWeaponEquip(event) {
     event.preventDefault();
     const itemId = event.currentTarget.dataset.itemId;
@@ -1057,6 +1292,12 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     const itemId = event.currentTarget.dataset.itemId;
     const item = this.actor.items.get(itemId);
     if (!item || item.type !== "armor") return;
+    this._preferredTab = "equipment";
+    this._scrollPositions = this._scrollPositions || {};
+    if (this.element) {
+      const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+      this._scrollPositions.equipment = $sheet.find(".tab.equipment").scrollTop() || 0;
+    }
 
     // Unequip all other armor first
     const allArmor = this.actor.items.filter(i => i.type === "armor" && i.id !== itemId);
@@ -1072,6 +1313,12 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     const itemId = event.currentTarget.dataset.itemId;
     const item = this.actor.items.get(itemId);
     if (!item || item.type !== "armor") return;
+    this._preferredTab = "equipment";
+    this._scrollPositions = this._scrollPositions || {};
+    if (this.element) {
+      const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+      this._scrollPositions.equipment = $sheet.find(".tab.equipment").scrollTop() || 0;
+    }
 
     await item.update({ "system.basic.equipped": false });
   }
