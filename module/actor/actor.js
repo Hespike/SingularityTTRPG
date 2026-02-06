@@ -676,10 +676,11 @@ export class SingularityActor extends Actor {
     const skills = this.system.skills || {};
     const skill = skills[skillName];
     const noisyPenalty = skillName === "Stealth" ? this._getNoisyPenalty() : 0;
+    const stealthyBonus = skillName === "Stealth" ? this._getStealthyBonus() : 0;
     if (!skill) {
       // If not trained, return only ability score
       const ability = this._getSkillAbility(skillName);
-      return this.getAbilityScore(ability) - noisyPenalty;
+      return this.getAbilityScore(ability) + stealthyBonus - noisyPenalty;
     }
 
     const ability = skill.ability || this._getSkillAbility(skillName);
@@ -687,7 +688,7 @@ export class SingularityActor extends Actor {
     const trainingBonus = this._getTrainingBonus(skill.rank || "Novice");
     const otherBonuses = Number(skill.otherBonuses) || 0;
     
-    return abilityScore + trainingBonus + otherBonuses - noisyPenalty;
+    return abilityScore + trainingBonus + otherBonuses + stealthyBonus - noisyPenalty;
   }
 
   /**
@@ -704,6 +705,27 @@ export class SingularityActor extends Actor {
         if (match) {
           highest = Math.max(highest, Number(match[1]));
         } else if (/^Noisy$/i.test(String(trait))) {
+          highest = Math.max(highest, 1);
+        }
+      }
+    }
+    return highest;
+  }
+
+  /**
+   * Get stealthy armor bonus to Stealth (Stealthy (X))
+   */
+  _getStealthyBonus() {
+    const armors = this.items.filter(item => item.type === "armor" && item.system?.basic?.equipped === true);
+    let highest = 0;
+    for (const armor of armors) {
+      const traits = armor.system?.basic?.traits || armor.system?.basic?.properties || [];
+      const traitList = Array.isArray(traits) ? traits : String(traits).split(",").map(t => t.trim());
+      for (const trait of traitList) {
+        const match = String(trait).match(/Stealthy\s*\((\d+)\)/i);
+        if (match) {
+          highest = Math.max(highest, Number(match[1]));
+        } else if (/^Stealthy$/i.test(String(trait))) {
           highest = Math.max(highest, 1);
         }
       }

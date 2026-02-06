@@ -774,45 +774,54 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const traits = equippedArmorForNoisy?.system?.basic?.traits || equippedArmorForNoisy?.system?.basic?.properties || [];
     const traitList = Array.isArray(traits) ? traits : String(traits || "").split(",").map(t => t.trim());
     let noisyPenalty = 0;
+    let stealthyBonus = 0;
     for (const trait of traitList) {
-      const match = String(trait).match(/Noisy\s*\((\d+)\)/i);
-      if (match) {
-        noisyPenalty = Math.max(noisyPenalty, Number(match[1]));
+      const noisyMatch = String(trait).match(/Noisy\s*\((\d+)\)/i);
+      if (noisyMatch) {
+        noisyPenalty = Math.max(noisyPenalty, Number(noisyMatch[1]));
       } else if (/^Noisy$/i.test(String(trait))) {
         noisyPenalty = Math.max(noisyPenalty, 1);
       }
+
+      const stealthyMatch = String(trait).match(/Stealthy\s*\((\d+)\)/i);
+      if (stealthyMatch) {
+        stealthyBonus = Math.max(stealthyBonus, Number(stealthyMatch[1]));
+      } else if (/^Stealthy$/i.test(String(trait))) {
+        stealthyBonus = Math.max(stealthyBonus, 1);
+      }
     }
-    // If wearing Noisy armor, add or update Stealth skill with Noisy penalty as locked other bonus
-    if (noisyPenalty > 0) {
+
+    const armorStealthModifier = stealthyBonus - noisyPenalty;
+    const hasArmorStealthModifier = stealthyBonus > 0 || noisyPenalty > 0;
+    // If wearing armor with Stealthy/Noisy, add or update Stealth skill with armor modifier
+    if (hasArmorStealthModifier) {
+      const parts = [];
+      if (stealthyBonus > 0) parts.push(`Stealthy +${stealthyBonus}`);
+      if (noisyPenalty > 0) parts.push(`Noisy -${noisyPenalty}`);
+      const sourceLabel = `Armor Traits (${parts.join(", ")})`;
+
       if (!skills["Stealth"]) {
-        // Auto-add Stealth with Novice training and Noisy penalty as locked other bonus
+        // Auto-add Stealth with Novice training and armor modifier as locked other bonus
         skills["Stealth"] = {
           rank: "Novice",
           ability: "agility",
-          otherBonuses: -noisyPenalty,
+          otherBonuses: armorStealthModifier,
           lockedOtherBonuses: true,
-          lockedSource: `Noisy Armor (${noisyPenalty})`,
-          _addedByNoisy: true
+          lockedSource: sourceLabel,
+          _addedByArmor: true
         };
-      } else if (skills["Stealth"]._addedByNoisy) {
-        // Update the Noisy penalty if Stealth was previously added by Noisy
-        skills["Stealth"].otherBonuses = -noisyPenalty;
-        skills["Stealth"].lockedSource = `Noisy Armor (${noisyPenalty})`;
+      } else if (skills["Stealth"]._addedByArmor) {
+        // Update the armor modifier if Stealth was previously added by armor
+        skills["Stealth"].otherBonuses = armorStealthModifier;
+        skills["Stealth"].lockedSource = sourceLabel;
       } else {
-        // Player has training in Stealth - add Noisy as additional penalty
+        // Player has training in Stealth - add armor modifier to other bonuses (display only)
         const existingBonus = Number(skills["Stealth"].otherBonuses) || 0;
-        skills["Stealth"].otherBonuses = existingBonus - noisyPenalty;
+        skills["Stealth"].otherBonuses = existingBonus + armorStealthModifier;
       }
-    } else if (skills["Stealth"]?._addedByNoisy) {
-      // Noisy armor removed and Stealth was only added by Noisy - remove it
+    } else if (skills["Stealth"]?._addedByArmor) {
+      // Armor removed and Stealth was only added by armor - remove it
       delete skills["Stealth"];
-    } else if (skills["Stealth"]) {
-      // Noisy armor removed but Stealth has training - remove the Noisy penalty
-      const existingBonus = Number(skills["Stealth"].otherBonuses) || 0;
-      const baseBonus = existingBonus + noisyPenalty; // Reverse the penalty to get base
-      skills["Stealth"].otherBonuses = baseBonus;
-      skills["Stealth"].lockedOtherBonuses = false;
-      skills["Stealth"].lockedSource = null;
     }
 
     for (const [skillName, skill] of Object.entries(skills)) {
@@ -2404,6 +2413,23 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
   }
 
   activateListeners(html) {
+        // Inline edit for equipment name and quantity
+        html.on("change", 'input[name="system.basic.quantity"]', (event) => {
+          const itemId = event.currentTarget.closest(".item").dataset.itemId;
+          const item = this.actor.items.get(itemId);
+          if (item && item.type === "equipment") {
+            this._preferredTab = "equipment";
+            item.update({ "system.basic.quantity": Number(event.currentTarget.value) || 0 });
+          }
+        });
+        html.on("change", 'input[name="name"]', (event) => {
+          const itemId = event.currentTarget.closest(".item").dataset.itemId;
+          const item = this.actor.items.get(itemId);
+          if (item && item.type === "equipment") {
+            this._preferredTab = "equipment";
+            item.update({ name: event.currentTarget.value.trim() });
+          }
+        });
     if (super.activateListeners) {
       super.activateListeners(html);
     }
@@ -3969,6 +3995,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       type: type,
       system: {}
     };
+    // Store equipment tab to preserve it after render
+    this._preferredTab = "equipment";
+    this._scrollPositions = this._scrollPositions || {};
+    if (this.element) {
+      const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+      this._scrollPositions.equipment = $sheet.find(".tab.equipment").scrollTop() || 0;
+    }
     await this.actor.createEmbeddedDocuments("Item", [itemData]);
     // Re-render to update calculated values like land speed
     this.render();
@@ -4178,6 +4211,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             
             ui.notifications.info(`Purchased ${armor.name} for ${armorPrice} credits. Remaining credits: ${newCredits}.`);
             
+            this._preferredTab = "equipment";
+            this._scrollPositions = this._scrollPositions || {};
+            if (this.element) {
+              const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+              this._scrollPositions.equipment = $sheet.find(".tab.equipment").scrollTop() || 0;
+            }
             this.render();
             
             // Close the dialog
@@ -4461,6 +4500,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             
             // Then render (wrap in try-catch to prevent errors from affecting the purchase)
             try {
+              this._preferredTab = "equipment";
+              this._scrollPositions = this._scrollPositions || {};
+              if (this.element) {
+                const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+                this._scrollPositions.equipment = $sheet.find(".tab.equipment").scrollTop() || 0;
+              }
               this.render();
             } catch (renderError) {
               console.error("Error rendering sheet after purchase:", renderError);
@@ -4592,6 +4637,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const itemId = event.currentTarget.closest(".item").dataset.itemId;
     const item = this.actor.items.get(itemId);
     if (item) {
+      // Store equipment tab to preserve it after render
+      this._preferredTab = "equipment";
+      this._scrollPositions = this._scrollPositions || {};
+      if (this.element) {
+        const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+        this._scrollPositions.equipment = $sheet.find(".tab.equipment").scrollTop() || 0;
+      }
       await item.delete();
       // Re-render to update calculated values like land speed
       this.render();

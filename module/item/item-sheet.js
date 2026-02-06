@@ -59,28 +59,176 @@ export class SingularityItemSheet extends foundry.applications.api.HandlebarsApp
     }
     
     // Description editor (DialogV2-compatible)
+    html.off("click", ".editor-edit");
     html.on("click", ".editor-edit", (event) => this._onEditDescription(event));
+    html.off("click", ".profile-img");
     html.on("click", ".profile-img", (event) => this._onChangeItemImage(event));
+    
+    // Handle form submission for name and other fields
+    html.off("submit", "form");
+    html.on("submit", "form", (event) => this._onSubmit(event));
+    
+    // Handle inline changes for immediate save
+    html.off("change", 'input[name="name"]');
+    html.on("change", 'input[name="name"]', (event) => {
+      const value = event.currentTarget?.value?.trim();
+      if (value) {
+        this._preserveParentTab();
+        this.item.update({ name: value });
+      }
+    });
+    
+    html.off("change", 'input[name="system.basic.quantity"]');
+    html.on("change", 'input[name="system.basic.quantity"]', (event) => {
+      const value = parseInt(event.currentTarget?.value) || 0;
+      this._preserveParentTab();
+      this.item.update({ "system.basic.quantity": Math.max(0, value) });
+    });
+    
+    html.off("change", 'select[name="system.basic.type"]');
     html.on("change", 'select[name="system.basic.type"]', async (event) => {
       const value = event.currentTarget?.value;
       if (!value) return;
+      this._preserveParentTab();
       await this.item.update({ "system.basic.type": value });
     });
 
+    html.off("change", 'input[name="system.basic.baseAC"]');
+    html.on("change", 'input[name="system.basic.baseAC"]', (event) => {
+      const raw = event.currentTarget?.value;
+      const value = raw === "" ? null : Number(raw);
+      this._preserveParentTab();
+      this.item.update({ "system.basic.baseAC": Number.isNaN(value) ? null : value });
+    });
+
+    html.off("change", 'input[name="system.basic.agilityCap"]');
+    html.on("change", 'input[name="system.basic.agilityCap"]', (event) => {
+      const raw = event.currentTarget?.value;
+      const value = raw === "" ? null : Number(raw);
+      this._preserveParentTab();
+      this.item.update({ "system.basic.agilityCap": Number.isNaN(value) ? null : value });
+    });
+
+    html.off("change", 'input[name="system.basic.mightRequirement"]');
+    html.on("change", 'input[name="system.basic.mightRequirement"]', (event) => {
+      const raw = event.currentTarget?.value;
+      const value = raw === "" ? null : Number(raw);
+      this._preserveParentTab();
+      this.item.update({ "system.basic.mightRequirement": Number.isNaN(value) ? null : value });
+    });
+
+    html.off("change", ".armor-trait-input");
+    html.on("change", ".armor-trait-input", () => {
+      this._updateArmorTraitsFromForm(html);
+    });
+
     // Handle categories field - convert string to array on change
-    html.find('input[name="system.basic.categories"]').on("change", (event) => {
+    html.find('input[name="system.basic.categories"]').off("change").on("change", (event) => {
       const input = event.target;
       const value = input.value.trim();
       if (value) {
         // Split by comma and clean up
         const categories = value.split(',').map(cat => cat.trim()).filter(cat => cat.length > 0);
         // Update the item with the array
+        this._preserveParentTab();
         this.item.update({ "system.basic.categories": categories });
       } else {
         // Empty string means empty array
+        this._preserveParentTab();
         this.item.update({ "system.basic.categories": [] });
       }
     });
+  }
+
+  _getArmorTraitsArray() {
+    const traits = this.item?.system?.basic?.traits || [];
+    if (Array.isArray(traits)) return traits.slice();
+    return String(traits || "")
+      .split(",")
+      .map((trait) => trait.trim())
+      .filter(Boolean);
+  }
+
+  _buildArmorTraits({ bulky, stealthyValue, noisyValue, sealedValue }) {
+    const existing = this._getArmorTraitsArray().filter((trait) => {
+      const value = String(trait || "").trim();
+      if (!value) return false;
+      if (/^Bulky$/i.test(value)) return false;
+      if (/^Stealthy\s*\(/i.test(value)) return false;
+      if (/^Stealthy$/i.test(value)) return false;
+      if (/^Noisy\s*\(/i.test(value)) return false;
+      if (/^Sealed\s*\(/i.test(value)) return false;
+      return true;
+    });
+
+    const next = [...existing];
+    if (bulky) next.push("Bulky");
+    if (stealthyValue) next.push(`Stealthy (${stealthyValue})`);
+    if (noisyValue) next.push(`Noisy (${noisyValue})`);
+    if (sealedValue) next.push(`Sealed (${sealedValue})`);
+    return next;
+  }
+
+  _updateArmorTraitsFromForm(html) {
+    if (this.item?.type !== "armor") return;
+    const $root = html instanceof jQuery ? html : $(html);
+    const bulky = Boolean($root.find('input[name="armorTraitBulky"]').prop("checked"));
+    const stealthyRaw = String($root.find('input[name="armorTraitStealthy"]').val() ?? "").trim();
+    const stealthyValue = stealthyRaw ? Number(stealthyRaw) : null;
+    const noisyRaw = String($root.find('input[name="armorTraitNoisy"]').val() ?? "").trim();
+    const noisyValue = noisyRaw ? Number(noisyRaw) : null;
+    const sealedValue = String($root.find('input[name="armorTraitSealed"]').val() ?? "").trim();
+
+    const traits = this._buildArmorTraits({
+      bulky,
+      stealthyValue: Number.isNaN(stealthyValue) ? null : stealthyValue,
+      noisyValue: Number.isNaN(noisyValue) ? null : noisyValue,
+      sealedValue: sealedValue || null
+    });
+
+    this._preserveParentTab();
+    this.item.update({ "system.basic.traits": traits });
+  }
+
+  _preserveParentTab() {
+    const parentSheet = this.item?.parent?.sheet;
+    if (!parentSheet) return;
+
+    let tab = parentSheet._preferredTab || "equipment";
+    let $parent = null;
+    if (parentSheet.element) {
+      $parent = parentSheet.element instanceof jQuery ? parentSheet.element : $(parentSheet.element);
+      const activeTab = $parent.find(".sheet-tabs .item.active").first();
+      if (activeTab.length) {
+        tab = activeTab.data("tab") || tab;
+      }
+    }
+
+    parentSheet._preferredTab = tab;
+    parentSheet._scrollPositions = parentSheet._scrollPositions || {};
+    if ($parent) {
+      parentSheet._scrollPositions[tab] = $parent.find(`.tab.${tab}`).scrollTop() || 0;
+    }
+  }
+  
+  async _onSubmit(event) {
+    event.preventDefault();
+    // Collect form data
+    const formData = new FormData(event.target);
+    const data = {};
+    
+    for (const [key, value] of formData) {
+      if (key === "name") {
+        data.name = value.trim();
+      } else if (key.startsWith("system.")) {
+        foundry.utils.setProperty(data, key, value);
+      }
+    }
+    
+    if (Object.keys(data).length > 0) {
+      this._preserveParentTab();
+      await this.item.update(data);
+    }
   }
 
   async _onEditDescription(event) {
@@ -113,8 +261,8 @@ export class SingularityItemSheet extends foundry.applications.api.HandlebarsApp
             const root = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
             const container = root?.shadowRoot || root;
             const value = container?.querySelector('textarea[name="description"]')?.value ?? "";
+            this._preserveParentTab();
             await this.item.update({ [target]: value });
-            this.render(true);
           }
         }
       : {
@@ -133,8 +281,8 @@ export class SingularityItemSheet extends foundry.applications.api.HandlebarsApp
               label: "Save",
               callback: async (html) => {
                 const value = html.find('textarea[name="description"]').val() ?? "";
+                this._preserveParentTab();
                 await this.item.update({ [target]: value });
-                this.render(true);
               }
             },
             cancel: {
@@ -213,6 +361,29 @@ export class SingularityItemSheet extends foundry.applications.api.HandlebarsApp
       }
     } else if (context.item.type === "weapon") {
       context.system.basic.categories = "";
+    }
+
+    if (context.item.type === "armor") {
+      const traits = Array.isArray(context.system.basic?.traits)
+        ? context.system.basic.traits
+        : String(context.system.basic?.traits || "")
+            .split(",")
+            .map((trait) => trait.trim())
+            .filter(Boolean);
+
+      const noisyMatch = traits.map((trait) => String(trait)).find((trait) => /Noisy\s*\(/i.test(trait));
+      const stealthyMatch = traits.map((trait) => String(trait)).find((trait) => /Stealthy\s*\(/i.test(trait));
+      const stealthyPlain = traits.map((trait) => String(trait)).find((trait) => /^Stealthy$/i.test(trait));
+      const sealedMatch = traits.map((trait) => String(trait)).find((trait) => /Sealed\s*\(/i.test(trait));
+
+      const noisyValue = noisyMatch?.match(/Noisy\s*\(([^)]+)\)/i)?.[1] ?? "";
+      const stealthyValue = stealthyMatch?.match(/Stealthy\s*\(([^)]+)\)/i)?.[1] ?? (stealthyPlain ? "1" : "");
+      const sealedValue = sealedMatch?.match(/Sealed\s*\(([^)]+)\)/i)?.[1] ?? "";
+
+      context.system.basic.traitsBulky = traits.some((trait) => /^Bulky$/i.test(String(trait)));
+      context.system.basic.traitsNoisyValue = noisyValue;
+      context.system.basic.traitsStealthyValue = stealthyValue;
+      context.system.basic.traitsSealedValue = sealedValue;
     }
     
     return context;

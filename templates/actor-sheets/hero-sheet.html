@@ -416,11 +416,11 @@
             </div>
             <span class="skill-bonus">{{skill.bonusDisplay}}</span>
             <div class="skill-controls">
-              {{#unless skill._addedByNoisy}}
+              {{#unless skill._addedByArmor}}
               <a class="edit-skill" data-skill="{{skillName}}" title="Edit"><i class="fas fa-pencil-alt"></i></a>
               {{/unless}}
               <button type="button" class="skill-roll" data-skill="{{skillName}}" title="Roll">Roll</button>
-              {{#unless skill._addedByNoisy}}
+              {{#unless skill._addedByArmor}}
               <a class="delete-skill" data-skill="{{skillName}}" title="Delete"><i class="fas fa-trash"></i></a>
               {{/unless}}
             </div>

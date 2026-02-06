@@ -48,8 +48,8 @@
 
     {{#if (eq item.type "armor")}}
       <div class="form-group">
-        <label>AC Bonus</label>
-        <input type="number" name="system.basic.acBonus" value="{{system.basic.acBonus}}" data-dtype="Number"/>
+        <label>Base AC</label>
+        <input type="number" name="system.basic.baseAC" value="{{system.basic.baseAC}}" data-dtype="Number"/>
       </div>
       <div class="form-group">
         <label>Type</label>
@@ -58,6 +58,35 @@
           <option value="medium" {{#if (eq system.basic.type "medium")}}selected{{/if}}>Medium</option>
           <option value="heavy" {{#if (eq system.basic.type "heavy")}}selected{{/if}}>Heavy</option>
         </select>
+      </div>
+      <div class="form-group">
+        <label>Agility Cap</label>
+        <input type="number" name="system.basic.agilityCap" value="{{system.basic.agilityCap}}" data-dtype="Number" placeholder="No cap"/>
+      </div>
+      <div class="form-group">
+        <label>Might Requirement</label>
+        <input type="number" name="system.basic.mightRequirement" value="{{system.basic.mightRequirement}}" data-dtype="Number" placeholder="None"/>
+      </div>
+      <div class="form-group">
+        <label>Traits</label>
+        <div class="traits-row">
+          <label class="trait-checkbox">
+            <input type="checkbox" class="armor-trait-input trait-toggle" name="armorTraitBulky" {{checked system.basic.traitsBulky}}/>
+            <span>Bulky</span>
+          </label>
+          <label class="trait-field">
+            <span>Stealthy</span>
+            <input type="number" class="armor-trait-input" name="armorTraitStealthy" value="{{system.basic.traitsStealthyValue}}" min="1" placeholder="Value"/>
+          </label>
+          <label class="trait-field">
+            <span>Noisy</span>
+            <input type="number" class="armor-trait-input" name="armorTraitNoisy" value="{{system.basic.traitsNoisyValue}}" min="1" placeholder="Value"/>
+          </label>
+          <label class="trait-field">
+            <span>Sealed</span>
+            <input type="text" class="armor-trait-input" name="armorTraitSealed" value="{{system.basic.traitsSealedValue}}" placeholder="Time"/>
+          </label>
+        </div>
       </div>
     {{/if}}
 
