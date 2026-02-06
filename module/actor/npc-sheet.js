@@ -300,7 +300,49 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     // Special abilities and traits
     context.specialAbilities = actorData.system.specialAbilities || [];
     context.traits = actorData.system.traits || [];
-    context.skills = actorData.system.skills || {};
+    
+    // Handle Noisy armor impact on Stealth skill for NPCs
+    const skills = foundry.utils.deepClone(actorData.system.skills || {});
+    const equippedArmorForNoisy = actorData.items?.find(i => i.type === "armor" && i.system?.basic?.equipped === true);
+    const armorTraits = equippedArmorForNoisy?.system?.basic?.traits || equippedArmorForNoisy?.system?.basic?.properties || [];
+    const traitList = Array.isArray(armorTraits) ? armorTraits : String(armorTraits || "").split(",").map(t => t.trim());
+    let noisyPenalty = 0;
+    for (const trait of traitList) {
+      const match = String(trait).match(/Noisy\s*\((\d+)\)/i);
+      if (match) {
+        noisyPenalty = Math.max(noisyPenalty, Number(match[1]));
+      } else if (/^Noisy$/i.test(String(trait))) {
+        noisyPenalty = Math.max(noisyPenalty, 1);
+      }
+    }
+    // Apply same Noisy logic for NPCs as heroes
+    if (noisyPenalty > 0) {
+      if (!skills["Stealth"]) {
+        skills["Stealth"] = {
+          rank: "Novice",
+          ability: "agility",
+          otherBonuses: -noisyPenalty,
+          lockedOtherBonuses: true,
+          lockedSource: `Noisy Armor (${noisyPenalty})`,
+          _addedByNoisy: true
+        };
+      } else if (skills["Stealth"]._addedByNoisy) {
+        skills["Stealth"].otherBonuses = -noisyPenalty;
+        skills["Stealth"].lockedSource = `Noisy Armor (${noisyPenalty})`;
+      } else {
+        const existingBonus = Number(skills["Stealth"].otherBonuses) || 0;
+        skills["Stealth"].otherBonuses = existingBonus - noisyPenalty;
+      }
+    } else if (skills["Stealth"]?._addedByNoisy) {
+      delete skills["Stealth"];
+    } else if (skills["Stealth"]) {
+      const existingBonus = Number(skills["Stealth"].otherBonuses) || 0;
+      const baseBonus = existingBonus + noisyPenalty;
+      skills["Stealth"].otherBonuses = baseBonus;
+      skills["Stealth"].lockedOtherBonuses = false;
+      skills["Stealth"].lockedSource = null;
+    }
+    context.skills = skills;
     
     // Resistances, Weaknesses & Immunities
     context.resistances = actorData.system.resistances || [];

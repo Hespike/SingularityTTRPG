@@ -782,12 +782,37 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         noisyPenalty = Math.max(noisyPenalty, 1);
       }
     }
-    if (noisyPenalty > 0 && !skills["Stealth"]) {
-      skills["Stealth"] = {
-        rank: "Novice",
-        ability: "agility",
-        otherBonuses: 0
-      };
+    // If wearing Noisy armor, add or update Stealth skill with Noisy penalty as locked other bonus
+    if (noisyPenalty > 0) {
+      if (!skills["Stealth"]) {
+        // Auto-add Stealth with Novice training and Noisy penalty as locked other bonus
+        skills["Stealth"] = {
+          rank: "Novice",
+          ability: "agility",
+          otherBonuses: -noisyPenalty,
+          lockedOtherBonuses: true,
+          lockedSource: `Noisy Armor (${noisyPenalty})`,
+          _addedByNoisy: true
+        };
+      } else if (skills["Stealth"]._addedByNoisy) {
+        // Update the Noisy penalty if Stealth was previously added by Noisy
+        skills["Stealth"].otherBonuses = -noisyPenalty;
+        skills["Stealth"].lockedSource = `Noisy Armor (${noisyPenalty})`;
+      } else {
+        // Player has training in Stealth - add Noisy as additional penalty
+        const existingBonus = Number(skills["Stealth"].otherBonuses) || 0;
+        skills["Stealth"].otherBonuses = existingBonus - noisyPenalty;
+      }
+    } else if (skills["Stealth"]?._addedByNoisy) {
+      // Noisy armor removed and Stealth was only added by Noisy - remove it
+      delete skills["Stealth"];
+    } else if (skills["Stealth"]) {
+      // Noisy armor removed but Stealth has training - remove the Noisy penalty
+      const existingBonus = Number(skills["Stealth"].otherBonuses) || 0;
+      const baseBonus = existingBonus + noisyPenalty; // Reverse the penalty to get base
+      skills["Stealth"].otherBonuses = baseBonus;
+      skills["Stealth"].lockedOtherBonuses = false;
+      skills["Stealth"].lockedSource = null;
     }
 
     for (const [skillName, skill] of Object.entries(skills)) {
@@ -796,8 +821,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       const trainingBonus = trainingBonuses[skill.rank] || 0;
     // Ensure otherBonuses exists, default to 0, and parse as number
     const otherBonuses = (skill.otherBonuses !== undefined && skill.otherBonuses !== null) ? Number(skill.otherBonuses) || 0 : 0;
-    const noisy = skillName === "Stealth" ? noisyPenalty : 0;
-    const totalBonus = Number(abilityScore) + Number(trainingBonus) + Number(otherBonuses) - noisy;
+    // Note: Noisy penalty is now included in otherBonuses (as a negative value), not calculated separately
+    const totalBonus = Number(abilityScore) + Number(trainingBonus) + Number(otherBonuses);
       
       // Format bonus for display (add + sign for positive numbers)
       const bonusDisplay = totalBonus >= 0 ? `+${totalBonus}` : `${totalBonus}`;
@@ -808,8 +833,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         totalBonus: totalBonus,
         bonusDisplay: bonusDisplay,
         lockedOtherBonuses: skill.lockedOtherBonuses || false, // Preserve locked status
-        lockedSource: skill.lockedSource || null, // Preserve source
-        noisyPenalty: noisy
+        lockedSource: skill.lockedSource || null // Preserve source
       };
       
       // Separate Heavy Armor from editable skills
@@ -3854,7 +3878,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     };
     const trainingBonus = trainingBonuses[skill?.rank || "Novice"] || 0;
     const otherBonuses = Number(skill?.otherBonuses) || 0;
-    const noisyPenalty = skillName === "Stealth" ? this.actor._getNoisyPenalty() : 0;
+    // Note: Noisy penalty is now included in otherBonuses, not calculated separately
 
     // Capitalize ability name for display
     const abilityDisplay = abilityName.charAt(0).toUpperCase() + abilityName.slice(1);
@@ -3878,12 +3902,6 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             <label>Other Bonuses:</label>
             <input type="number" id="other-bonuses" value="${otherBonuses}" readonly class="readonly-input"/>
           </div>
-          ${noisyPenalty > 0 ? `
-          <div class="form-group-inline">
-            <label>Noisy Penalty:</label>
-            <input type="number" id="noisy-penalty" value="-${noisyPenalty}" readonly class="readonly-input"/>
-          </div>
-          ` : ''}
           <div class="form-group-inline">
             <label>Extra Modifier:</label>
             <input type="text" id="extra-modifier" value="0" placeholder="0 or +1d6" class="editable-input"/>
@@ -3910,9 +3928,6 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             
             // Build roll formula: 1d20 + ability + training + other + extra
             let rollFormula = `1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
-            if (noisyPenalty > 0) {
-              rollFormula += ` - ${noisyPenalty}`;
-            }
             if (extra && extra !== "0") {
               rollFormula += ` + ${extra}`;
             }
@@ -3921,9 +3936,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             await roll.evaluate();
             
             const otherText = otherBonuses !== 0 ? ` + ${otherBonuses} (Other)` : "";
-            const noisyText = noisyPenalty > 0 ? ` - ${noisyPenalty} (Noisy)` : "";
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
-            const flavor = `<div class="roll-flavor"><b>${skillName} Skill Roll</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${skill?.rank || "Novice"})${otherText}${noisyText}${extraText} = <strong>${roll.total}</strong></div>`;
+            const flavor = `<div class="roll-flavor"><b>${skillName} Skill Roll</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${skill?.rank || "Novice"})${otherText}${extraText} = <strong>${roll.total}</strong></div>`;
             
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
