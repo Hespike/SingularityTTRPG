@@ -8,6 +8,19 @@
     {{{item.system.description}}}
   </div>
   {{/if}}
+  {{#if gadgetActions}}
+  <div class="chat-card-buttons">
+    {{#if gadgetActions.canAttack}}
+    <button type="button" class="singularity-gadget-attack-roll" data-gadget-id="{{gadgetActions.gadgetId}}" data-actor-id="{{gadgetActions.actorId}}">Roll Attack</button>
+    {{/if}}
+    {{#if gadgetActions.canDamage}}
+    <button type="button" class="singularity-gadget-damage-roll" data-gadget-id="{{gadgetActions.gadgetId}}" data-actor-id="{{gadgetActions.actorId}}">Roll Damage</button>
+    {{/if}}
+    {{#if gadgetActions.canHeal}}
+    <button type="button" class="singularity-gadget-heal" data-gadget-id="{{gadgetActions.gadgetId}}" data-actor-id="{{gadgetActions.actorId}}" data-heal-formula="{{gadgetActions.healFormula}}" data-gadget-name="{{gadgetActions.gadgetName}}">Heal</button>
+    {{/if}}
+  </div>
+  {{/if}}
 </div>
 
 <style>
@@ -58,5 +71,26 @@
 
 .singularity.chat-card .card-content p {
   margin: 5px 0;
+}
+
+.singularity.chat-card .chat-card-buttons {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.singularity.chat-card .chat-card-buttons button {
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 3px;
+  border: 1px solid rgba(189, 95, 255, 0.4);
+  background: rgba(74, 42, 110, 0.4);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.singularity.chat-card .chat-card-buttons button:hover {
+  background: rgba(189, 95, 255, 0.35);
 }
 </style>

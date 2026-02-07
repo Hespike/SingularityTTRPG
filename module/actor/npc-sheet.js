@@ -1343,7 +1343,7 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     
     const sortedWeapons = allWeapons.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     
-    const content = await renderTemplate("systems/singularity/templates/dialogs/item-selection.html", {
+    const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/dialogs/item-selection.html", {
       level: 1,
       slotType: "weapon",
       items: sortedWeapons,
@@ -1418,7 +1418,7 @@ export class SingularityActorSheetNPC extends foundry.applications.api.Handlebar
     
     const sortedArmor = allArmor.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     
-    const content = await renderTemplate("systems/singularity/templates/dialogs/armor-selection.html", {
+    const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/dialogs/armor-selection.html", {
       armors: sortedArmor
     });
     

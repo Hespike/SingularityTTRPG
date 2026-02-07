@@ -120,7 +120,7 @@
               <div class="attack-details">
               <span>Attack Bonus: {{calculatedAttackBonus}} {{#if attackBonusBreakdown}}<span class="attack-breakdown" title="{{attackBonusBreakdown}}">({{attackBonusBreakdown}})</span>{{/if}}</span>
               <span>Damage: {{calculatedDamage}}</span>
-              <span>Type: {{attack.damageType}}</span>
+              <span>Type: {{capitalize attack.damageType}}</span>
               <span>Energy Cost: {{#if (eq attack.cost 0)}}0{{else}}{{attack.cost}}{{/if}}</span>
               </div>
             </div>

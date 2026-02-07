@@ -496,6 +496,16 @@ Hooks.once("init", function() {
       const actor = game.actors.get(actorId);
       if (!actor || actor.type !== "hero") return;
 
+      const buildHeroSheetContext = (actor) => ({
+        actor: actor,
+        _getGadgetTuningBonus: SingularityActorSheetHero.prototype._getGadgetTuningBonus,
+        _getGadgetDamageFormula: SingularityActorSheetHero.prototype._getGadgetDamageFormula,
+        _getGadgetDamageFormulaFromBasic: SingularityActorSheetHero.prototype._getGadgetDamageFormulaFromBasic,
+        _getGadgetDamageFormulaFromDescription: SingularityActorSheetHero.prototype._getGadgetDamageFormulaFromDescription,
+        _getGadgetDamageTypeFromDescription: SingularityActorSheetHero.prototype._getGadgetDamageTypeFromDescription,
+        _buildGadgetAttackFromUuid: SingularityActorSheetHero.prototype._buildGadgetAttackFromUuid
+      });
+
       // Find a place to append a Roll Damage button (prefer .roll-flavor)
       const $flavor = $html.find('.roll-flavor').first().length ? $html.find('.roll-flavor').first() : $html.find('.message-content').first();
       if (!$flavor.length) return;
@@ -503,7 +513,10 @@ Hooks.once("init", function() {
       // Add button if not present
       if ($flavor.find('.singularity-roll-damage').length === 0) {
         const attackId = attackFlag.attackId;
-        const btnHtml = `<div class="chat-card-buttons" style="margin-top: 6px;"><button class="singularity-roll-damage" data-attack-id="${attackId}" data-actor-id="${actorId}" style="padding:4px 8px; font-size:11px;">Roll Damage</button></div>`;
+        const gadgetId = attackFlag.gadgetId || (Number.isFinite(Number(attackId)) ? null : attackId);
+        const attackIdAttr = Number.isFinite(Number(attackId)) ? ` data-attack-id="${attackId}"` : "";
+        const gadgetIdAttr = gadgetId ? ` data-gadget-id="${gadgetId}"` : "";
+        const btnHtml = `<div class="chat-card-buttons" style="margin-top: 6px;"><button class="singularity-roll-damage"${attackIdAttr}${gadgetIdAttr} data-actor-id="${actorId}" style="padding:4px 8px; font-size:11px;">Roll Damage</button></div>`;
         $flavor.append(btnHtml);
       }
 
@@ -511,12 +524,17 @@ Hooks.once("init", function() {
       $flavor.off('click.singularity-roll-damage').on('click.singularity-roll-damage', '.singularity-roll-damage', async (ev) => {
         ev.preventDefault();
         const attackId = ev.currentTarget.dataset.attackId;
+        const gadgetId = ev.currentTarget.dataset.gadgetId;
         const actorId = ev.currentTarget.dataset.actorId;
         const actor = game.actors.get(actorId);
         if (!actor) return;
         try {
           // Call the Hero sheet damage handler with a minimal event-like object
-          await SingularityActorSheetHero.prototype._onRollDamage.call({ actor }, { preventDefault: () => {}, currentTarget: { dataset: { attackId } } });
+          const sheetContext = buildHeroSheetContext(actor);
+          await SingularityActorSheetHero.prototype._onRollDamage.call(
+            sheetContext,
+            { preventDefault: () => {}, currentTarget: { dataset: { attackId, gadgetId } } }
+          );
         } catch (err) {
           console.warn("Singularity | Failed to open Roll Damage from chat:", err);
         }
@@ -524,6 +542,153 @@ Hooks.once("init", function() {
     } catch (err) {
       console.warn("Singularity | renderChatMessageHTML hook failed:", err);
     }
+  });
+
+  // Add gadget action buttons to chat item cards (attack, damage, heal)
+  Hooks.on("renderChatMessageHTML", (message, html) => {
+    const $html = html instanceof jQuery ? html : $(html);
+    const getActorFromDataset = (datasetActorId) => {
+      const actorId = datasetActorId || message.speaker?.actor;
+      return actorId ? game.actors.get(actorId) : null;
+    };
+
+    const parseHealingFromDescription = (description) => {
+      const raw = String(description || "");
+      if (!raw) return "";
+      const text = raw
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!text) return "";
+
+      const diceMatch = text.match(/(?:heal(?:s|ing)?|healing)[^0-9d]*([0-9]+d[0-9]+(?:\s*[+-]\s*[0-9]+)*)/i);
+      if (diceMatch?.[1]) {
+        return diceMatch[1].replace(/\s+/g, "");
+      }
+
+      const flatMatch = text.match(/(?:heal(?:s|ing)?|healing)[^0-9]*([0-9]+)(?!d)/i);
+      if (flatMatch?.[1]) {
+        return flatMatch[1];
+      }
+
+      return "";
+    };
+
+    const getHealingFormulaFromItem = (item) => {
+      if (!item?.system) return "";
+      const basic = item.system.basic || {};
+      const direct = basic.healing || basic.healingFormula || basic.heal || basic.healFormula || basic.healingRoll;
+      if (direct) return String(direct).trim();
+
+      const flatValue = basic.healingValue ?? basic.healValue ?? basic.healAmount ?? null;
+      const dice = basic.healingDice || basic.healDice || basic.healingDie || basic.healDie;
+      const diceCount = basic.healingDiceCount || basic.healDiceCount || basic.healingCount || basic.healCount;
+      let formula = "";
+
+      if (dice) {
+        const diceText = String(dice).trim();
+        if (diceText.includes("d")) {
+          formula = diceText;
+        } else if (diceCount) {
+          formula = `${diceCount}d${diceText}`;
+        } else {
+          formula = `1d${diceText}`;
+        }
+      } else if (flatValue !== null && flatValue !== undefined && flatValue !== "") {
+        return String(flatValue);
+      }
+
+      const bonus = Number(basic.healingBonus ?? basic.healBonus ?? basic.healingMod ?? basic.healMod ?? 0);
+      if (formula && Number.isFinite(bonus) && bonus !== 0) {
+        formula += bonus > 0 ? `+${bonus}` : `${bonus}`;
+      }
+
+      if (formula) return formula;
+      return parseHealingFromDescription(item.system.description || item.system.details?.description || "");
+    };
+
+    const buildHeroSheetContext = (actor) => ({
+      actor: actor,
+      _getGadgetTuningBonus: SingularityActorSheetHero.prototype._getGadgetTuningBonus,
+      _getGadgetDamageFormula: SingularityActorSheetHero.prototype._getGadgetDamageFormula,
+      _getGadgetDamageFormulaFromBasic: SingularityActorSheetHero.prototype._getGadgetDamageFormulaFromBasic,
+      _getGadgetDamageFormulaFromDescription: SingularityActorSheetHero.prototype._getGadgetDamageFormulaFromDescription,
+      _getGadgetDamageTypeFromDescription: SingularityActorSheetHero.prototype._getGadgetDamageTypeFromDescription,
+      _buildGadgetAttackFromUuid: SingularityActorSheetHero.prototype._buildGadgetAttackFromUuid
+    });
+
+    $html.off("click.singularity-gadget-attack").on("click.singularity-gadget-attack", ".singularity-gadget-attack-roll", async (ev) => {
+      ev.preventDefault();
+      const gadgetId = ev.currentTarget.dataset.gadgetId;
+      const actor = getActorFromDataset(ev.currentTarget.dataset.actorId);
+      if (!actor || !gadgetId) return;
+      try {
+        const sheetContext = buildHeroSheetContext(actor);
+        await SingularityActorSheetHero.prototype._onRollAttack.call(sheetContext, {
+          preventDefault: () => {},
+          currentTarget: { dataset: { gadgetId } }
+        });
+      } catch (err) {
+        console.warn("Singularity | Failed to roll gadget attack from chat:", err);
+      }
+    });
+
+    $html.off("click.singularity-gadget-damage").on("click.singularity-gadget-damage", ".singularity-gadget-damage-roll", async (ev) => {
+      ev.preventDefault();
+      const gadgetId = ev.currentTarget.dataset.gadgetId;
+      const actor = getActorFromDataset(ev.currentTarget.dataset.actorId);
+      if (!actor || !gadgetId) return;
+      try {
+        const sheetContext = buildHeroSheetContext(actor);
+        await SingularityActorSheetHero.prototype._onRollDamage.call(sheetContext, {
+          preventDefault: () => {},
+          currentTarget: { dataset: { gadgetId } }
+        });
+      } catch (err) {
+        console.warn("Singularity | Failed to roll gadget damage from chat:", err);
+      }
+    });
+
+    $html.off("click.singularity-gadget-heal").on("click.singularity-gadget-heal", ".singularity-gadget-heal", async (ev) => {
+      ev.preventDefault();
+      const button = ev.currentTarget;
+      const gadgetId = button.dataset.gadgetId;
+      const actor = getActorFromDataset(button.dataset.actorId);
+      const gadgetName = button.dataset.gadgetName || "Gadget";
+      if (!actor) return;
+
+      let formula = String(button.dataset.healFormula || "").trim();
+      if (!formula && gadgetId) {
+        try {
+          const item = await fromUuid(gadgetId);
+          formula = getHealingFormulaFromItem(item);
+        } catch (err) {
+          console.warn("Singularity | Failed to load gadget for healing:", err);
+        }
+      }
+
+      if (!formula) {
+        ui.notifications.warn(`${gadgetName} has no healing formula to roll.`);
+        return;
+      }
+
+      const targets = Array.from(game.user?.targets || []);
+      const targetToken = targets[0];
+      if (!targetToken) {
+        ui.notifications.warn("Select a target to report gadget healing.");
+        return;
+      }
+
+      const roll = new Roll(formula);
+      await roll.evaluate();
+      const targetName = targetToken.name || targetToken.actor?.name || "Target";
+      const flavor = `<div class="roll-flavor"><b>${gadgetName}</b><br>${targetName} heals for <strong>${roll.total}</strong> (${formula})</div>`;
+      await roll.toMessage({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        flavor: flavor
+      });
+    });
   });
 
   const updateStatusSummary = (token) => {
@@ -5429,7 +5594,7 @@ function addNpcBrowserButton() {
 
 // Open NPC Browser Dialog
 async function openNpcBrowserDialog() {
-  const content = await renderTemplate("systems/singularity/templates/dialogs/npc-browser.html", {});
+  const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/dialogs/npc-browser.html", {});
   
   const dialog = new Dialog({
     title: "NPC Browser",

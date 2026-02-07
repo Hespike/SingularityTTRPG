@@ -154,6 +154,7 @@
     {{/if}}
 
     {{#if (eq item.type "talent")}}
+      {{#unless isGadgetItem}}
       <div class="form-group">
         <label>Type</label>
         <select name="system.basic.type">
@@ -165,6 +166,7 @@
         <label>Prerequisites</label>
         <input type="text" name="system.basic.prerequisites" value="{{system.basic.prerequisites}}" placeholder="Prerequisites"/>
       </div>
+      {{/unless}}
     {{/if}}
 
     {{#if (eq item.type "equipment")}}

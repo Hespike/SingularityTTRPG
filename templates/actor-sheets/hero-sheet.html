@@ -111,7 +111,7 @@
         <h3>Attacks</h3>
         <ol class="attack-list">
           {{#each attacks as |attack id|}}
-          <li class="attack" data-attack-id="{{id}}">
+          <li class="attack" data-attack-id="{{id}}" {{#if attack.gadgetId}}data-gadget-id="{{attack.gadgetId}}"{{/if}}>
             {{#if attack.weaponImg}}
             <img class="attack-icon weapon-icon" src="{{attack.weaponImg}}" alt="{{attack.name}}" onerror="this.src='icons/svg/sword.svg'">
             {{/if}}
@@ -124,8 +124,8 @@
                   {{attack.name}}
                 </h4>
                 <div class="attack-controls">
-                  <button type="button" class="attack-roll" data-attack-id="{{id}}" title="Roll Attack">Roll Attack</button>
-                  <button type="button" class="damage-roll" data-attack-id="{{id}}" title="Roll Damage">Roll Damage</button>
+                  <button type="button" class="attack-roll" data-attack-id="{{id}}" {{#if attack.gadgetId}}data-gadget-id="{{attack.gadgetId}}"{{/if}} title="Roll Attack">Roll Attack</button>
+                  <button type="button" class="damage-roll" data-attack-id="{{id}}" {{#if attack.gadgetId}}data-gadget-id="{{attack.gadgetId}}"{{/if}} title="Roll Damage">Roll Damage</button>
                   {{#if attack.isUnarmed}}
                   <a class="attack-edit" data-attack-id="{{id}}" title="Edit"><i class="fas fa-edit"></i></a>
                   {{/if}}
@@ -137,7 +137,7 @@
               <div class="attack-details">
               <span>Attack Bonus: {{calculatedAttackBonus}} {{#if attackBonusBreakdown}}<span class="attack-breakdown" title="{{attackBonusBreakdown}}">({{attackBonusBreakdown}})</span>{{/if}}</span>
               <span>Damage: {{calculatedDamage}}</span>
-              <span>Type: {{attack.damageType}}</span>
+              <span>Type: {{capitalize attack.damageType}}</span>
               <span>Energy Cost: {{#if (eq attack.cost 0)}}0{{else}}{{attack.cost}}{{/if}}</span>
               </div>
             </div>
@@ -192,18 +192,14 @@
             <span>Active</span>
           </label>
           {{#if actor.system.combat.enoughPrepTime.active}}
-          <div class="enough-prep-time-enemy">
-            <label>Enemy Name:</label>
-            <input type="text" name="system.combat.enoughPrepTime.enemyName" value="{{actor.system.combat.enoughPrepTime.enemyName}}" placeholder="Enter enemy name" class="enough-prep-time-enemy-input"/>
-            {{#if enoughPrepTimeAttackBonus}}
-            <div class="enough-prep-time-bonuses">
-              <span class="enough-prep-time-bonus-display">+{{enoughPrepTimeAttackBonus}} attack bonus, +{{enoughPrepTimeDCBonus}} Gadget Tuning DC</span>
-            </div>
-            {{/if}}
+          {{#if enoughPrepTimeAttackBonus}}
+          <div class="enough-prep-time-bonuses">
+            <span class="enough-prep-time-bonus-display">+{{enoughPrepTimeAttackBonus}} attack bonus, +{{enoughPrepTimeDCBonus}} Gadget Tuning DC</span>
           </div>
           {{/if}}
+          {{/if}}
         </div>
-        <p class="enough-prep-time-help-text">After 1 hour of preparation for a known enemy, gain +1 per Gadgeteer level to Gadget Tuning DC and attack rolls with gadgets against that enemy.</p>
+        <p class="enough-prep-time-help-text">When active, gain +1 per Gadgeteer level to Gadget Tuning DC and attack rolls with gadgets.</p>
       </div>
       {{/if}}
 

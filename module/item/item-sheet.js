@@ -809,6 +809,12 @@ export class SingularityItemSheet extends foundry.applications.api.HandlebarsApp
       editable: this.isEditable ?? this.item?.isOwner ?? false,
       cssClass: "singularity sheet item"
     };
+
+    context.isGadgetItem = Boolean(
+      this.item?.type === "talent" &&
+      this.item?.system?.basic?.level !== undefined &&
+      this.item?.system?.basic?.level !== null
+    );
     
     // Ensure description is initialized if it doesn't exist
     if (!context.item.system.description) {

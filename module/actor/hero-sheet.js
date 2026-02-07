@@ -1514,6 +1514,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             // Fix old cog.svg icon or set default image if missing
             gadget.img = "icons/svg/item-bag.svg";
           }
+          // Normalize legacy fields for display
+          gadget.damage = gadget.damage || gadget.damageFormula || gadget.damageRoll || gadget.attackDamage;
+          gadget.healing = gadget.healing || gadget.healingFormula || gadget.heal || gadget.healFormula;
+          gadget.canHeal = Boolean(gadget.healing) || /trauma\s*stabilizer/i.test(gadget.name || "");
         }
         return gadget;
       });
@@ -1524,6 +1528,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             // Fix old cog.svg icon or set default image if missing
             gadget.img = "icons/svg/item-bag.svg";
           }
+          // Normalize legacy fields for display
+          gadget.damage = gadget.damage || gadget.damageFormula || gadget.damageRoll || gadget.attackDamage;
+          gadget.healing = gadget.healing || gadget.healingFormula || gadget.heal || gadget.healFormula;
+          gadget.canHeal = Boolean(gadget.healing) || /trauma\s*stabilizer/i.test(gadget.name || "");
         }
         return gadget;
       });
@@ -1564,12 +1572,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         "Legendary": 14
       };
       const skillModifier = rankModifiers[gadgetTuningRank] || 0;
+      const gadgetTuningAttackBonus = skillModifier;
       let gadgetTuningDC = 10 + wits + skillModifier;
       
       // Add "Enough Prep Time" bonus if active
       if (hasEnoughPrepTime) {
-        const enoughPrepTimeData = actorData.system.combat?.enoughPrepTime || { active: false, enemyName: "" };
-        if (enoughPrepTimeData.active && enoughPrepTimeData.enemyName) {
+        const enoughPrepTimeData = actorData.system.combat?.enoughPrepTime || { active: false };
+        if (enoughPrepTimeData.active) {
           const enoughPrepTimeBonus = gadgeteerLevel; // +1 per Gadgeteer level
           gadgetTuningDC += enoughPrepTimeBonus;
           context.enoughPrepTimeDCBonus = enoughPrepTimeBonus;
@@ -1582,20 +1591,19 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       context.gadgetTuningDC = gadgetTuningDC;
       context.gadgeteerLevel = gadgeteerLevel;
+      context.gadgetTuningAttackBonus = gadgetTuningAttackBonus;
       
       // Calculate "Enough Prep Time" attack bonus if active
       if (hasEnoughPrepTime) {
-        const enoughPrepTimeData = actorData.system.combat?.enoughPrepTime || { active: false, enemyName: "" };
+        const enoughPrepTimeData = actorData.system.combat?.enoughPrepTime || { active: false };
         context.enoughPrepTimeActive = enoughPrepTimeData.active;
-        context.enoughPrepTimeEnemyName = enoughPrepTimeData.enemyName || "";
-        if (enoughPrepTimeData.active && enoughPrepTimeData.enemyName) {
+        if (enoughPrepTimeData.active) {
           context.enoughPrepTimeAttackBonus = gadgeteerLevel; // +1 per Gadgeteer level
         } else {
           context.enoughPrepTimeAttackBonus = 0;
         }
       } else {
         context.enoughPrepTimeActive = false;
-        context.enoughPrepTimeEnemyName = "";
         context.enoughPrepTimeAttackBonus = 0;
       }
     } else {
@@ -1603,7 +1611,6 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       context.gadgetTuningRank = "Novice";
       context.gadgetTuningDC = null;
       context.enoughPrepTimeActive = false;
-      context.enoughPrepTimeEnemyName = "";
       context.enoughPrepTimeAttackBonus = 0;
       context.enoughPrepTimeDCBonus = 0;
     }
@@ -1619,21 +1626,93 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
       const blindedPenalty = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded") ? 10 : 0;
 
+      const gadgetAttackEntries = [];
+      if (hasGadgeteer) {
+        const preparedGadgets = actorData.system.gadgets?.prepared || { level0: [], level1: [] };
+        const gadgetEntries = [...(preparedGadgets.level0 || []), ...(preparedGadgets.level1 || [])].filter(Boolean);
+        for (const gadgetEntry of gadgetEntries) {
+          let damageFormula = gadgetEntry.damage || gadgetEntry.damageFormula || gadgetEntry.damageRoll || gadgetEntry.attackDamage;
+          let damageType = gadgetEntry.damageType;
+          let range = gadgetEntry.range;
+          let energyCost = gadgetEntry.energyCost;
+          let attackBonus = gadgetEntry.attackBonus;
+          let gadgetDoc = null;
+
+          if (!damageFormula || !damageType || !range || attackBonus === undefined || attackBonus === null || attackBonus === "") {
+            try {
+              gadgetDoc = await fromUuid(gadgetEntry.id);
+            } catch (err) {
+              console.warn("Singularity | Failed to load gadget for attack data:", err);
+            }
+          }
+
+          const basic = gadgetDoc?.system?.basic || {};
+          if (!damageFormula && gadgetDoc) {
+            damageFormula = this._getGadgetDamageFormula(gadgetDoc);
+          }
+          if (!damageFormula) {
+            continue;
+          }
+
+          const description = gadgetDoc?.system?.description || gadgetDoc?.system?.details?.description || "";
+          const parsedDamageType = this._getGadgetDamageTypeFromDescription(description);
+          damageType =
+            damageType ||
+            parsedDamageType ||
+            basic.damageType ||
+            "Kinetic";
+          range = range || basic.range || "Ranged";
+          energyCost = energyCost ?? basic.energyCost ?? 0;
+          if (Number.isFinite(Number(attackBonus))) {
+            attackBonus = Number(attackBonus);
+          } else if (Number.isFinite(Number(basic.attackBonus))) {
+            attackBonus = Number(basic.attackBonus);
+          } else {
+            attackBonus = context.gadgetTuningAttackBonus || 0;
+          }
+
+          const attackType = basic.type || (String(range || "").toLowerCase().includes("melee") ? "melee" : "ranged");
+
+          gadgetAttackEntries.push({
+            name: gadgetEntry.name || gadgetDoc?.name || "Gadget Attack",
+            baseAttackBonus: attackBonus,
+            baseDamage: damageFormula,
+            ability: "wits",
+            damageType: damageType,
+            range: range,
+            cost: energyCost,
+            type: attackType,
+            weaponImg: gadgetEntry.img || gadgetDoc?.img,
+            isCustom: false,
+            isGadgetAttack: true,
+            gadgetId: gadgetEntry.id,
+            gadgetTuningBonus: context.gadgetTuningAttackBonus || 0
+          });
+        }
+      }
+
       // Process attacks to calculate dynamic attack bonuses and damage
-      const attacksWithCalculations = (actorData.system.attacks || []).map(attack => {
+      const attacksWithCalculations = ([...(actorData.system.attacks || []), ...gadgetAttackEntries]).map(attack => {
         const attackCopy = { ...attack };
+        const isGadgetAttack = attack.isGadgetAttack === true;
+        attackCopy.isGadgetAttack = isGadgetAttack;
+        if (isGadgetAttack) {
+          attackCopy.gadgetId = attack.gadgetId;
+        }
         
         // Try to match attack name with equipped weapon name (case-insensitive)
         // For dual-mode weapons, strip the mode suffix (e.g., "Combat Knife (Melee)" -> "Combat Knife")
         const baseAttackName = attack.name?.replace(/\s*\(Melee\)$/i, "").replace(/\s*\(Thrown\)$/i, "");
-        const matchingWeapon = equippedWeapons.find(w => w.name && baseAttackName && w.name.toLowerCase() === baseAttackName.toLowerCase());
-        if (matchingWeapon && matchingWeapon.img) {
+        const matchingWeapon = !isGadgetAttack
+          ? equippedWeapons.find(w => w.name && baseAttackName && w.name.toLowerCase() === baseAttackName.toLowerCase())
+          : null;
+        if (!isGadgetAttack && matchingWeapon && matchingWeapon.img) {
           attackCopy.weaponImg = matchingWeapon.img;
         }
-        const isWeaponAttack = Boolean(attack.weaponId) || Boolean(matchingWeapon);
+        const isWeaponAttack = !isGadgetAttack && (Boolean(attack.weaponId) || Boolean(matchingWeapon));
         const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
         attackCopy.isUnarmed = Boolean(isUnarmed);
-        const isTalentAttack = attack.isTalentAttack === true || (attack.name && attack.name.toLowerCase() === "blast");
+        const isTalentAttack = !isGadgetAttack && (attack.isTalentAttack === true || (attack.name && attack.name.toLowerCase() === "blast"));
         if (isTalentAttack) {
           attackCopy.isTalentAttack = true;
           if (!attackCopy.weaponImg) {
@@ -1645,11 +1724,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           ? true
           : isCustom === false
             ? false
-            : (!isWeaponAttack && !isUnarmed && !isTalentAttack);
+            : (!isWeaponAttack && !isUnarmed && !isTalentAttack && !isGadgetAttack);
         
         // Determine weapon competence rank and bonus
         let weaponCompetenceRank = "Novice"; // Default
         let weaponCompetenceBonus = 0; // Novice = +0
+        const gadgetTuningBonus = Number(attack.gadgetTuningBonus ?? 0);
         
         // Get weapon categories from matching weapon item
         const weaponCategories = matchingWeapon?.system?.basic?.categories || [];
@@ -1657,7 +1737,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const weaponMode = attack.weaponMode; // "melee", "thrown", or undefined
         
         // Check for Unarmed Strike
-        if (attack.name && attack.name.toLowerCase() === "unarmed strike") {
+        if (isGadgetAttack) {
+          weaponCompetenceRank = "Gadget Tuning";
+          weaponCompetenceBonus = 0;
+        } else if (attack.name && attack.name.toLowerCase() === "unarmed strike") {
           // Unarmed Strike: Novice by default, Apprentice if Paragon
           if (powersetName === "Paragon") {
             // Paragon gets Apprentice with unarmed at level 1
@@ -1670,7 +1753,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
         // If this is a talent-based attack (e.g., Blast) and it stores a baseAttackBonus,
         // treat that stored baseAttackBonus as the talent competence instead of a separate base bonus.
-        if (isTalentAttack && (attack.baseAttackBonus || attack.baseAttackBonus === 0)) {
+        if (!isGadgetAttack && isTalentAttack && (attack.baseAttackBonus || attack.baseAttackBonus === 0)) {
           const rankBonuses = {
             "Novice": 0,
             "Apprentice": 4,
@@ -1684,7 +1767,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
         // Check weapon categories for Weapon Training talents
         // For dual-mode weapons, only check categories relevant to the current mode
-        else if (weaponCategories.length > 0) {
+        else if (!isGadgetAttack && weaponCategories.length > 0) {
           // Filter categories based on weapon mode
           let relevantCategories = weaponCategories;
           if (weaponMode === "melee") {
@@ -1799,7 +1882,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           }
         }
         // Fallback: Check for ranged weapons (Marksman competence) using type
-        else if (weaponType === "ranged" || attack.type === "ranged") {
+        else if (!isGadgetAttack && (weaponType === "ranged" || attack.type === "ranged")) {
           if (powersetName === "Marksman") {
             // Marksman gets Ranged Weapon Competence: Apprentice at level 1, Competent at 5, Masterful at 10, Legendary at 15
             if (primeLevel >= 15) {
@@ -1818,7 +1901,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           }
         }
         // Check if attack already has a stored competence rank (from previous calculations)
-        else if (attack.weaponCompetenceRank) {
+        else if (!isGadgetAttack && attack.weaponCompetenceRank) {
           weaponCompetenceRank = attack.weaponCompetenceRank;
           // Map rank to bonus
           const rankBonuses = {
@@ -1837,7 +1920,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         // Check for Deadeye bonus (only applies to ranged weapons)
         let deadeyeBonus = 0;
         const deadeyeData = actorData.system.combat?.deadeye || { active: false };
-        if (deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"))) {
+        if (!isGadgetAttack && deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"))) {
           deadeyeBonus = 5; // +5 attack bonus from Deadeye
         }
         
@@ -1848,7 +1931,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           attackCopy.calculatedAttackBonus = attack.baseAttackBonus + weaponCompetenceBonus + deadeyeBonus + currentAbilityScore;
           // Build breakdown string
           const parts = [];
-          if (weaponCompetenceBonus > 0) {
+          if (isGadgetAttack) {
+            parts.push(`${gadgetTuningBonus >= 0 ? "+" : ""}${gadgetTuningBonus} (Gadget Tuning)`);
+          } else if (weaponCompetenceBonus > 0) {
             parts.push(`+${weaponCompetenceBonus} (${weaponCompetenceRank})`);
           } else if (weaponCompetenceRank === "Novice") {
             parts.push(`+0 (Novice)`);
@@ -1856,7 +1941,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           if (deadeyeBonus > 0) {
             parts.push(`+${deadeyeBonus} (Deadeye)`);
           }
-          if (attack.baseAttackBonus > 0 && !isTalentAttack) {
+          if (attack.baseAttackBonus > 0 && !isTalentAttack && !isGadgetAttack) {
             parts.push(`+${attack.baseAttackBonus}`);
           }
           if (currentAbilityScore !== 0) {
@@ -1883,7 +1968,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           // Legacy support: if attackBonus exists but no baseAttackBonus, use it as-is
           attackCopy.calculatedAttackBonus = attack.attackBonus + weaponCompetenceBonus + deadeyeBonus;
           const parts = [`+${attack.attackBonus}`];
-          if (weaponCompetenceBonus > 0) {
+          if (isGadgetAttack) {
+            parts.push(`${gadgetTuningBonus >= 0 ? "+" : ""}${gadgetTuningBonus} (Gadget Tuning)`);
+          } else if (weaponCompetenceBonus > 0) {
             parts.push(`+${weaponCompetenceBonus} (${weaponCompetenceRank})`);
           }
           if (deadeyeBonus > 0) {
@@ -1911,7 +1998,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           const currentAbilityScore = calculatedAbilityScores[attack.ability || "might"] || 0;
           attackCopy.calculatedAttackBonus = weaponCompetenceBonus + deadeyeBonus + currentAbilityScore;
           const parts = [];
-          if (weaponCompetenceBonus > 0) {
+          if (isGadgetAttack) {
+            parts.push(`${gadgetTuningBonus >= 0 ? "+" : ""}${gadgetTuningBonus} (Gadget Tuning)`);
+          } else if (weaponCompetenceBonus > 0) {
             parts.push(`+${weaponCompetenceBonus} (${weaponCompetenceRank})`);
           } else if (weaponCompetenceRank === "Novice") {
             parts.push(`+0 (Novice)`);
@@ -2584,7 +2673,6 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
     // Enough Prep Time controls
     html.find(".enough-prep-time-toggle").on("change", this._onEnoughPrepTimeToggle.bind(this));
-    html.find(".enough-prep-time-enemy-input").on("change blur", this._onEnoughPrepTimeEnemyChange.bind(this));
 
     // Gadgets management
     html.find(".add-gadget").click(this._onAddGadget.bind(this));
@@ -3534,7 +3622,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       user: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
       content: chatContent,
-      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+      style: CONST.CHAT_MESSAGE_STYLES.OTHER
     });
     
     // If it's a Vital Organ Extreme Wound (roll 20 and it already exists), roll an additional wound
@@ -3628,7 +3716,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       user: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this.actor }),
       content: chatContent,
-      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+      style: CONST.CHAT_MESSAGE_STYLES.OTHER
     });
     
     // If it's a Vital Organ (roll 20), roll an additional wound
@@ -6558,16 +6646,20 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       ui.notifications.warn("Paralyzed: you cannot take actions or reactions.");
       return;
     }
+    const gadgetId = event.currentTarget.dataset.gadgetId;
     const attackId = parseInt(event.currentTarget.dataset.attackId);
     const attacks = this.actor.system.attacks || [];
-    const attack = attacks[attackId];
+    const attack = gadgetId ? await this._buildGadgetAttackFromUuid(gadgetId) : attacks[attackId];
 
     if (!attack) return;
+    const isGadgetAttack = Boolean(gadgetId) || attack.isGadgetAttack === true;
 
     // Get equipped weapons to check weapon type (for ranged weapons)
     const items = this.actor.items || [];
     const equippedWeapons = items.filter(i => i && i.type === "weapon" && i.system?.basic?.equipped === true);
-    const matchingWeapon = equippedWeapons.find(w => w.name && attack.name && w.name.toLowerCase() === attack.name.toLowerCase());
+    const matchingWeapon = !isGadgetAttack
+      ? equippedWeapons.find(w => w.name && attack.name && w.name.toLowerCase() === attack.name.toLowerCase())
+      : null;
     const isRangedAttack = attack.type === "ranged" || attack.weaponMode === "thrown" || matchingWeapon?.system?.basic?.type === "ranged";
     if (isRangedAttack && this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "blinded")) {
       ui.notifications.warn("Blinded: ranged attacks are impossible.");
@@ -6733,95 +6825,100 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     let weaponCompetenceRank = "Novice";
     let weaponCompetenceBonus = 0;
     
-    // Check for Weapon Training talent bonuses first
-    const progression = this.actor.system.progression || {};
-    const level1Data = progression.level1 || {};
-    const weaponCategory = getWeaponCategory(attack.name, attack.type, false);
-    
-    // Check all Weapon Training selections
-    if (weaponCategory) {
-      // Check humanGenericTalentWeaponCategory
-      if (level1Data.humanGenericTalentName && 
-          (level1Data.humanGenericTalentName.toLowerCase().includes("weapon training") || level1Data.humanGenericTalentName.toLowerCase().includes("weapon training (apprentice)"))) {
-        if (level1Data.humanGenericTalentWeaponCategory === weaponCategory) {
-          weaponCompetenceRank = "Apprentice";
-          weaponCompetenceBonus = 4;
+    if (!isGadgetAttack) {
+      // Check for Weapon Training talent bonuses first
+      const progression = this.actor.system.progression || {};
+      const level1Data = progression.level1 || {};
+      const weaponCategory = getWeaponCategory(attack.name, attack.type, false);
+      
+      // Check all Weapon Training selections
+      if (weaponCategory) {
+        // Check humanGenericTalentWeaponCategory
+        if (level1Data.humanGenericTalentName && 
+            (level1Data.humanGenericTalentName.toLowerCase().includes("weapon training") || level1Data.humanGenericTalentName.toLowerCase().includes("weapon training (apprentice)"))) {
+          if (level1Data.humanGenericTalentWeaponCategory === weaponCategory) {
+            weaponCompetenceRank = "Apprentice";
+            weaponCompetenceBonus = 4;
+          }
+        }
+        
+        // Check terranGenericTalentWeaponCategory
+        if (level1Data.terranGenericTalentName && 
+            (level1Data.terranGenericTalentName.toLowerCase().includes("weapon training") || level1Data.terranGenericTalentName.toLowerCase().includes("weapon training (apprentice)"))) {
+          if (level1Data.terranGenericTalentWeaponCategory === weaponCategory) {
+            weaponCompetenceRank = "Apprentice";
+            weaponCompetenceBonus = 4;
+          }
+        }
+        
+        // Check genericTalentWeaponCategory (for other levels)
+        for (let lvl = 1; lvl <= 20; lvl++) {
+          const levelKey = `level${lvl}`;
+          const levelData = progression[levelKey] || {};
+          if (levelData.genericTalentName && 
+              (levelData.genericTalentName.toLowerCase().includes("weapon training") || levelData.genericTalentName.toLowerCase().includes("weapon training (apprentice)"))) {
+            if (levelData.genericTalentWeaponCategory === weaponCategory) {
+              weaponCompetenceRank = "Apprentice";
+              weaponCompetenceBonus = 4;
+            }
+          }
         }
       }
       
-      // Check terranGenericTalentWeaponCategory
-      if (level1Data.terranGenericTalentName && 
-          (level1Data.terranGenericTalentName.toLowerCase().includes("weapon training") || level1Data.terranGenericTalentName.toLowerCase().includes("weapon training (apprentice)"))) {
-        if (level1Data.terranGenericTalentWeaponCategory === weaponCategory) {
+      // Check for Unarmed Strike (Paragon powerset) - apply after Weapon Training checks
+      // but only if no Weapon Training was already applied for Unarmed Strikes
+      if (attack.name && attack.name.toLowerCase() === "unarmed strike") {
+        if (powersetName === "Paragon" && weaponCompetenceBonus === 0) {
+          // Paragon gets Apprentice with unarmed at level 1, but only if no Weapon Training was applied
           weaponCompetenceRank = "Apprentice";
-          weaponCompetenceBonus = 4;
+          weaponCompetenceBonus = 4; // Apprentice = +4
+        } else if (weaponCompetenceBonus === 0) {
+          // Only use default if no Weapon Training was applied
+          weaponCompetenceRank = "Novice";
+          weaponCompetenceBonus = 0; // Novice = +0
         }
       }
-      
-      // Check genericTalentWeaponCategory (for other levels)
-      for (let lvl = 1; lvl <= 20; lvl++) {
-        const levelKey = `level${lvl}`;
-        const levelData = progression[levelKey] || {};
-        if (levelData.genericTalentName && 
-            (levelData.genericTalentName.toLowerCase().includes("weapon training") || levelData.genericTalentName.toLowerCase().includes("weapon training (apprentice)"))) {
-          if (levelData.genericTalentWeaponCategory === weaponCategory) {
+      // Check for ranged weapons (Marksman competence) - only if no Weapon Training applied
+      else if (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged")) {
+        if (powersetName === "Marksman" && weaponCompetenceBonus === 0) {
+          // Marksman gets Ranged Weapon Competence: Apprentice at level 1, Competent at 5, Masterful at 10, Legendary at 15
+          // Only apply if no Weapon Training was already applied
+          if (primeLevel >= 15) {
+            weaponCompetenceRank = "Legendary";
+            weaponCompetenceBonus = 16;
+          } else if (primeLevel >= 10) {
+            weaponCompetenceRank = "Masterful";
+            weaponCompetenceBonus = 12;
+          } else if (primeLevel >= 5) {
+            weaponCompetenceRank = "Competent";
+            weaponCompetenceBonus = 8;
+          } else if (primeLevel >= 1) {
             weaponCompetenceRank = "Apprentice";
             weaponCompetenceBonus = 4;
           }
         }
       }
-    }
-    
-    // Check for Unarmed Strike (Paragon powerset) - apply after Weapon Training checks
-    // but only if no Weapon Training was already applied for Unarmed Strikes
-    if (attack.name && attack.name.toLowerCase() === "unarmed strike") {
-      if (powersetName === "Paragon" && weaponCompetenceBonus === 0) {
-        // Paragon gets Apprentice with unarmed at level 1, but only if no Weapon Training was applied
-        weaponCompetenceRank = "Apprentice";
-        weaponCompetenceBonus = 4; // Apprentice = +4
-      } else if (weaponCompetenceBonus === 0) {
-        // Only use default if no Weapon Training was applied
-        weaponCompetenceRank = "Novice";
-        weaponCompetenceBonus = 0; // Novice = +0
+      // Use stored competence rank if available (and no Weapon Training was applied)
+      else if (attack.weaponCompetenceRank && weaponCompetenceBonus === 0) {
+        weaponCompetenceRank = attack.weaponCompetenceRank;
+        const rankBonuses = {
+          "Novice": 0,
+          "Apprentice": 4,
+          "Competent": 8,
+          "Masterful": 12,
+          "Legendary": 16
+        };
+        weaponCompetenceBonus = rankBonuses[weaponCompetenceRank] || 0;
       }
-    }
-    // Check for ranged weapons (Marksman competence) - only if no Weapon Training applied
-    else if (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged")) {
-      if (powersetName === "Marksman" && weaponCompetenceBonus === 0) {
-        // Marksman gets Ranged Weapon Competence: Apprentice at level 1, Competent at 5, Masterful at 10, Legendary at 15
-        // Only apply if no Weapon Training was already applied
-        if (primeLevel >= 15) {
-          weaponCompetenceRank = "Legendary";
-          weaponCompetenceBonus = 16;
-        } else if (primeLevel >= 10) {
-          weaponCompetenceRank = "Masterful";
-          weaponCompetenceBonus = 12;
-        } else if (primeLevel >= 5) {
-          weaponCompetenceRank = "Competent";
-          weaponCompetenceBonus = 8;
-        } else if (primeLevel >= 1) {
-          weaponCompetenceRank = "Apprentice";
-          weaponCompetenceBonus = 4;
-        }
-      }
-    }
-    // Use stored competence rank if available (and no Weapon Training was applied)
-    else if (attack.weaponCompetenceRank && weaponCompetenceBonus === 0) {
-      weaponCompetenceRank = attack.weaponCompetenceRank;
-      const rankBonuses = {
-        "Novice": 0,
-        "Apprentice": 4,
-        "Competent": 8,
-        "Masterful": 12,
-        "Legendary": 16
-      };
-      weaponCompetenceBonus = rankBonuses[weaponCompetenceRank] || 0;
+    } else {
+      weaponCompetenceRank = "Gadget Tuning";
+      weaponCompetenceBonus = 0;
     }
     
     // Check for Deadeye bonus (only applies to ranged weapons)
     let deadeyeBonus = 0;
     const deadeyeData = this.actor.system.combat?.deadeye || { active: false };
-    if (deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"))) {
+    if (!isGadgetAttack && deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"))) {
       deadeyeBonus = 5; // +5 attack bonus from Deadeye
     }
     
@@ -6945,7 +7042,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
             // Add Deadeye info if applicable
             const deadeyeData = this.actor.system.combat?.deadeye || { active: false };
-            const isDeadeyeActive = deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"));
+            const isDeadeyeActive = !isGadgetAttack && deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"));
             const deadeyeInfo = isDeadeyeActive ? ` (includes +5 Deadeye)` : "";
             const scaredText = scaredPenalty > 0 ? ` (includes -${scaredPenalty} Scared)` : "";
             const proneText = pronePenalty > 0 ? ` (includes -${pronePenalty} Prone)` : "";
@@ -6954,6 +7051,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const restrictedText = restrictedRangedPenalty > 0 ? ` (includes -${restrictedRangedPenalty} ${restrictedRangedSource})` : "";
             const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
             let acComparison = "";
+            let targetAC = null;
             const targets = Array.from(game.user.targets);
             if (targets.length > 0) {
               const targetToken = targets[0];
@@ -6967,7 +7065,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 }
                 return actor.system?.combat?.ac ?? null;
               };
-              const targetAC = await getTargetAc(targetActor);
+              targetAC = await getTargetAc(targetActor);
               if (targetAC !== null) {
                 const difference = roll.total - targetAC;
                 if (difference >= 10) {
@@ -6992,7 +7090,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             // Store attack roll result for AC comparison when rolling damage
             await message.setFlag("singularity", "attackRoll", {
               total: roll.total,
-              attackId: attackId,
+              attackId: isGadgetAttack ? gadgetId : attackId,
               attackName: attack.name
             });
             // If this was a success or extreme success vs a target, open the Roll Damage dialog automatically
@@ -7000,11 +7098,14 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
               const difference = roll.total - targetAC;
               if (difference >= 0) {
                 try {
-                  await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId } } });
+                  await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId, gadgetId: gadgetId } } });
                 } catch (err) {
                   console.warn("Singularity | Failed to open Roll Damage dialog:", err);
                 }
               }
+            }
+            if (dialog?.close) {
+              dialog.close();
             }
               }
             },
@@ -7049,7 +7150,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
                 // Add Deadeye info if applicable
                 const deadeyeData = this.actor.system.combat?.deadeye || { active: false };
-                const isDeadeyeActive = deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"));
+                const isDeadeyeActive = !isGadgetAttack && deadeyeData.active && (attack.type === "ranged" || (matchingWeapon && matchingWeapon.system?.basic?.type === "ranged"));
                 const deadeyeInfo = isDeadeyeActive ? ` (includes +5 Deadeye)` : "";
                 const scaredText = scaredPenalty > 0 ? ` (includes -${scaredPenalty} Scared)` : "";
                 const proneText = pronePenalty > 0 ? ` (includes -${pronePenalty} Prone)` : "";
@@ -7095,7 +7196,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 // Store attack roll result for AC comparison when rolling damage
                 await message.setFlag("singularity", "attackRoll", {
                   total: roll.total,
-                  attackId: attackId,
+                  attackId: isGadgetAttack ? gadgetId : attackId,
+                  gadgetId: isGadgetAttack ? gadgetId : null,
                   attackName: attack.name
                 });
               }
@@ -7120,9 +7222,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       ui.notifications.warn("Paralyzed: you cannot take actions or reactions.");
       return;
     }
+    const gadgetId = event.currentTarget.dataset.gadgetId;
     const attackId = parseInt(event.currentTarget.dataset.attackId);
     const attacks = this.actor.system.attacks || [];
-    const attack = attacks[attackId];
+    const attack = gadgetId ? await this._buildGadgetAttackFromUuid(gadgetId) : attacks[attackId];
 
     if (!attack) {
       ui.notifications.warn("Attack not found.");
@@ -7433,24 +7536,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
   async _onEnoughPrepTimeToggle(event) {
     event.preventDefault();
     const isActive = event.currentTarget.checked;
-    const enoughPrepTimeData = foundry.utils.deepClone(this.actor.system.combat?.enoughPrepTime || { active: false, enemyName: "" });
+    const enoughPrepTimeData = foundry.utils.deepClone(this.actor.system.combat?.enoughPrepTime || { active: false });
     enoughPrepTimeData.active = isActive;
-    
-    // If deactivating, clear enemy name
-    if (!isActive) {
-      enoughPrepTimeData.enemyName = "";
-    }
-    
-    await this.actor.update({ "system.combat.enoughPrepTime": enoughPrepTimeData });
-    // Don't call render() to preserve current tab state
-  }
-
-  async _onEnoughPrepTimeEnemyChange(event) {
-    event.preventDefault();
-    const enemyName = event.currentTarget.value.trim();
-    const enoughPrepTimeData = foundry.utils.deepClone(this.actor.system.combat?.enoughPrepTime || { active: false, enemyName: "" });
-    enoughPrepTimeData.enemyName = enemyName;
-    
     await this.actor.update({ "system.combat.enoughPrepTime": enoughPrepTimeData });
     // Don't call render() to preserve current tab state
   }
@@ -7483,41 +7570,60 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       </div>
     `;
     
-    const dialog = new Dialog({
-      title: `Select Level ${gadgetLevel} Gadget`,
-      content: content,
-      buttons: {
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel"
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: `Select Level ${gadgetLevel} Gadget`,
+          content: content,
+          buttons: [
+            {
+              action: "cancel",
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => dialog?.close?.()
+            }
+          ],
+          default: "cancel"
         }
-      },
-      default: "cancel"
-    });
-    
+      : {
+          title: `Select Level ${gadgetLevel} Gadget`,
+          content: content,
+          buttons: {
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: () => dialog?.close?.()
+            }
+          },
+          default: "cancel"
+        };
+    dialog = new DialogClass(dialogOptions);
     dialog.render(true);
+
+    const getDialogRoot = () => {
+      const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+      return el instanceof HTMLElement ? el : null;
+    };
     
     // Set dialog size after rendering - make it much taller to show more gadgets
     setTimeout(() => {
-      const windowElement = dialog.element.closest(".window-app");
+      const root = getDialogRoot();
+      const windowElement = root ? root.closest(".window-app") : null;
       if (windowElement) {
-        windowElement.css({
-          "width": "650px",
-          "min-width": "650px",
-          "max-width": "650px",
-          "height": "700px",
-          "min-height": "700px",
-          "max-height": "700px"
-        });
+        windowElement.style.width = "650px";
+        windowElement.style.minWidth = "650px";
+        windowElement.style.maxWidth = "650px";
+        windowElement.style.height = "700px";
+        windowElement.style.minHeight = "700px";
+        windowElement.style.maxHeight = "700px";
         // Also set the content area height
-        const contentElement = dialog.element.find(".window-content");
+        const contentElement = root?.querySelector(".window-content");
         if (contentElement) {
-          contentElement.css({
-            "height": "600px",
-            "min-height": "600px",
-            "max-height": "600px",
-            "overflow-y": "auto"
-          });
+          contentElement.style.height = "600px";
+          contentElement.style.minHeight = "600px";
+          contentElement.style.maxHeight = "600px";
+          contentElement.style.overflowY = "auto";
         }
       }
     }, 100);
@@ -7555,7 +7661,11 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     
     if (gadgetItems.length === 0) {
-      dialog.element.find(".gadget-selection-dialog").html(`<p>No Level ${gadgetLevel} gadgets found in compendium.</p>`);
+      const root = getDialogRoot();
+      const selection = root?.querySelector(".gadget-selection-dialog");
+      if (selection) {
+        selection.innerHTML = `<p>No Level ${gadgetLevel} gadgets found in compendium.</p>`;
+      }
       return;
     }
     
@@ -7576,86 +7686,114 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       </div>
     `;
     
-    dialog.element.find(".gadget-selection-dialog").replaceWith(updatedContent);
+    {
+      const root = getDialogRoot();
+      const selection = root?.querySelector(".gadget-selection-dialog");
+      if (selection) {
+        selection.outerHTML = updatedContent;
+      }
+    }
     
     // Re-apply sizing after content update to ensure dialog is tall enough
     setTimeout(() => {
-      const windowElement = dialog.element.closest(".window-app");
+      const root = getDialogRoot();
+      const windowElement = root ? root.closest(".window-app") : null;
       if (windowElement) {
-        windowElement.css({
-          "width": "650px",
-          "min-width": "650px",
-          "max-width": "650px",
-          "height": "700px",
-          "min-height": "700px",
-          "max-height": "700px"
-        });
-        const contentElement = dialog.element.find(".window-content");
+        windowElement.style.width = "650px";
+        windowElement.style.minWidth = "650px";
+        windowElement.style.maxWidth = "650px";
+        windowElement.style.height = "700px";
+        windowElement.style.minHeight = "700px";
+        windowElement.style.maxHeight = "700px";
+        const contentElement = root?.querySelector(".window-content");
         if (contentElement) {
-          contentElement.css({
-            "height": "600px",
-            "min-height": "600px",
-            "max-height": "600px",
-            "overflow-y": "auto"
-          });
+          contentElement.style.height = "600px";
+          contentElement.style.minHeight = "600px";
+          contentElement.style.maxHeight = "600px";
+          contentElement.style.overflowY = "auto";
         }
       }
     }, 50);
     
     // Add click handlers
-    dialog.element.find(".gadget-item-selectable").click(async (event) => {
-      const gadgetId = $(event.currentTarget).data("gadget-id");
-      const gadgetName = $(event.currentTarget).data("gadget-name");
-      const isDuplicate = $(event.currentTarget).hasClass("gadget-duplicate");
+    {
+      const root = getDialogRoot();
+      const selectable = root?.querySelectorAll(".gadget-item-selectable") || [];
+      selectable.forEach((element) => {
+        element.addEventListener("click", async (event) => {
+          const target = event.currentTarget;
+          const gadgetId = target?.dataset?.gadgetId;
+          const gadgetName = target?.dataset?.gadgetName;
+          const isDuplicate = target?.classList?.contains("gadget-duplicate");
       
       // Prevent adding duplicate Level 0 gadgets
-      if (isDuplicate && gadgetLevel === 0) {
-        ui.notifications.warn(`"${gadgetName}" is already prepared. Level 0 gadgets cannot be prepared twice.`);
-        return;
-      }
+          if (isDuplicate && gadgetLevel === 0) {
+            ui.notifications.warn(`"${gadgetName}" is already prepared. Level 0 gadgets cannot be prepared twice.`);
+            return;
+          }
       
       // Get the full gadget document to get its image
-      let gadgetImg = "icons/svg/mystery-man.svg";
-      try {
-        const gadgetDoc = await fromUuid(gadgetId);
-        if (gadgetDoc && gadgetDoc.img) {
-          gadgetImg = gadgetDoc.img;
-        }
-      } catch (err) {
-        console.warn(`Could not load gadget image for ${gadgetName}:`, err);
-      }
+          let gadgetImg = "icons/svg/mystery-man.svg";
+          let gadgetBasic = {};
+          try {
+            const gadgetDoc = await fromUuid(gadgetId);
+            if (gadgetDoc && gadgetDoc.img) {
+              gadgetImg = gadgetDoc.img;
+            }
+            gadgetBasic = gadgetDoc?.system?.basic || {};
+          } catch (err) {
+            console.warn(`Could not load gadget image for ${gadgetName}:`, err);
+          }
       
-      const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
-      
-      if (!gadgets[levelKey]) {
-        gadgets[levelKey] = [];
-      }
-      
-      // If slotIndex is specified, insert at that position; otherwise append
-      if (slotIndex !== undefined && slotIndex !== null && !isNaN(slotIndex)) {
-        gadgets[levelKey][slotIndex] = {
-          id: gadgetId,
-          name: gadgetName,
-          img: gadgetImg,
-          used: false
-        };
-      } else {
-        gadgets[levelKey].push({
-          id: gadgetId,
-          name: gadgetName,
-          img: gadgetImg,
-          used: false
+          const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
+          const damageFormula = this._getGadgetDamageFormulaFromBasic(gadgetBasic);
+          const healingFormula = this._getGadgetHealingFormulaFromBasic(gadgetBasic);
+          
+          if (!gadgets[levelKey]) {
+            gadgets[levelKey] = [];
+          }
+          
+          // If slotIndex is specified, insert at that position; otherwise append
+          if (slotIndex !== undefined && slotIndex !== null && !isNaN(slotIndex)) {
+            gadgets[levelKey][slotIndex] = {
+              id: gadgetId,
+              name: gadgetName,
+              img: gadgetImg,
+              used: false,
+              damage: damageFormula,
+              damageType: gadgetBasic.damageType,
+              range: gadgetBasic.range,
+              energyCost: gadgetBasic.energyCost,
+              attackBonus: gadgetBasic.attackBonus,
+              healing: healingFormula
+            };
+          } else {
+            gadgets[levelKey].push({
+              id: gadgetId,
+              name: gadgetName,
+              img: gadgetImg,
+              used: false,
+              damage: damageFormula,
+              damageType: gadgetBasic.damageType,
+              range: gadgetBasic.range,
+              energyCost: gadgetBasic.energyCost,
+              attackBonus: gadgetBasic.attackBonus,
+              healing: healingFormula
+            });
+          }
+          
+          this._preferredTab = "gadgets";
+          await this.actor.update({ "system.gadgets.prepared": gadgets });
+          this.render();
+          dialog?.close?.();
         });
-      }
-      
-      await this.actor.update({ "system.gadgets.prepared": gadgets });
-      this.render();
-      dialog.close();
-    });
+      });
+    }
   }
 
   async _onUseGadget(event) {
     event.preventDefault();
+    event.stopPropagation();
     const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
     const gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
     
@@ -7664,15 +7802,354 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     
     if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
       // Level 0 gadgets can be used unlimited times, Level 1+ can only be used once
-      if (gadgetLevel === 0) {
-        ui.notifications.info(`${gadgets[levelKey][gadgetIndex].name} used! (Level 0 gadgets can be used unlimited times)`);
+      const gadgetEntry = gadgets[levelKey][gadgetIndex];
+      const gadgetId = gadgetEntry?.id;
+      const gadgetName = gadgetEntry?.name || "Gadget";
+
+      if (gadgetId) {
+        try {
+          const gadgetDoc = await fromUuid(gadgetId);
+          if (gadgetDoc) {
+            const gadgetActions = this._getGadgetChatActions(gadgetDoc);
+            const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
+              item: gadgetDoc,
+              actor: this.actor,
+              gadgetActions: gadgetActions
+            });
+            await ChatMessage.create({
+              content: content,
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              style: CONST.CHAT_MESSAGE_STYLES.OTHER
+            });
+          }
+        } catch (err) {
+          console.warn("Singularity | Failed to post gadget card:", err);
+        }
+      }
+
+      await this._markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName);
+    }
+  }
+
+  async _onHealGadget(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
+    const gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
+    const levelKey = `level${gadgetLevel}`;
+
+    if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
+      const gadgetEntry = gadgets[levelKey][gadgetIndex];
+      const gadgetId = gadgetEntry?.id;
+      const gadgetName = gadgetEntry?.name || "Gadget";
+      let gadgetDoc = null;
+
+      if (gadgetId) {
+        try {
+          gadgetDoc = await fromUuid(gadgetId);
+        } catch (err) {
+          console.warn("Singularity | Failed to load gadget for healing:", err);
+        }
+      }
+
+      const didHeal = await this._rollGadgetHealing(gadgetEntry, gadgetDoc);
+      if (!didHeal) {
+        ui.notifications.warn(`${gadgetName} has no healing formula to roll.`);
+        return;
+      }
+
+      await this._markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName);
+    }
+  }
+
+  async _markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName) {
+    if (gadgetLevel === 0) {
+      ui.notifications.info(`${gadgetName} used! (Level 0 gadgets can be used unlimited times)`);
+      return;
+    }
+
+    gadgets[levelKey][gadgetIndex].used = true;
+    await this.actor.update({ "system.gadgets.prepared": gadgets });
+    this.render();
+    ui.notifications.info(`${gadgetName} used!`);
+  }
+
+  async _rollGadgetHealing(gadgetEntry, gadgetDoc) {
+    const healFormula =
+      gadgetEntry?.healing ||
+      (gadgetDoc ? this._getGadgetHealingFormula(gadgetDoc) : "");
+    if (!healFormula) {
+      return false;
+    }
+
+    const targets = Array.from(game.user?.targets || []);
+    const targetToken = targets[0];
+    if (!targetToken) {
+      ui.notifications.warn("Select a target to report gadget healing.");
+      return false;
+    }
+
+    const roll = new Roll(healFormula);
+    await roll.evaluate();
+    const targetName = targetToken.name || targetToken.actor?.name || "Target";
+    const gadgetName = gadgetDoc?.name || gadgetEntry?.name || "Gadget";
+    const healContent = `<div class="roll-flavor"><b>${gadgetName}</b><br>${targetName} heals for <strong>${roll.total}</strong> (${healFormula})</div>`;
+    await roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      flavor: healContent
+    });
+
+    return true;
+  }
+
+  _getGadgetHealingFormula(gadgetDoc) {
+    if (!gadgetDoc?.system) return "";
+    const basicFormula = this._getGadgetHealingFormulaFromBasic(gadgetDoc.system.basic || {});
+    if (basicFormula) return basicFormula;
+    return this._getGadgetHealingFormulaFromDescription(
+      gadgetDoc.system.description || gadgetDoc.system.details?.description || ""
+    );
+  }
+
+  _getGadgetHealingFormulaFromBasic(basic) {
+    if (!basic) return "";
+    const direct = basic.healing || basic.healingFormula || basic.heal || basic.healFormula || basic.healingRoll;
+    if (direct) return String(direct).trim();
+
+    const flatValue = basic.healingValue ?? basic.healValue ?? basic.healAmount ?? null;
+    const dice = basic.healingDice || basic.healDice || basic.healingDie || basic.healDie;
+    const diceCount = basic.healingDiceCount || basic.healDiceCount || basic.healingCount || basic.healCount;
+    let formula = "";
+
+    if (dice) {
+      const diceText = String(dice).trim();
+      if (diceText.includes("d")) {
+        formula = diceText;
+      } else if (diceCount) {
+        formula = `${diceCount}d${diceText}`;
       } else {
-        gadgets[levelKey][gadgetIndex].used = true;
-        await this.actor.update({ "system.gadgets.prepared": gadgets });
-        this.render();
-        ui.notifications.info(`${gadgets[levelKey][gadgetIndex].name} used!`);
+        formula = `1d${diceText}`;
+      }
+    } else if (flatValue !== null && flatValue !== undefined && flatValue !== "") {
+      return String(flatValue);
+    }
+
+    const bonus = Number(basic.healingBonus ?? basic.healBonus ?? basic.healingMod ?? basic.healMod ?? 0);
+    if (formula && Number.isFinite(bonus) && bonus !== 0) {
+      formula += bonus > 0 ? `+${bonus}` : `${bonus}`;
+    }
+
+    return formula;
+  }
+
+  _getGadgetHealingFormulaFromDescription(description) {
+    const raw = String(description || "");
+    if (!raw) return "";
+    const text = raw
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) return "";
+
+    const diceMatch = text.match(/(?:heal(?:s|ing)?|healing)[^0-9d]*([0-9]+d[0-9]+(?:\s*[+-]\s*[0-9]+)*)/i);
+    if (diceMatch?.[1]) {
+      return diceMatch[1].replace(/\s+/g, "");
+    }
+
+    const flatMatch = text.match(/(?:heal(?:s|ing)?|healing)[^0-9]*([0-9]+)(?!d)/i);
+    if (flatMatch?.[1]) {
+      return flatMatch[1];
+    }
+
+    return "";
+  }
+
+  _getGadgetDamageFormula(gadgetDoc) {
+    if (!gadgetDoc?.system) return "";
+    const basicFormula = this._getGadgetDamageFormulaFromBasic(gadgetDoc.system.basic || {});
+    if (basicFormula) return basicFormula;
+    return this._getGadgetDamageFormulaFromDescription(
+      gadgetDoc.system.description || gadgetDoc.system.details?.description || ""
+    );
+  }
+
+  _getGadgetDamageFormulaFromBasic(basic) {
+    if (!basic) return "";
+    const direct = basic.damage || basic.damageFormula || basic.damageRoll || basic.attackDamage;
+    if (direct) return String(direct).trim();
+
+    const flatValue = basic.damageValue ?? basic.damageAmount ?? null;
+    const dice = basic.damageDice || basic.damageDie || basic.damageDiceFormula;
+    const diceCount = basic.damageDiceCount || basic.damageCount || basic.damageDiceNumber;
+    let formula = "";
+
+    if (dice) {
+      const diceText = String(dice).trim();
+      if (diceText.includes("d")) {
+        formula = diceText;
+      } else if (diceCount) {
+        formula = `${diceCount}d${diceText}`;
+      } else {
+        formula = `1d${diceText}`;
+      }
+    } else if (flatValue !== null && flatValue !== undefined && flatValue !== "") {
+      return String(flatValue);
+    }
+
+    const bonus = Number(basic.damageBonus ?? basic.damageMod ?? basic.damageModifier ?? 0);
+    if (formula && Number.isFinite(bonus) && bonus !== 0) {
+      formula += bonus > 0 ? `+${bonus}` : `${bonus}`;
+    }
+
+    return formula;
+  }
+
+  _getGadgetDamageFormulaFromDescription(description) {
+    const raw = String(description || "");
+    if (!raw) return "";
+    const text = raw
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) return "";
+
+    const diceMatch = text.match(/(?:damage|deals?)[^0-9d]*([0-9]+d[0-9]+(?:\s*[+-]\s*[0-9]+)*)/i);
+    if (diceMatch?.[1]) {
+      return diceMatch[1].replace(/\s+/g, "");
+    }
+
+    const flatMatch = text.match(/(?:damage|deals?)[^0-9]*([0-9]+)(?!d)/i);
+    if (flatMatch?.[1]) {
+      return flatMatch[1];
+    }
+
+    return "";
+  }
+
+  _getGadgetDamageTypeFromDescription(description) {
+    const raw = String(description || "");
+    if (!raw) return "";
+    const text = raw
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) return "";
+
+    const damageTypeMatch = text.match(/\b(Acid|Chaos|Cold|Energy|Fire|Force|Kinetic|Lightning|Necrotic|Photonic|Poison|Psychic|Radiant|Sonic|Thunder)\b\s+damage\b/i);
+    if (damageTypeMatch?.[1]) {
+      return damageTypeMatch[1].charAt(0).toUpperCase() + damageTypeMatch[1].slice(1).toLowerCase();
+    }
+
+    const labeledTypeMatch = text.match(/\b(?:damage\s*type|type)\s*[:\-]\s*(Acid|Chaos|Cold|Energy|Fire|Force|Kinetic|Lightning|Necrotic|Photonic|Poison|Psychic|Radiant|Sonic|Thunder)\b/i);
+    if (labeledTypeMatch?.[1]) {
+      return labeledTypeMatch[1].charAt(0).toUpperCase() + labeledTypeMatch[1].slice(1).toLowerCase();
+    }
+
+    const types = [
+      "Acid",
+      "Chaos",
+      "Cold",
+      "Fire",
+      "Force",
+      "Kinetic",
+      "Lightning",
+      "Necrotic",
+      "Photonic",
+      "Poison",
+      "Psychic",
+      "Radiant",
+      "Sonic",
+      "Thunder"
+    ];
+
+    for (const type of types) {
+      const regex = new RegExp(`\\b${type}\\b`, "i");
+      if (regex.test(text)) {
+        return type;
       }
     }
+
+    return "";
+  }
+
+  _getGadgetChatActions(gadgetDoc) {
+    if (!gadgetDoc) return null;
+    const damageFormula = this._getGadgetDamageFormula(gadgetDoc);
+    const healFormula = this._getGadgetHealingFormula(gadgetDoc);
+    const canAttack = Boolean(damageFormula);
+    const canDamage = Boolean(damageFormula);
+    const canHeal = Boolean(healFormula);
+    if (!canAttack && !canHeal) return null;
+
+    return {
+      gadgetId: gadgetDoc.uuid || gadgetDoc.id,
+      gadgetName: gadgetDoc.name || "Gadget",
+      actorId: this.actor?.id,
+      canAttack: canAttack,
+      canDamage: canDamage,
+      canHeal: canHeal,
+      healFormula: healFormula
+    };
+  }
+
+  _getGadgetTuningBonus() {
+    const gadgetTuningSkill = this.actor?.system?.skills?.["Gadget Tuning"] || {};
+    const gadgetTuningRank = gadgetTuningSkill.rank || "Novice";
+    const rankModifiers = {
+      "Novice": 0,
+      "Apprentice": 2,
+      "Competent": 5,
+      "Masterful": 9,
+      "Legendary": 14
+    };
+    return rankModifiers[gadgetTuningRank] || 0;
+  }
+
+  async _buildGadgetAttackFromUuid(gadgetId) {
+    if (!gadgetId) return null;
+    let gadgetDoc = null;
+    try {
+      gadgetDoc = await fromUuid(gadgetId);
+    } catch (err) {
+      console.warn("Singularity | Failed to load gadget for attack:", err);
+      return null;
+    }
+    if (!gadgetDoc) return null;
+
+    const damageFormula = this._getGadgetDamageFormula(gadgetDoc);
+    if (!damageFormula) return null;
+
+    const basic = gadgetDoc.system?.basic || {};
+    const range = basic.range || "Ranged";
+    const attackType = basic.type || (String(range || "").toLowerCase().includes("melee") ? "melee" : "ranged");
+    const gadgetTuningBonus = this._getGadgetTuningBonus();
+    const attackBonus = Number.isFinite(Number(basic.attackBonus)) ? Number(basic.attackBonus) : gadgetTuningBonus;
+    const description = gadgetDoc.system?.description || gadgetDoc.system?.details?.description || "";
+    const parsedDamageType = this._getGadgetDamageTypeFromDescription(description);
+    const damageType =
+      parsedDamageType ||
+      basic.damageType ||
+      "Kinetic";
+
+    return {
+      name: gadgetDoc.name || "Gadget Attack",
+      baseAttackBonus: attackBonus,
+      baseDamage: damageFormula,
+      ability: "wits",
+      damageType: damageType,
+      range: range,
+      cost: basic.energyCost ?? 0,
+      type: attackType,
+      weaponImg: gadgetDoc.img,
+      isCustom: false,
+      isGadgetAttack: true,
+      gadgetId: gadgetId,
+      gadgetTuningBonus: gadgetTuningBonus
+    };
   }
 
   async _onRemoveGadget(event) {
@@ -7734,7 +8211,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       if (isIconClick) {
         // Send gadget to chat
-        const content = await renderTemplate("systems/singularity/templates/chat/item-card.html", {
+        const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
           item: item,
           actor: this.actor
         });
@@ -7742,7 +8219,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         await ChatMessage.create({
           content: content,
           speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-          type: CONST.CHAT_MESSAGE_TYPES.OTHER
+          style: CONST.CHAT_MESSAGE_STYLES.OTHER
         });
       } else if (isNameClick || (!isIconClick && !isNameClick)) {
         // Open gadget sheet (default behavior if clicking elsewhere on the gadget-item)
@@ -8139,15 +8616,17 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       if (isIconClick) {
         // Send item to chat
-        const content = await renderTemplate("systems/singularity/templates/chat/item-card.html", {
+        const gadgetActions = this._getGadgetChatActions(item);
+        const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
           item: item,
-          actor: this.actor
+          actor: this.actor,
+          gadgetActions: gadgetActions
         });
         
         await ChatMessage.create({
           content: content,
           speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-          type: CONST.CHAT_MESSAGE_TYPES.OTHER
+          style: CONST.CHAT_MESSAGE_STYLES.OTHER
         });
       } else if (isNameClick || (!isIconClick && !isNameClick)) {
         // Open item sheet (default behavior if clicking elsewhere on the slot-item)
