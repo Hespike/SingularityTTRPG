@@ -1,6 +1,8 @@
 <div class="singularity chat-card item-card" data-item-id="{{item._id}}" data-actor-id="{{actor._id}}">
   <header class="card-header flexrow">
+    {{#unless hideImage}}
     <img src="{{item.img}}" alt="{{item.name}}" title="{{item.name}}" />
+    {{/unless}}
     <h3>{{item.name}}</h3>
   </header>
   {{#if item.system.description}}

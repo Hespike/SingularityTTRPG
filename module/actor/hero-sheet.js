@@ -7814,7 +7814,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
               item: gadgetDoc,
               actor: this.actor,
-              gadgetActions: gadgetActions
+              gadgetActions: gadgetActions,
+              hideImage: true
             });
             await ChatMessage.create({
               content: content,
@@ -8213,7 +8214,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         // Send gadget to chat
         const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
           item: item,
-          actor: this.actor
+          actor: this.actor,
+          hideImage: true
         });
         
         await ChatMessage.create({
@@ -8620,7 +8622,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
           item: item,
           actor: this.actor,
-          gadgetActions: gadgetActions
+          gadgetActions: gadgetActions,
+          hideImage: item?.type === "gadget"
         });
         
         await ChatMessage.create({
