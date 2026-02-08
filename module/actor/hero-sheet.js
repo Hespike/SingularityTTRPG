@@ -2458,7 +2458,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     try {
       // Preserve the current active tab before re-rendering
       let activeTab = null;
-      if (this.element && !force) {
+      if (this.element) {
         const currentActiveTab = this.element.find('.sheet-tabs .item.active, .tab.active');
         if (currentActiveTab.length) {
           activeTab = currentActiveTab.first().data('tab');
@@ -2480,8 +2480,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           if (sheetBody.length) {
             sheetBody.css('display', 'block');
             
-            // Restore the preferred tab if set, otherwise keep active tab or default to main
-            const tabToActivate = this._preferredTab || activeTab || "main";
+            // Prefer the currently active tab, fall back to preferred/default
+            const tabToActivate = activeTab || this._preferredTab || "main";
+            this._preferredTab = tabToActivate;
             const tabElement = this.element.find(`.tab[data-tab="${tabToActivate}"]`);
             const tabNav = this.element.find(`.sheet-tabs .item[data-tab="${tabToActivate}"]`);
             
@@ -2776,6 +2777,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     $panes.removeClass("active");
     html.find(`.sheet-tabs .item[data-tab="${tabName}"]`).addClass("active");
     html.find(`.sheet-body .tab[data-tab="${tabName}"]`).addClass("active");
+    this._preferredTab = tabName;
   }
 
   async _onInlineFieldChange(event) {
@@ -10128,6 +10130,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
   async _onAbilityBoostChange(event) {
     event.preventDefault();
+    this._preferredTab = "progression";
     const select = event.currentTarget;
     const value = select.value;
     const slotType = select.dataset.slotType || $(select).closest(".progression-slot").data("slot-type");

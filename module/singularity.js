@@ -2535,6 +2535,221 @@ Hooks.once("ready", async function() {
     }
   }, 3500);
 
+  // Auto-create selected Level 0 gadgets in gadgets compendium if they don't exist
+  setTimeout(async () => {
+    try {
+      let pack = game.packs.find(p => p.metadata.name === "gadgets" && p.metadata.packageName === "singularity");
+      if (!pack) {
+        console.warn("Singularity | Gadgets compendium not found");
+        return;
+      }
+
+      if (!pack.index.size) {
+        await pack.getIndex();
+      }
+
+      const wasLocked = pack.locked;
+      if (wasLocked) {
+        if (!game.user?.isGM) {
+          return;
+        }
+        try {
+          const packKey = pack.collection ?? `${pack.metadata.packageName}.${pack.metadata.name}`;
+          const config = game.settings.get("core", "compendiumConfiguration") ?? {};
+          const updated = foundry.utils.duplicate(config);
+          updated[packKey] = { ...(updated[packKey] ?? {}), locked: false };
+          await game.settings.set("core", "compendiumConfiguration", updated);
+        } catch (unlockSettingError) {
+          // Ignore and fall back to configure below.
+        }
+        try {
+          await pack.configure({ locked: false });
+          await new Promise(resolve => setTimeout(resolve, 200));
+          const packKey = pack.collection ?? `${pack.metadata.packageName}.${pack.metadata.name}`;
+          pack = game.packs.get(packKey) ?? pack;
+        } catch (unlockError) {
+          return;
+        }
+      }
+
+      const gadgets = [
+        {
+          name: "Motion Tracker",
+          img: "icons/svg/item-bag.svg",
+          basic: {
+            type: "gadget",
+            level: 0,
+            range: "Touch",
+            energyCost: 1,
+            hands: 1
+          },
+          description: `<h2>Description</h2>
+<p>You deploy a small disc or handheld device that uses passive motion sensors and vibration detection to track movement within a designated area, alerting you to any creatures passing through.</p>
+
+<h3>Motion Tracker</h3>
+<ul>
+  <li><strong>Type:</strong> Action</li>
+  <li><strong>Range:</strong> Touch</li>
+  <li><strong>Cost:</strong> 1 energy</li>
+  <li><strong>Hands:</strong> 1</li>
+  <li><strong>Duration:</strong> 1 hour</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You place the tracker on a surface. For the duration, you are aware of any creature of Small size or larger that moves within a 30-foot radius of the tracker. You learn the direction and approximate distance of each detected creature, but not their identity or exact number if multiple creatures are present.</p>
+<p><em>Note:</em> The tracker cannot detect stationary creatures. You can have a number of trackers active at once equal to your Wits ability maximum.</p>`
+        },
+        {
+          name: "Smoke Canister",
+          img: "icons/svg/item-bag.svg",
+          basic: {
+            type: "gadget",
+            level: 0,
+            range: "20 feet",
+            energyCost: 2,
+            hands: 1
+          },
+          description: `<h2>Description</h2>
+<p>You activate a compact chemical canister that rapidly emits a thick cloud of smoke, providing cover for movement and obscuring vision from ranged attacks.</p>
+
+<h3>Smoke Canister</h3>
+<ul>
+  <li><strong>Type:</strong> Action</li>
+  <li><strong>Range:</strong> 20 feet</li>
+  <li><strong>Cost:</strong> 2 energy</li>
+  <li><strong>Hands:</strong> 1</li>
+  <li><strong>Duration:</strong> 1 minute</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You create a cloud of thick smoke in a 10-foot radius burst centered on a point within range. The area is heavily obscured. Creatures inside the smoke have standard cover. Additionally, any attack made through the smoke provides standard cover to the target.</p>
+<p>A moderate wind (at least 10 miles per hour) disperses the smoke in 3 rounds. A strong wind (at least 20 miles per hour) disperses it immediately.</p>`
+        },
+        {
+          name: "Utility Multi-Tool",
+          img: "icons/svg/item-bag.svg",
+          basic: {
+            type: "gadget",
+            level: 0,
+            range: "Touch",
+            energyCost: 1,
+            hands: 1
+          },
+          description: `<h2>Description</h2>
+<p>A compact device that can morph into various tools - lockpicks, wire cutters, screwdrivers, and more - allowing you to overcome mechanical obstacles with precision and efficiency.</p>
+
+<h3>Utility Multi-Tool</h3>
+<ul>
+  <li><strong>Type:</strong> Action</li>
+  <li><strong>Range:</strong> Touch</li>
+  <li><strong>Cost:</strong> 1 energy</li>
+  <li><strong>Hands:</strong> 1</li>
+  <li><strong>Duration:</strong> 1 minute</li>
+</ul>
+
+<h3>Effect</h3>
+<p>While the multi-tool is active, you gain a +2 bonus to skill checks involving mechanical devices, locks, traps, or similar technical challenges. This includes attempts to pick locks, disable traps, repair equipment, or interact with complex machinery.</p>
+<p>The multi-tool can function as any standard tool for the duration, automatically adjusting its form as needed.</p>`
+        }
+      ];
+
+      let createdCount = 0;
+
+      for (const gadget of gadgets) {
+        const existing = pack.index.find(i => i.name === gadget.name);
+        if (existing) {
+          try {
+            const existingItem = await pack.getDocument(existing._id);
+            if (existingItem) {
+              const updates = {};
+              if (existingItem.system?.basic?.level !== 0) {
+                updates["system.basic.level"] = 0;
+              }
+              if (existingItem.system?.basic?.type !== "gadget") {
+                updates["system.basic.type"] = "gadget";
+              }
+              if (Object.keys(updates).length > 0) {
+                await existingItem.update(updates);
+              }
+            }
+          } catch (error) {
+            console.error(`Singularity | Error checking/fixing existing gadget ${gadget.name}:`, error);
+          }
+          continue;
+        }
+
+        const itemData = {
+          name: gadget.name,
+          type: "talent",
+          system: {
+            description: gadget.description,
+            basic: {
+              type: gadget.basic.type,
+              level: gadget.basic.level,
+              range: gadget.basic.range,
+              energyCost: gadget.basic.energyCost,
+              hands: gadget.basic.hands,
+              prerequisites: ""
+            },
+            archived: false
+          },
+          img: gadget.img
+        };
+
+        let item = null;
+        try {
+          const createdItems = await Item.createDocuments([itemData], { render: false });
+          item = createdItems[0];
+
+          if (!item || !item.id) {
+            throw new Error(`Failed to create ${gadget.name} in world`);
+          }
+
+          if (pack.locked) {
+            await pack.configure({ locked: false });
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+
+          await pack.importDocument(item);
+          await item.delete();
+          item = null;
+          createdCount++;
+
+          await new Promise(resolve => setTimeout(resolve, 200));
+        } catch (createError) {
+          console.error(`Singularity | Error creating/importing gadget ${gadget.name}:`, createError);
+          if (item && item.id && !item.pack) {
+            try {
+              await item.delete();
+              item = null;
+            } catch (cleanupError) {
+              console.error(`Singularity | Error cleaning up ${gadget.name} world item:`, cleanupError);
+            }
+          }
+        }
+      }
+
+      await pack.getIndex({ force: true });
+
+      if (wasLocked && !pack.locked) {
+        await pack.configure({ locked: true });
+      }
+
+      for (const app of Object.values(ui.windows)) {
+        if (app.pack && app.pack === pack && app.render) {
+          await app.render(false);
+        }
+      }
+
+      if (createdCount > 0) {
+        ui.notifications.info(`Created ${createdCount} gadget${createdCount > 1 ? "s" : ""} in Gadgets compendium!`);
+      }
+    } catch (error) {
+      console.error("Singularity | Could not auto-create gadgets:", error);
+      ui.notifications.error(`Failed to create gadgets: ${error.message}`);
+    }
+  }, 3600);
+
   // Auto-create Bastion powerset in powersets compendium if it doesn't exist
   setTimeout(async () => {
     try {
