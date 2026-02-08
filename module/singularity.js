@@ -544,6 +544,42 @@ Hooks.once("init", function() {
     }
   });
 
+  // Add an Apply Healing button to healing roll messages
+  Hooks.on("renderChatMessageHTML", (message, html) => {
+    try {
+      const $html = html instanceof jQuery ? html : $(html);
+      const healFlag = message.getFlag("singularity", "healRoll");
+      if (!healFlag) return;
+      const $flavor = $html.find('.roll-flavor').first().length ? $html.find('.roll-flavor').first() : $html.find('.message-content').first();
+      if (!$flavor.length) return;
+
+      if ($flavor.find('.singularity-apply-healing').length === 0) {
+        const btnHtml = `<div class="chat-card-buttons" style="margin-top: 6px;"><button class="singularity-apply-healing" data-heal-total="${healFlag.total}" style="padding:4px 8px; font-size:11px;">Apply Healing</button></div>`;
+        $flavor.append(btnHtml);
+      }
+
+      $flavor.off('click.singularity-apply-healing').on('click.singularity-apply-healing', '.singularity-apply-healing', async (ev) => {
+        ev.preventDefault();
+        const healTotal = Number(ev.currentTarget.dataset.healTotal) || 0;
+        const targets = Array.from(game.user?.targets || []);
+        const targetToken = targets[0];
+        const targetActor = targetToken?.actor;
+        if (!targetActor) {
+          ui.notifications.warn("Select a target to apply healing.");
+          return;
+        }
+        const currentHp = Number(targetActor.system?.combat?.hp?.value ?? 0);
+        const maxHp = Number(targetActor.system?.combat?.hp?.max ?? 0);
+        const newHp = maxHp > 0 ? Math.min(maxHp, currentHp + healTotal) : currentHp + healTotal;
+        await targetActor.update({ "system.combat.hp.value": newHp });
+        const targetName = targetToken.name || targetActor.name || "Target";
+        ui.notifications.info(`${targetName} healed for ${healTotal} HP.`);
+      });
+    } catch (err) {
+      console.warn("Singularity | renderChatMessageHTML heal hook failed:", err);
+    }
+  });
+
   // Add gadget action buttons to chat item cards (attack, damage, heal)
   Hooks.on("renderChatMessageHTML", (message, html) => {
     const $html = html instanceof jQuery ? html : $(html);
@@ -562,12 +598,12 @@ Hooks.once("init", function() {
         .trim();
       if (!text) return "";
 
-      const diceMatch = text.match(/(?:heal(?:s|ing)?|healing)[^0-9d]*([0-9]+d[0-9]+(?:\s*[+-]\s*[0-9]+)*)/i);
+      const diceMatch = text.match(/(?:heal(?:s|ing)?|healing|regain(?:s|ing)?|restore(?:s|d|ing)?)[^0-9d]*([0-9]+d[0-9]+(?:\s*[+-]\s*[0-9]+)*)/i);
       if (diceMatch?.[1]) {
         return diceMatch[1].replace(/\s+/g, "");
       }
 
-      const flatMatch = text.match(/(?:heal(?:s|ing)?|healing)[^0-9]*([0-9]+)(?!d)/i);
+      const flatMatch = text.match(/(?:heal(?:s|ing)?|healing|regain(?:s|ing)?|restore(?:s|d|ing)?)[^0-9]*([0-9]+)(?!d)/i);
       if (flatMatch?.[1]) {
         return flatMatch[1];
       }
@@ -658,14 +694,36 @@ Hooks.once("init", function() {
       const gadgetName = button.dataset.gadgetName || "Gadget";
       if (!actor) return;
 
+      const getTargetToken = () => {
+        const targets = Array.from(game.user?.targets || []);
+        return targets[0] || null;
+      };
+
+      const appendBonus = (baseFormula, bonus) => {
+        const trimmed = String(baseFormula || "").trim();
+        if (!trimmed || !Number.isFinite(bonus) || bonus === 0) return trimmed;
+        return `${trimmed}${bonus > 0 ? "+" : ""}${bonus}`;
+      };
+
       let formula = String(button.dataset.healFormula || "").trim();
+      let item = null;
       if (!formula && gadgetId) {
         try {
-          const item = await fromUuid(gadgetId);
+          item = await fromUuid(gadgetId);
           formula = getHealingFormulaFromItem(item);
         } catch (err) {
           console.warn("Singularity | Failed to load gadget for healing:", err);
         }
+      }
+
+      const sheetContext = buildHeroSheetContext(actor);
+      const tuningBonus = typeof sheetContext?._getGadgetTuningBonus === "function"
+        ? Number(sheetContext._getGadgetTuningBonus.call(sheetContext)) || 0
+        : 0;
+      const rawDescription = String(item?.system?.description || item?.system?.details?.description || "");
+      const needsTuningBonus = /gadget\s*tuning/i.test(rawDescription) || /trauma\s*stabilizer/i.test(item?.name || gadgetName);
+      if (needsTuningBonus && !/gadget\s*tuning/i.test(formula)) {
+        formula = appendBonus(formula, tuningBonus);
       }
 
       if (!formula) {
@@ -673,21 +731,102 @@ Hooks.once("init", function() {
         return;
       }
 
-      const targets = Array.from(game.user?.targets || []);
-      const targetToken = targets[0];
-      if (!targetToken) {
-        ui.notifications.warn("Select a target to report gadget healing.");
-        return;
-      }
+      const dialogContent = `
+        <form class="singularity-roll-dialog">
+          <div class="roll-fields-row">
+            <div class="form-group-inline">
+              <label>Healing Formula:</label>
+              <input type="text" id="heal-formula" value="${formula}" readonly class="readonly-input"/>
+            </div>
+          </div>
+          <p class="help-text">Select a target token. Click "Roll Healing" and then use "Apply Healing" in chat.</p>
+        </form>
+      `;
 
-      const roll = new Roll(formula);
-      await roll.evaluate();
-      const targetName = targetToken.name || targetToken.actor?.name || "Target";
-      const flavor = `<div class="roll-flavor"><b>${gadgetName}</b><br>${targetName} heals for <strong>${roll.total}</strong> (${formula})</div>`;
-      await roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        flavor: flavor
-      });
+      const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+      let dialog;
+      const getDialogRoot = () => {
+        const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+        return el instanceof HTMLElement ? el : document;
+      };
+
+      const rollHealing = async (root) => {
+        const targetToken = getTargetToken();
+        if (!targetToken) {
+          ui.notifications.warn("Select a target to roll healing.");
+          return;
+        }
+
+        const rollFormula = String(root.querySelector("#heal-formula")?.value ?? "").trim();
+        if (!rollFormula) {
+          ui.notifications.warn("No healing formula found.");
+          return;
+        }
+
+        const roll = new Roll(rollFormula);
+        await roll.evaluate();
+
+        const targetName = targetToken.name || targetToken.actor?.name || "Target";
+        const flavor = `<div class="roll-flavor"><b>${gadgetName}</b><br>${targetName} heals for <strong>${roll.total}</strong> (${rollFormula})</div>`;
+        const message = await roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          flavor: flavor
+        });
+        await message.setFlag("singularity", "healRoll", {
+          total: roll.total,
+          formula: rollFormula,
+          gadgetName: gadgetName,
+          healerActorId: actor.id
+        });
+      };
+
+      const dialogOptions = DialogClass?.name === "DialogV2"
+        ? {
+            title: `Roll Healing: ${gadgetName}`,
+            content: dialogContent,
+            buttons: [
+              {
+                action: "roll",
+                icon: '<i class="fas fa-dice"></i>',
+                label: "Roll Healing",
+                callback: async () => {
+                  const root = getDialogRoot();
+                  await rollHealing(root);
+                }
+              },
+              {
+                action: "cancel",
+                icon: '<i class="fas fa-times"></i>',
+                label: "Cancel"
+              }
+            ],
+            default: "roll"
+          }
+        : {
+            title: `Roll Healing: ${gadgetName}`,
+            content: dialogContent,
+            buttons: {
+              roll: {
+                icon: '<i class="fas fa-dice"></i>',
+                label: "Roll Healing",
+                callback: async (html) => {
+                  const root = html instanceof jQuery ? html[0] : html;
+                  await rollHealing(root);
+                }
+              },
+              cancel: {
+                icon: '<i class="fas fa-times"></i>',
+                label: "Cancel",
+                callback: () => {}
+              }
+            },
+            default: "roll",
+            close: () => {}
+          };
+      dialogOptions.position = { width: 520 };
+      dialogOptions.window = { resizable: true };
+      dialog = new DialogClass(dialogOptions);
+      await dialog.render(true);
     });
   });
 

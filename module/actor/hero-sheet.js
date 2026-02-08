@@ -7835,6 +7835,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
   async _onHealGadget(event) {
     event.preventDefault();
     event.stopPropagation();
+    this._preferredTab = "gadgets";
     const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
     const gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
     const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
@@ -7954,12 +7955,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       .trim();
     if (!text) return "";
 
-    const diceMatch = text.match(/(?:heal(?:s|ing)?|healing)[^0-9d]*([0-9]+d[0-9]+(?:\s*[+-]\s*[0-9]+)*)/i);
+    const diceMatch = text.match(/(?:heal(?:s|ing)?|healing|regain(?:s|ing)?|restore(?:s|d|ing)?)[^0-9d]*([0-9]+d[0-9]+(?:\s*[+-]\s*[0-9]+)*)/i);
     if (diceMatch?.[1]) {
       return diceMatch[1].replace(/\s+/g, "");
     }
 
-    const flatMatch = text.match(/(?:heal(?:s|ing)?|healing)[^0-9]*([0-9]+)(?!d)/i);
+    const flatMatch = text.match(/(?:heal(?:s|ing)?|healing|regain(?:s|ing)?|restore(?:s|d|ing)?)[^0-9]*([0-9]+)(?!d)/i);
     if (flatMatch?.[1]) {
       return flatMatch[1];
     }
