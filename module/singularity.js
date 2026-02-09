@@ -654,6 +654,218 @@ Hooks.once("init", function() {
       _buildGadgetAttackFromUuid: SingularityActorSheetHero.prototype._buildGadgetAttackFromUuid
     });
 
+    const savingThrowRankBonuses = {
+      "Novice": 0,
+      "Apprentice": 4,
+      "Competent": 8,
+      "Masterful": 12,
+      "Legendary": 16
+    };
+
+    const computeAbilityScoreFromProgression = (actor, ability) => {
+      const actorData = actor?.system || {};
+      const progression = actorData.progression || {};
+      if (!progression || Object.keys(progression).length === 0) return null;
+
+      const abilityBonuses = {
+        might: 0,
+        agility: 0,
+        endurance: 0,
+        wits: 0,
+        charm: 0
+      };
+
+      if (progression.level1?.humanAbilityBoost) {
+        const boostAbility = progression.level1.humanAbilityBoost;
+        if (abilityBonuses.hasOwnProperty(boostAbility)) {
+          abilityBonuses[boostAbility] += 1;
+        }
+      }
+      if (progression.level1?.terranAbilityBoost) {
+        const boostAbility = progression.level1.terranAbilityBoost;
+        if (abilityBonuses.hasOwnProperty(boostAbility)) {
+          abilityBonuses[boostAbility] += 1;
+        }
+      }
+      if (progression.level1?.backgroundAbilityBoost) {
+        const boostAbility = progression.level1.backgroundAbilityBoost;
+        if (abilityBonuses.hasOwnProperty(boostAbility)) {
+          abilityBonuses[boostAbility] += 1;
+        }
+      }
+      if (progression.level1?.genericAbilityBoost) {
+        const boostAbility = progression.level1.genericAbilityBoost;
+        if (abilityBonuses.hasOwnProperty(boostAbility)) {
+          abilityBonuses[boostAbility] += 1;
+        }
+      }
+
+      const powersetName = progression.level1?.powersetName || actorData.basic?.powerset;
+      if (powersetName === "Bastion") {
+        abilityBonuses.endurance += 1;
+        if (progression.level1?.bastionAbilityBoost1) {
+          const boostAbility = progression.level1.bastionAbilityBoost1;
+          if (abilityBonuses.hasOwnProperty(boostAbility) && boostAbility !== "endurance") {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+        if (progression.level1?.bastionAbilityBoost2) {
+          const boostAbility = progression.level1.bastionAbilityBoost2;
+          if (abilityBonuses.hasOwnProperty(boostAbility) && boostAbility !== "endurance") {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+      } else if (powersetName === "Paragon") {
+        abilityBonuses.might += 1;
+        if (progression.level1?.paragonAbilityBoost1) {
+          const boostAbility = progression.level1.paragonAbilityBoost1;
+          if (abilityBonuses.hasOwnProperty(boostAbility) && boostAbility !== "might") {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+        if (progression.level1?.paragonAbilityBoost2) {
+          const boostAbility = progression.level1.paragonAbilityBoost2;
+          if (abilityBonuses.hasOwnProperty(boostAbility) && boostAbility !== "might") {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+      } else if (powersetName === "Gadgeteer") {
+        abilityBonuses.wits += 1;
+        if (progression.level1?.gadgeteerAbilityBoost1) {
+          const boostAbility = progression.level1.gadgeteerAbilityBoost1;
+          if (abilityBonuses.hasOwnProperty(boostAbility) && boostAbility !== "wits") {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+        if (progression.level1?.gadgeteerAbilityBoost2) {
+          const boostAbility = progression.level1.gadgeteerAbilityBoost2;
+          if (abilityBonuses.hasOwnProperty(boostAbility) && boostAbility !== "wits") {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+      } else if (powersetName === "Marksman") {
+        abilityBonuses.agility += 1;
+        if (progression.level1?.marksmanAbilityBoost1) {
+          const boostAbility = progression.level1.marksmanAbilityBoost1;
+          if (abilityBonuses.hasOwnProperty(boostAbility) && boostAbility !== "agility") {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+        if (progression.level1?.marksmanAbilityBoost2) {
+          const boostAbility = progression.level1.marksmanAbilityBoost2;
+          if (abilityBonuses.hasOwnProperty(boostAbility) && boostAbility !== "agility") {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+      }
+
+      for (let lvl = 2; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        if (levelData.humanAbilityBoost) {
+          const boostAbility = levelData.humanAbilityBoost;
+          if (abilityBonuses.hasOwnProperty(boostAbility)) {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+        if (levelData.terranAbilityBoost) {
+          const boostAbility = levelData.terranAbilityBoost;
+          if (abilityBonuses.hasOwnProperty(boostAbility)) {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+        if (levelData.genericAbilityBoost) {
+          const boostAbility = levelData.genericAbilityBoost;
+          if (abilityBonuses.hasOwnProperty(boostAbility)) {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+      }
+
+      return abilityBonuses[ability] ?? 0;
+    };
+
+    const computeAbilityScore = (actor, ability) => {
+      const fromProgression = computeAbilityScoreFromProgression(actor, ability);
+      if (fromProgression !== null && fromProgression !== undefined) {
+        return Number(fromProgression) || 0;
+      }
+      const raw = actor?.system?.abilities?.[ability];
+      return Number(raw) || 0;
+    };
+
+    const hasEnoughPrepTimeTalent = (actor) => {
+      const progression = actor?.system?.progression || {};
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+        if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("enough prep time")) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const computeGadgetTuningDC = (actor) => {
+      const witsScore = computeAbilityScore(actor, "wits");
+      const gadgetTuningSkill = actor?.system?.skills?.["Gadget Tuning"] || {};
+      const gadgetTuningRank = gadgetTuningSkill.rank || "Novice";
+      const rankModifiers = {
+        "Novice": 0,
+        "Apprentice": 2,
+        "Competent": 5,
+        "Masterful": 9,
+        "Legendary": 14
+      };
+      let dc = 10 + witsScore + (rankModifiers[gadgetTuningRank] || 0);
+      const enoughPrepTimeData = actor?.system?.combat?.enoughPrepTime || { active: false };
+      if (enoughPrepTimeData.active && hasEnoughPrepTimeTalent(actor)) {
+        const primeLevel = Number(actor?.system?.basic?.primeLevel || 1);
+        dc += primeLevel;
+      }
+      return dc;
+    };
+
+    const applyStatusEffect = async (actor, statusId, value, rounds = 1) => {
+      if (!actor || !statusId) return;
+      const statusDef = CONFIG.singularity?.statusEffectsMap?.[statusId];
+      if (!statusDef) return;
+
+      const existing = actor.effects.find(effect => effect.getFlag("core", "statusId") === statusId);
+      if (existing) {
+        if (Number.isFinite(value)) {
+          const currentValue = Number(existing.getFlag("singularity", "value") ?? 0);
+          const nextValue = Math.max(currentValue, Number(value));
+          await existing.update({ "flags.singularity.value": nextValue });
+        }
+        return;
+      }
+
+      const flags = foundry.utils.deepClone(statusDef.flags || {});
+      if (Number.isFinite(value)) {
+        flags.singularity = flags.singularity || {};
+        flags.singularity.value = Number(value);
+      }
+
+      const duration = {};
+      if (game.combat) {
+        duration.rounds = rounds;
+        duration.startRound = game.combat.round;
+        duration.startTurn = game.combat.turn;
+      }
+
+      const effectData = {
+        name: statusDef.label || statusId,
+        icon: statusDef.icon || "icons/svg/aura.svg",
+        flags: flags,
+        disabled: false,
+        duration: duration
+      };
+
+      await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    };
+
     $html.off("click.singularity-gadget-attack").on("click.singularity-gadget-attack", ".singularity-gadget-attack-roll", async (ev) => {
       ev.preventDefault();
       const gadgetId = ev.currentTarget.dataset.gadgetId;
@@ -827,6 +1039,106 @@ Hooks.once("init", function() {
       dialogOptions.window = { resizable: true };
       dialog = new DialogClass(dialogOptions);
       await dialog.render(true);
+    });
+
+    $html.off("click.singularity-gadget-save").on("click.singularity-gadget-save", ".singularity-gadget-save-roll", async (ev) => {
+      ev.preventDefault();
+      const gadgetId = ev.currentTarget.dataset.gadgetId;
+      const actor = getActorFromDataset(ev.currentTarget.dataset.actorId);
+      const saveAbility = (ev.currentTarget.dataset.saveAbility || "agility").toLowerCase();
+      if (!actor || !gadgetId) return;
+
+      const targets = Array.from(game.user?.targets || []);
+      if (targets.length === 0) {
+        ui.notifications.warn("Select one or more targets to roll saving throws.");
+        return;
+      }
+
+      let gadgetName = "Sonic Grenade";
+      try {
+        const gadgetDoc = await fromUuid(gadgetId);
+        gadgetName = gadgetDoc?.name || gadgetName;
+      } catch (err) {
+        console.warn("Singularity | Failed to load gadget for save roll:", err);
+      }
+
+      const dc = computeGadgetTuningDC(actor);
+      const results = [];
+
+      for (const targetToken of targets) {
+        const targetActor = targetToken.actor;
+        if (!targetActor) continue;
+        if (targetActor.id === actor.id) continue;
+
+        const savingThrow = targetActor.system?.savingThrows?.[saveAbility] || {};
+        const rank = savingThrow.rank || "Novice";
+        const trainingBonus = savingThrowRankBonuses[rank] || 0;
+        const otherBonuses = Number(savingThrow.otherBonuses) || 0;
+        const abilityScore = computeAbilityScore(targetActor, saveAbility);
+
+        const roll = new Roll(`1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`);
+        await roll.evaluate();
+
+        let degree = "Failure";
+        if (roll.total >= dc + 10) {
+          degree = "Extreme Success";
+        } else if (roll.total >= dc) {
+          degree = "Success";
+        } else if (roll.total <= dc - 10) {
+          degree = "Extreme Failure";
+        }
+
+        const effectsApplied = [];
+        if (degree === "Success") {
+          if (targetActor.isOwner || game.user.isGM) {
+            await applyStatusEffect(targetActor, "dazed");
+            effectsApplied.push("Dazed");
+          }
+        } else if (degree === "Failure") {
+          if (targetActor.isOwner || game.user.isGM) {
+            await applyStatusEffect(targetActor, "staggered", 1);
+            await applyStatusEffect(targetActor, "dazed");
+            effectsApplied.push("Staggered 1", "Dazed");
+          }
+        } else if (degree === "Extreme Failure") {
+          if (targetActor.isOwner || game.user.isGM) {
+            await applyStatusEffect(targetActor, "staggered", 2);
+            await applyStatusEffect(targetActor, "dazed");
+            await applyStatusEffect(targetActor, "deafened");
+            effectsApplied.push("Staggered 2", "Dazed", "Deafened");
+          }
+        }
+
+        results.push({
+          name: targetToken.name || targetActor.name || "Target",
+          total: roll.total,
+          degree: degree,
+          effects: effectsApplied
+        });
+      }
+
+      const resultLines = results
+        .map(result => {
+          const effectsText = result.effects.length
+            ? ` - <em>Applied:</em> ${result.effects.join(", ")}`
+            : "";
+          return `<li><strong>${result.name}</strong>: ${result.total} vs DC ${dc} (${result.degree})${effectsText}</li>`;
+        })
+        .join("");
+
+      const saveLabel = saveAbility.charAt(0).toUpperCase() + saveAbility.slice(1);
+      const content = `
+        <div class="roll-flavor">
+          <b>${gadgetName}</b><br>
+          ${saveLabel} Saving Throw (DC ${dc})
+          <ul>${resultLines}</ul>
+        </div>
+      `;
+
+      await ChatMessage.create({
+        content: content,
+        speaker: ChatMessage.getSpeaker({ actor })
+      });
     });
   });
 

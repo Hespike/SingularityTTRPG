@@ -7813,6 +7813,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           const gadgetDoc = await fromUuid(gadgetId);
           if (gadgetDoc) {
             const gadgetActions = this._getGadgetChatActions(gadgetDoc);
+            if (gadgetActions?.canSave) {
+              gadgetActions.showSaveButton = (game.user?.targets?.size || 0) > 0;
+            }
             const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
               item: gadgetDoc,
               actor: this.actor,
@@ -8087,7 +8090,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const canAttack = Boolean(damageFormula);
     const canDamage = Boolean(damageFormula);
     const canHeal = Boolean(healFormula);
-    if (!canAttack && !canHeal) return null;
+    const isSonicGrenade = String(gadgetDoc.name || "").trim().toLowerCase() === "sonic grenade";
+    if (!canAttack && !canHeal && !isSonicGrenade) return null;
 
     return {
       gadgetId: gadgetDoc.uuid || gadgetDoc.id,
@@ -8096,7 +8100,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       canAttack: canAttack,
       canDamage: canDamage,
       canHeal: canHeal,
-      healFormula: healFormula
+      healFormula: healFormula,
+      canSave: isSonicGrenade,
+      saveAbility: "agility",
+      showSaveButton: false
     };
   }
 

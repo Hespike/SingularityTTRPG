@@ -21,6 +21,11 @@
     {{#if gadgetActions.canHeal}}
     <button type="button" class="singularity-gadget-heal" data-gadget-id="{{gadgetActions.gadgetId}}" data-actor-id="{{gadgetActions.actorId}}" data-heal-formula="{{gadgetActions.healFormula}}" data-gadget-name="{{gadgetActions.gadgetName}}">Roll Healing</button>
     {{/if}}
+    {{#if gadgetActions.canSave}}
+      {{#if gadgetActions.showSaveButton}}
+      <button type="button" class="singularity-gadget-save-roll" data-gadget-id="{{gadgetActions.gadgetId}}" data-actor-id="{{gadgetActions.actorId}}" data-save-ability="{{gadgetActions.saveAbility}}">Roll Save</button>
+      {{/if}}
+    {{/if}}
   </div>
   {{/if}}
 </div>
