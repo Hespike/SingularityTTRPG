@@ -2544,12 +2544,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
   activateListeners(html) {
         // Inline edit for equipment name and quantity
-        html.on("change", 'input[name="system.basic.quantity"]', (event) => {
+        html.on("change", 'input[name="system.basic.quantity"]', async (event) => {
           const itemId = event.currentTarget.closest(".item").dataset.itemId;
           const item = this.actor.items.get(itemId);
           if (item && item.type === "equipment") {
             this._preferredTab = "equipment";
-            item.update({ "system.basic.quantity": Number(event.currentTarget.value) || 0 });
+            const nextQty = Number(event.currentTarget.value) || 0;
+            if (nextQty <= 0) {
+              await item.delete();
+              this.render(true);
+              return;
+            }
+            await item.update({ "system.basic.quantity": nextQty });
           }
         });
         html.on("change", 'input[name="name"]', (event) => {
@@ -2631,7 +2637,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     });
 
     // Add item (exclude buy buttons which are separate flows)
-    html.find(".item-create:not(.buy-weapon):not(.buy-armor)").click(this._onItemCreate.bind(this));
+    html.find(".item-create:not(.buy-weapon):not(.buy-armor):not(.buy-consumables)").click(this._onItemCreate.bind(this));
     
     // Buy armor from compendium
     html.find(".buy-armor").click(this._onBuyArmor.bind(this));
@@ -2642,6 +2648,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
     // Buy weapon from compendium
     html.find(".buy-weapon").click(this._onBuyWeapon.bind(this));
+
+    // Buy consumables from list
+    html.find(".buy-consumables, .buy-equipment").click(this._onBuyConsumables.bind(this));
+
+    // Use consumables
+    html.find(".equipment-use").click(this._onUseConsumable.bind(this));
 
     // Equip/Unequip weapons
     html.find(".weapon-equip").click(this._onEquipWeapon.bind(this));
@@ -4763,6 +4775,200 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       const $html = dialogEl ? $(dialogEl) : null;
       if ($html) {
         bindWeaponDialog($html);
+      }
+    }
+  }
+
+  async _onBuyConsumables(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const primeLevel = Number(this.actor?.system?.basic?.primeLevel) || 1;
+    const equipmentCatalog = [
+      {
+        name: "Glow Stick",
+        price: 2,
+        requirement: 1,
+        type: "Consumable",
+        img: "icons/svg/light.svg",
+        description: [
+          "A small, flexible tube containing two separate chemical compounds.",
+          "When bent, the inner barrier breaks, mixing the chemicals to produce a steady, non-heat-producing light.",
+          "The glow stick is waterproof and can be attached to equipment or thrown to illuminate an area.",
+          "<strong>Usage:</strong> Activating the glow stick costs 1 energy.",
+          "<strong>Effect:</strong> Emits bright light in a 10-foot radius and dim light for an additional 10 feet for 6 hours."
+        ].join(" ")
+      },
+      {
+        name: "Med-Gel I",
+        price: 5,
+        requirement: 1,
+        type: "Consumable",
+        img: "icons/svg/heal.svg",
+        healing: "1d6+1",
+        description: [
+          "A thick, bio-active gel contained in a single-use applicator.",
+          "The gel contains nano-medical particles and regenerative compounds that accelerate natural healing when applied to wounds.",
+          "The applicator can be used on yourself or another creature within reach.",
+          "<strong>Usage:</strong> Applying the med-gel costs 1 energy.",
+          "<strong>Effect:</strong> The target creature immediately regains 1d6 + 1 HP."
+        ].join(" ")
+      },
+      {
+        name: "Underwater Breathing Gel",
+        price: 5,
+        requirement: 1,
+        type: "Consumable",
+        img: "icons/svg/item-bag.svg",
+        description: [
+          "A thick, translucent gel infused with oxygenating nano-particles and specialized chemical compounds.",
+          "When applied, it creates a thin membrane that extracts oxygen from water and allows you to breathe underwater.",
+          "The gel is contained in a small, airtight tube that prevents it from losing its potency.",
+          "<strong>Usage:</strong> Applying the gel costs 1 energy.",
+          "<strong>Effect:</strong> You can breathe underwater for 1 hour."
+        ].join(" ")
+      }
+    ];
+
+    const availableEquipment = equipmentCatalog.filter((item) => (item.requirement || 1) <= primeLevel);
+    if (availableEquipment.length === 0) {
+      ui.notifications.warn("No equipment available for your current Prime Level.");
+      return;
+    }
+
+    const sortedEquipment = availableEquipment.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    const content = `
+      <div class="equipment-selection-dialog">
+        <div class="equipment-content-area">
+          <p class="dialog-description">Select equipment to purchase:</p>
+          <div class="equipment-list" style="max-height: 400px; overflow-y: auto;">
+            ${sortedEquipment.map(item => `
+              <div class="equipment-selection-item" data-item-name="${item.name}" style="padding: 10px; margin: 5px 0; border: 1px solid rgba(189, 95, 255, 0.3); border-radius: 3px; cursor: pointer; background: rgba(30, 33, 45, 0.5);">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <img src="${item.img}" style="width: 32px; height: 32px; flex-shrink: 0;" onerror="this.src='icons/svg/item-bag.svg'">
+                  <div style="flex: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <div style="font-weight: bold;">${item.name}</div>
+                      <div style="font-weight: bold; color: #BD5FFF;">${item.price} credits</div>
+                    </div>
+                    <div style="font-size: 12px; margin-top: 5px; display: flex; gap: 10px; flex-wrap: wrap;">
+                      <span style="padding: 2px 6px; background: rgba(100, 150, 255, 0.2); border-radius: 3px;">${item.type}</span>
+                      <span>Req: Prime Level ${item.requirement}</span>
+                    </div>
+                    ${item.description ? `<div style="font-size: 11px; margin-top: 5px; color: rgba(255, 255, 255, 0.7);">${item.description}</div>` : ""}
+                  </div>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+
+    const dialogTitle = "Buy Consumables";
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const bindEquipmentDialog = (root) => {
+      const $root = root instanceof jQuery ? root : $(root);
+      $root.find(".equipment-selection-item").on("click", async (clickEvent) => {
+        const itemName = $(clickEvent.currentTarget).data("item-name");
+        const equipment = equipmentCatalog.find((entry) => entry.name === itemName);
+        if (!equipment) {
+          ui.notifications.error("Equipment not found!");
+          return;
+        }
+
+        const actorCredits = this.actor?.system?.equipment?.credits;
+        let currentCredits = Number(actorCredits);
+        if (Number.isNaN(currentCredits)) {
+          currentCredits = 0;
+        }
+        if (this.element) {
+          const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+          const inputVal = $sheet.find('input[name="system.equipment.credits"]').val();
+          if (inputVal !== undefined && inputVal !== null && inputVal !== "") {
+            const parsed = Number(String(inputVal).replace(/,/g, "").trim());
+            if (!Number.isNaN(parsed)) {
+              currentCredits = parsed;
+            }
+          }
+        }
+
+        const itemPrice = Number(equipment.price) || 0;
+        if (currentCredits < itemPrice) {
+          ui.notifications.warn(`You don't have enough credits! This item costs ${itemPrice} credits, but you only have ${currentCredits}.`);
+          return;
+        }
+
+        const existingItem = this.actor.items.find(i => i.type === "equipment" && i.name?.toLowerCase() === equipment.name.toLowerCase());
+        if (existingItem) {
+          const currentQty = Number(existingItem.system?.basic?.quantity) || 0;
+          await existingItem.update({ "system.basic.quantity": currentQty + 1 });
+        } else {
+          const equipmentData = {
+            name: equipment.name,
+            type: "equipment",
+            img: equipment.img || "icons/svg/item-bag.svg",
+            system: {
+              basic: {
+                quantity: 1,
+                price: equipment.price,
+                requirement: equipment.requirement,
+                type: equipment.type,
+                healing: equipment.healing || ""
+              },
+              description: equipment.description
+            }
+          };
+          await this.actor.createEmbeddedDocuments("Item", [equipmentData]);
+        }
+
+        const newCredits = currentCredits - itemPrice;
+        await this.actor.update({ "system.equipment.credits": newCredits });
+
+        ui.notifications.info(`Purchased ${equipment.name} for ${itemPrice} credits. Remaining credits: ${newCredits}.`);
+
+        this._preferredTab = "equipment";
+        this._scrollPositions = this._scrollPositions || {};
+        if (this.element) {
+          const $sheet = this.element instanceof jQuery ? this.element : $(this.element);
+          this._scrollPositions.equipment = $sheet.find(".tab.equipment").scrollTop() || 0;
+        }
+        this.render();
+
+        dialog.close();
+      });
+    };
+
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: content,
+          buttons: [
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "cancel"
+        }
+      : {
+          title: dialogTitle,
+          content: content,
+          buttons: {
+            cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          },
+          default: "cancel",
+          render: (html) => {
+            bindEquipmentDialog(html);
+          }
+        };
+    dialogOptions.position = { width: 720, height: 600 };
+    dialogOptions.window = { resizable: true };
+    dialog = new DialogClass(dialogOptions);
+    await dialog.render(true);
+    if (DialogClass?.name === "DialogV2") {
+      const dialogEl = dialog.element instanceof jQuery ? dialog.element[0] : dialog.element;
+      if (dialogEl) {
+        bindEquipmentDialog(dialogEl);
       }
     }
   }
@@ -7929,6 +8135,84 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
       await this._markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName);
     }
+  }
+
+  async _onUseConsumable(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    this._preferredTab = "equipment";
+
+    const itemId = event.currentTarget.dataset.itemId;
+    const item = this.actor.items.get(itemId);
+    if (!item || item.type !== "equipment") {
+      ui.notifications.warn("Consumable not found!");
+      return;
+    }
+
+    // Post item card to chat (same flow as gadgets)
+    try {
+      const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
+        item: item,
+        actor: this.actor,
+        hideImage: true
+      });
+      await ChatMessage.create({
+        content: content,
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        style: CONST.CHAT_MESSAGE_STYLES.OTHER
+      });
+    } catch (err) {
+      console.warn("Singularity | Failed to post consumable card:", err);
+    }
+
+    const rawHealing =
+      item.system?.basic?.healing ||
+      item.system?.basic?.healingFormula ||
+      (item.name && /med\s*[-]?\s*gel/i.test(item.name) ? "1d6+1" : "");
+    if (rawHealing) {
+      await this._rollConsumableHealing(String(rawHealing), item.name);
+    }
+
+    const rawQty = Number(item.system?.basic?.quantity);
+    const currentQty = Number.isFinite(rawQty) ? rawQty : 1;
+    const nextQty = currentQty - 1;
+    if (nextQty <= 0) {
+      await item.delete();
+    } else {
+      await item.update({ "system.basic.quantity": nextQty });
+    }
+    this.render(true);
+  }
+
+  async _rollConsumableHealing(healFormula, itemName) {
+    const formula = String(healFormula || "").trim();
+    if (!formula) {
+      return false;
+    }
+
+    const targets = Array.from(game.user?.targets || []);
+    const targetToken = targets[0];
+    if (!targetToken) {
+      ui.notifications.warn("Select a target to report consumable healing.");
+      return false;
+    }
+
+    const roll = new Roll(formula);
+    await roll.evaluate();
+    const targetName = targetToken.name || targetToken.actor?.name || "Target";
+    const healContent = `<div class="roll-flavor"><b>${itemName}</b><br>${targetName} heals for <strong>${roll.total}</strong> (${formula})</div>`;
+    const message = await roll.toMessage({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      flavor: healContent
+    });
+    await message.setFlag("singularity", "healRoll", {
+      total: roll.total,
+      formula: formula,
+      gadgetName: itemName,
+      healerActorId: this.actor?.id
+    });
+
+    return true;
   }
 
   async _onHealGadget(event) {

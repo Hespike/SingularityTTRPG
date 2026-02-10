@@ -1706,6 +1706,17 @@
   color: #ffffff;
 }
 
+.item-list .item .item-name .item-quantity-input {
+  width: 60px;
+  margin-left: 8px;
+  padding: 2px 6px;
+  background: rgba(30, 33, 45, 0.7);
+  border: 1px solid rgba(189, 95, 255, 0.4);
+  border-radius: 3px;
+  color: #ffffff;
+  font-size: 12px;
+}
+
 .item-list .item .item-controls {
   display: flex;
   gap: 5px;
@@ -4169,7 +4180,8 @@ button.weapon-attack:hover {
 }
 
 .gadget-use,
-.gadget-heal {
+.gadget-heal,
+.equipment-use {
   padding: 4px 8px;
   background: rgba(189, 95, 255, 0.3);
   border: 1px solid rgba(189, 95, 255, 0.5);
@@ -4180,12 +4192,14 @@ button.weapon-attack:hover {
 }
 
 .gadget-use:hover:not(:disabled),
-.gadget-heal:hover:not(:disabled) {
+.gadget-heal:hover:not(:disabled),
+.equipment-use:hover:not(:disabled) {
   background: rgba(189, 95, 255, 0.5);
 }
 
 .gadget-use:disabled,
-.gadget-heal:disabled {
+.gadget-heal:disabled,
+.equipment-use:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
