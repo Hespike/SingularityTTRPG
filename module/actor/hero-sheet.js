@@ -829,6 +829,28 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       delete skills["Stealth"];
     }
 
+    const powersetSkillNames = new Set();
+    const paragonSkillTraining = actorData.system.progression?.level1?.paragonSkillTraining;
+    const gadgeteerSkillTraining = actorData.system.progression?.level1?.gadgeteerSkillTraining;
+    const marksmanSkillTraining = actorData.system.progression?.level1?.marksmanSkillTraining;
+    if (paragonSkillTraining) {
+      const match = String(paragonSkillTraining).match(/^(.+?)\s*\(/);
+      if (match?.[1]) powersetSkillNames.add(match[1].trim());
+    }
+    if (gadgeteerSkillTraining) {
+      const match = String(gadgeteerSkillTraining).match(/^(.+?)\s*\(/);
+      if (match?.[1]) powersetSkillNames.add(match[1].trim());
+    }
+    if (marksmanSkillTraining) {
+      powersetSkillNames.add(String(marksmanSkillTraining).trim());
+    }
+    if (powersetName === "Marksman") {
+      powersetSkillNames.add("Perception");
+    }
+    if (powersetName === "Gadgeteer") {
+      powersetSkillNames.add("Gadget Tuning");
+    }
+
     for (const [skillName, skill] of Object.entries(skills)) {
       const abilityName = skill.ability;
       const abilityScore = calculatedAbilityScores[abilityName] || 0;
@@ -847,7 +869,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         totalBonus: totalBonus,
         bonusDisplay: bonusDisplay,
         lockedOtherBonuses: skill.lockedOtherBonuses || false, // Preserve locked status
-        lockedSource: skill.lockedSource || null // Preserve source
+        lockedSource: skill.lockedSource || null, // Preserve source
+        lockedByPowerset: skill.lockedByPowerset || powersetSkillNames.has(skillName)
       };
       
       // Separate Heavy Armor from editable skills
@@ -2707,6 +2730,15 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Handle ability boost selection changes
     html.find(".ability-boost-select").on("change", this._onAbilityBoostChange.bind(this));
     html.find(".talent-detail-select").on("change", this._onAbilityBoostChange.bind(this));
+
+    // Marksman bonus skill manual save
+    html.on("click", ".marksman-skill-save", this._onSaveMarksmanSkillTraining.bind(this));
+    html.on("keydown", ".marksman-skill-input", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        this._onSaveMarksmanSkillTraining(event);
+      }
+    });
     
     // Prevent talent slot click when clicking on talent detail select
     html.find(".talent-detail-select").on("click", (event) => {
@@ -3074,6 +3106,36 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Check if this skill comes from a talent (locked)
     const skills = this.actor.system.skills || {};
     const skill = skills[skillName];
+    const progressionLevel1 = this.actor.system.progression?.level1 || {};
+    const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+    const powersetSkillNames = new Set();
+    if (progressionLevel1.paragonSkillTraining) {
+      const match = String(progressionLevel1.paragonSkillTraining).match(/^(.+?)\s*\(/);
+      if (match?.[1]) powersetSkillNames.add(match[1].trim());
+    }
+    if (progressionLevel1.gadgeteerSkillTraining) {
+      const match = String(progressionLevel1.gadgeteerSkillTraining).match(/^(.+?)\s*\(/);
+      if (match?.[1]) powersetSkillNames.add(match[1].trim());
+    }
+    if (progressionLevel1.marksmanSkillTraining) {
+      powersetSkillNames.add(String(progressionLevel1.marksmanSkillTraining).trim());
+    }
+    if (powersetName === "Marksman") {
+      powersetSkillNames.add("Perception");
+    }
+    if (powersetName === "Gadgeteer") {
+      powersetSkillNames.add("Gadget Tuning");
+    }
+
+    if (powersetSkillNames.has(skillName)) {
+      ui.notifications.warn(`Cannot delete ${skillName}. This skill comes from a powerset. Change it in the Progression tab.`);
+      return;
+    }
+    if (skill && (skill.lockedByPowerset || skill.lockedSource === "Marksman Skill Training" || skill.lockedSource === "Paragon Skill Training" || skill.lockedSource === "Gadgeteer Skill Training")) {
+      const source = skill.lockedSource || "a powerset";
+      ui.notifications.warn(`Cannot delete ${skillName}. This skill comes from ${source}. Change it in the Progression tab.`);
+      return;
+    }
     if (skill && skill.lockedOtherBonuses) {
       const source = skill.lockedSource || "a talent";
       ui.notifications.warn(`Cannot delete ${skillName}. This skill comes from ${source}. Remove the talent from the Progression tab to remove this skill.`);
@@ -3790,6 +3852,38 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     
     if (!skill) {
       ui.notifications.warn(`Skill "${skillName}" not found.`);
+      return;
+    }
+
+    const progressionLevel1 = this.actor.system.progression?.level1 || {};
+    const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+    const powersetSkillNames = new Set();
+    if (progressionLevel1.paragonSkillTraining) {
+      const match = String(progressionLevel1.paragonSkillTraining).match(/^(.+?)\s*\(/);
+      if (match?.[1]) powersetSkillNames.add(match[1].trim());
+    }
+    if (progressionLevel1.gadgeteerSkillTraining) {
+      const match = String(progressionLevel1.gadgeteerSkillTraining).match(/^(.+?)\s*\(/);
+      if (match?.[1]) powersetSkillNames.add(match[1].trim());
+    }
+    if (progressionLevel1.marksmanSkillTraining) {
+      powersetSkillNames.add(String(progressionLevel1.marksmanSkillTraining).trim());
+    }
+    if (powersetName === "Marksman") {
+      powersetSkillNames.add("Perception");
+    }
+    if (powersetName === "Gadgeteer") {
+      powersetSkillNames.add("Gadget Tuning");
+    }
+
+    if (powersetSkillNames.has(skillName)) {
+      ui.notifications.warn(`Cannot edit ${skillName}. This skill comes from a powerset. Change it in the Progression tab.`);
+      return;
+    }
+
+    if (skill.lockedByPowerset || skill.lockedSource === "Marksman Skill Training" || skill.lockedSource === "Paragon Skill Training" || skill.lockedSource === "Gadgeteer Skill Training") {
+      const source = skill.lockedSource || "a powerset";
+      ui.notifications.warn(`Cannot edit ${skillName}. This skill comes from ${source}. Change it in the Progression tab.`);
       return;
     }
 
@@ -10141,6 +10235,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const select = event.currentTarget;
     const value = select.value;
     const slotType = select.dataset.slotType || $(select).closest(".progression-slot").data("slot-type");
+
+    if (select.dataset?.manualSave === "true") {
+      return;
+    }
     
     // For Bastion ability boosts, validate that Endurance is not selected
     if (slotType === "bastionAbilityBoost1" || slotType === "bastionAbilityBoost2") {
@@ -10200,13 +10298,19 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           skills[skillName] = {
             rank: "Apprentice",
             ability: ability,
-            otherBonuses: 0
+            otherBonuses: 0,
+            lockedSource: "Paragon Skill Training",
+            lockedByPowerset: true
           };
         } else {
           // Upgrade to Apprentice if currently Novice
           if (skills[skillName].rank === "Novice" || !skills[skillName].rank) {
             skills[skillName].rank = "Apprentice";
           }
+          if (!skills[skillName].lockedSource) {
+            skills[skillName].lockedSource = "Paragon Skill Training";
+          }
+          skills[skillName].lockedByPowerset = true;
         }
         
         await this.actor.update({
@@ -10231,12 +10335,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           skills[skillName] = {
             rank: "Apprentice",
             ability: ability,
-            otherBonuses: 0
+            otherBonuses: 0,
+            lockedSource: "Gadgeteer Skill Training",
+            lockedByPowerset: true
           };
         } else {
           if (skills[skillName].rank === "Novice" || !skills[skillName].rank) {
             skills[skillName].rank = "Apprentice";
           }
+          if (!skills[skillName].lockedSource) {
+            skills[skillName].lockedSource = "Gadgeteer Skill Training";
+          }
+          skills[skillName].lockedByPowerset = true;
         }
         
         await this.actor.update({
@@ -10249,56 +10359,16 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     
     // Handle Marksman skill training (bonus skill)
-    if (slotType === "marksmanSkillTraining" && value) {
-      // The value is just the skill name (e.g., "Stealth", "Investigation")
-      const skillName = value.trim();
-      
-      // Get the ability for this skill (using the standard skill mapping)
-      const skillAbilityMap = {
-        "Athletics": "might",
-        "Acrobatics": "agility",
-        "Dexterity": "agility",
-        "Piloting (Flying Vehicles)": "agility",
-        "Piloting (Land Vehicles)": "agility",
-        "Piloting (Aquatic Vehicles)": "agility",
-        "Stealth": "agility",
-        "Animal Handling": "wits",
-        "Electricity": "wits",
-        "Insight": "wits",
-        "Investigation": "wits",
-        "Lore (History)": "wits",
-        "Lore (Medicine)": "wits",
-        "Lore (Nature)": "wits",
-        "Lore (Religion)": "wits",
-        "Lore (Technology)": "wits",
-        "Perception": "wits",
-        "Survival": "wits",
-        "Deception": "charm",
-        "Intimidation": "charm",
-        "Performance": "charm",
-        "Persuasion": "charm"
-      };
-      
-      const ability = skillAbilityMap[skillName] || "wits";
-      
-      const skills = foundry.utils.deepClone(this.actor.system.skills || {});
-      if (!skills[skillName]) {
-        skills[skillName] = {
-          rank: "Apprentice",
-          ability: ability,
-          otherBonuses: 0
-        };
-      } else {
-        if (skills[skillName].rank === "Novice" || !skills[skillName].rank) {
-          skills[skillName].rank = "Apprentice";
-        }
-      }
-      
-      await this.actor.update({
-        "system.skills": skills,
-        [`system.progression.level1.${slotType}`]: value
-      });
-      this.render();
+    if (slotType === "marksmanSkillTraining") {
+      await this._applyMarksmanSkillTraining(value, select);
+      return;
+    }
+
+    if (slotType === "marksmanSkillTrainingAbility") {
+      const slot = $(select).closest(".progression-slot");
+      const input = slot.find(".marksman-skill-input")[0];
+      const rawValue = input ? input.value : "";
+      await this._applyMarksmanSkillTraining(rawValue, input, value);
       return;
     }
     
@@ -10511,6 +10581,184 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       updateData[`system.abilities.${ability}`] = abilityBonuses[ability] || 0;
     }
     
+    await this.actor.update(updateData);
+    this.render();
+  }
+
+  async _onSaveMarksmanSkillTraining(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    this._preferredTab = "progression";
+
+    const slot = $(event.currentTarget).closest(".progression-slot");
+    const input = slot.find(".marksman-skill-input")[0];
+    const abilitySelect = slot.find(".marksman-skill-ability")[0];
+    const rawValue = input ? input.value : "";
+    const abilityOverride = abilitySelect ? abilitySelect.value : "";
+    await this._applyMarksmanSkillTraining(rawValue, input, abilityOverride);
+  }
+
+  async _applyMarksmanSkillTraining(rawValue, inputEl, abilityOverride = "") {
+    const normalizeSkillKey = (name) => String(name || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/\s*\(\s*/g, "(")
+      .replace(/\s*\)\s*/g, ")")
+      .toLowerCase();
+
+    const cleanedValue = String(rawValue || "").trim();
+    const previousValueRaw = String(this.actor.system.progression?.level1?.marksmanSkillTraining || "").trim();
+    const previousKeyRaw = String(this.actor.system.progression?.level1?.marksmanSkillTrainingKey || "").trim();
+    const normalizedPrevious = normalizeSkillKey(previousKeyRaw || previousValueRaw);
+    const deletions = [];
+    const storedAbility = String(this.actor.system.progression?.level1?.marksmanSkillTrainingAbility || "").trim();
+
+    if (!cleanedValue) {
+      const skills = foundry.utils.deepClone(this.actor.system.skills || {});
+      for (const key of Object.keys(skills)) {
+        const skill = skills[key];
+        if (key === "Perception") {
+          continue;
+        }
+        if (skill?.lockedSource === "Marksman Skill Training" && !skill.lockedOtherBonuses) {
+          delete skills[key];
+          deletions.push(key);
+        }
+      }
+      if (normalizedPrevious) {
+        const previousSkillKey = Object.keys(skills).find(
+          (key) => normalizeSkillKey(key) === normalizedPrevious
+        );
+        if (previousSkillKey && previousSkillKey !== "Perception" && !skills[previousSkillKey]?.lockedOtherBonuses) {
+          delete skills[previousSkillKey];
+          deletions.push(previousSkillKey);
+        }
+      }
+      const updateData = {
+        "system.skills": skills,
+        "system.progression.level1.marksmanSkillTraining": null,
+        "system.progression.level1.marksmanSkillTrainingKey": null,
+        "system.progression.level1.marksmanSkillTrainingAbility": null
+      };
+      for (const key of deletions) {
+        updateData[`system.skills.-=${key}`] = null;
+      }
+      await this.actor.update(updateData);
+      if (inputEl) {
+        inputEl.value = "";
+      }
+      this.render();
+      return;
+    }
+
+    const formattedValue = cleanedValue
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/\s*\(\s*/g, " (")
+      .replace(/\s*\)\s*/g, ")");
+    let skillName = formattedValue.charAt(0).toUpperCase() + formattedValue.slice(1);
+
+    const skillAbilityMap = {
+      "Athletics": "might",
+      "Acrobatics": "agility",
+      "Dexterity": "agility",
+      "Piloting (Flying Vehicles)": "agility",
+      "Piloting (Land Vehicles)": "agility",
+      "Piloting (Aquatic Vehicles)": "agility",
+      "Stealth": "agility",
+      "Animal Handling": "wits",
+      "Electricity": "wits",
+      "Insight": "wits",
+      "Investigation": "wits",
+      "Lore (History)": "wits",
+      "Lore (Medicine)": "wits",
+      "Lore (Nature)": "wits",
+      "Lore (Religion)": "wits",
+      "Lore (Technology)": "wits",
+      "Perception": "wits",
+      "Survival": "wits",
+      "Deception": "charm",
+      "Intimidation": "charm",
+      "Performance": "charm",
+      "Persuasion": "charm"
+    };
+
+    let ability = abilityOverride || storedAbility || "wits";
+    for (const [mappedName, mappedAbility] of Object.entries(skillAbilityMap)) {
+      if (normalizeSkillKey(mappedName) === normalizeSkillKey(skillName)) {
+        skillName = mappedName;
+        if (!abilityOverride && !storedAbility) {
+          ability = mappedAbility;
+        }
+        break;
+      }
+    }
+
+    const existingAbility = this.actor.system.skills?.[skillName]?.ability;
+    if (existingAbility && !abilityOverride) {
+      ability = existingAbility;
+    }
+
+    if (inputEl && inputEl.value !== skillName) {
+      inputEl.value = skillName;
+    }
+
+    const skills = foundry.utils.deepClone(this.actor.system.skills || {});
+    const normalizedNewKey = normalizeSkillKey(skillName);
+    const existingSkillKey = Object.keys(skills).find(
+      (key) => normalizeSkillKey(key) === normalizedNewKey
+    );
+
+    for (const key of Object.keys(skills)) {
+      const skill = skills[key];
+      if (key === "Perception") {
+        continue;
+      }
+      if (skill?.lockedSource === "Marksman Skill Training" && normalizeSkillKey(key) !== normalizedNewKey && !skill.lockedOtherBonuses) {
+        delete skills[key];
+        deletions.push(key);
+      }
+    }
+
+    if (normalizedPrevious && normalizedPrevious !== normalizedNewKey) {
+      const previousSkillKey = Object.keys(skills).find(
+        (key) => normalizeSkillKey(key) === normalizedPrevious
+      );
+      if (previousSkillKey && previousSkillKey !== "Perception" && !skills[previousSkillKey]?.lockedOtherBonuses) {
+        delete skills[previousSkillKey];
+        deletions.push(previousSkillKey);
+      }
+    }
+
+    const targetSkillKey = existingSkillKey || skillName;
+    if (!skills[targetSkillKey]) {
+      skills[targetSkillKey] = {
+        rank: "Apprentice",
+        ability: ability,
+        otherBonuses: 0,
+        lockedSource: "Marksman Skill Training",
+        lockedByPowerset: true
+      };
+    } else {
+      if (skills[targetSkillKey].rank === "Novice" || !skills[targetSkillKey].rank) {
+        skills[targetSkillKey].rank = "Apprentice";
+      }
+      if (abilityOverride) {
+        skills[targetSkillKey].ability = abilityOverride;
+      }
+      skills[targetSkillKey].lockedSource = "Marksman Skill Training";
+      skills[targetSkillKey].lockedByPowerset = true;
+    }
+
+    const updateData = {
+      "system.skills": skills,
+      "system.progression.level1.marksmanSkillTraining": skillName,
+      "system.progression.level1.marksmanSkillTrainingKey": targetSkillKey,
+      "system.progression.level1.marksmanSkillTrainingAbility": ability
+    };
+    for (const key of deletions) {
+      updateData[`system.skills.-=${key}`] = null;
+    }
     await this.actor.update(updateData);
     this.render();
   }

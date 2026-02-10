@@ -414,11 +414,11 @@
             </div>
             <span class="skill-bonus">{{skill.bonusDisplay}}</span>
             <div class="skill-controls">
-              {{#unless skill._addedByArmor}}
+              {{#unless (or skill._addedByArmor skill.lockedByPowerset)}}
               <a class="edit-skill" data-skill="{{skillName}}" title="Edit"><i class="fas fa-pencil-alt"></i></a>
               {{/unless}}
               <button type="button" class="skill-roll" data-skill="{{skillName}}" title="Roll">Roll</button>
-              {{#unless skill._addedByArmor}}
+              {{#unless (or skill._addedByArmor skill.lockedByPowerset)}}
               <a class="delete-skill" data-skill="{{skillName}}" title="Delete"><i class="fas fa-trash"></i></a>
               {{/unless}}
             </div>
@@ -929,17 +929,17 @@
                     {{!-- Skill Training (Bonus) --}}
                     <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="marksmanSkillTraining">
                       <label>Skill Training (Bonus - Marksman):</label>
-                      <select name="system.progression.level1.marksmanSkillTraining" class="ability-boost-select">
-                        <option value="">Choose Skill...</option>
-                        <option value="Athletics" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Athletics")}}selected{{/if}}>Athletics (Might)</option>
-                        <option value="Acrobatics" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Acrobatics")}}selected{{/if}}>Acrobatics (Agility)</option>
-                        <option value="Stealth" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Stealth")}}selected{{/if}}>Stealth (Agility)</option>
-                        <option value="Investigation" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Investigation")}}selected{{/if}}>Investigation (Wits)</option>
-                        <option value="Survival" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Survival")}}selected{{/if}}>Survival (Wits)</option>
-                        <option value="Deception" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Deception")}}selected{{/if}}>Deception (Charm)</option>
-                        <option value="Intimidation" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Intimidation")}}selected{{/if}}>Intimidation (Charm)</option>
-                        <option value="Persuasion" {{#if (eq actor.system.progression.level1.marksmanSkillTraining "Persuasion")}}selected{{/if}}>Persuasion (Charm)</option>
-                      </select>
+                      <div class="marksman-skill-input-row">
+                        <input type="text" name="system.progression.level1.marksmanSkillTraining" class="ability-boost-select marksman-skill-input" data-manual-save="true" placeholder="Enter any skill" value="{{actor.system.progression.level1.marksmanSkillTraining}}"/>
+                        <select name="system.progression.level1.marksmanSkillTrainingAbility" class="ability-boost-select marksman-skill-ability" data-slot-type="marksmanSkillTrainingAbility" title="Choose ability">
+                          <option value="might" {{#if (eq actor.system.progression.level1.marksmanSkillTrainingAbility "might")}}selected{{/if}}>Might</option>
+                          <option value="agility" {{#if (eq actor.system.progression.level1.marksmanSkillTrainingAbility "agility")}}selected{{/if}}>Agility</option>
+                          <option value="endurance" {{#if (eq actor.system.progression.level1.marksmanSkillTrainingAbility "endurance")}}selected{{/if}}>Endurance</option>
+                          <option value="wits" {{#if (eq actor.system.progression.level1.marksmanSkillTrainingAbility "wits")}}selected{{/if}}>Wits</option>
+                          <option value="charm" {{#if (eq actor.system.progression.level1.marksmanSkillTrainingAbility "charm")}}selected{{/if}}>Charm</option>
+                        </select>
+                        <button type="button" class="marksman-skill-save" title="Save bonus skill">Save</button>
+                      </div>
                     </div>
                     {{!-- Ranged Weapon Competence --}}
                     <div class="progression-slot ability-boost-slot" data-level="1" data-slot-type="marksmanRangedCompetence">

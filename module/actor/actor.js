@@ -221,6 +221,9 @@ export class SingularityActor extends Actor {
     
     // Ensure Perception skill exists for Marksman
     this._ensureMarksmanPerception(systemData);
+
+    // Remove powerset skills if powerset is no longer selected
+    this._cleanupPowersetSkills(systemData);
   }
   
   /**
@@ -241,8 +244,12 @@ export class SingularityActor extends Actor {
           rank: "Apprentice",
           ability: "wits",
           otherBonuses: 0,
-          source: "Gadgeteer"
+          lockedSource: "Gadgeteer Skill Training",
+          lockedByPowerset: true
         };
+      } else {
+        systemData.skills["Gadget Tuning"].lockedSource = "Gadgeteer Skill Training";
+        systemData.skills["Gadget Tuning"].lockedByPowerset = true;
       }
     }
   }
@@ -264,12 +271,52 @@ export class SingularityActor extends Actor {
         systemData.skills["Perception"] = {
           rank: "Apprentice",
           ability: "wits",
-          otherBonuses: 0
+          otherBonuses: 0,
+          lockedSource: "Marksman Skill Training",
+          lockedByPowerset: true
         };
       } else {
         // Ensure it has Apprentice rank if it exists
         if (!systemData.skills["Perception"].rank || systemData.skills["Perception"].rank === "Novice") {
           systemData.skills["Perception"].rank = "Apprentice";
+        }
+        systemData.skills["Perception"].lockedSource = "Marksman Skill Training";
+        systemData.skills["Perception"].lockedByPowerset = true;
+      }
+    }
+  }
+
+  /**
+   * Remove powerset-granted skills when powerset is removed.
+   */
+  _cleanupPowersetSkills(systemData) {
+    if (!systemData.skills) {
+      return;
+    }
+
+    const powersetName = systemData.progression?.level1?.powersetName || systemData.basic?.powerset;
+    const skills = systemData.skills;
+
+    if (powersetName !== "Marksman") {
+      for (const [skillName, skill] of Object.entries(skills)) {
+        if (skill?.lockedSource === "Marksman Skill Training" || skillName === "Perception") {
+          delete skills[skillName];
+        }
+      }
+    }
+
+    if (powersetName !== "Gadgeteer") {
+      for (const [skillName, skill] of Object.entries(skills)) {
+        if (skill?.lockedSource === "Gadgeteer Skill Training" || skillName === "Gadget Tuning") {
+          delete skills[skillName];
+        }
+      }
+    }
+
+    if (powersetName !== "Paragon") {
+      for (const [skillName, skill] of Object.entries(skills)) {
+        if (skill?.lockedSource === "Paragon Skill Training") {
+          delete skills[skillName];
         }
       }
     }
