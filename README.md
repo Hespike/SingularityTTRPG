@@ -6,4 +6,4 @@ For the Rules see:
 https://hespike.github.io/singularity/
 
 If you find any bugs, feel free to reach out:
-https://discord.gg/TcSeGPFT
+https://discord.com/invite/pe6Bb2rHgW
