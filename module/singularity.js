@@ -4272,7 +4272,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
     }
   }, 4000);
 
-  // Auto-create Level 1 Bastion Talents in the talents compendium
+  // Auto-create Bastion talents in the talents compendium
   setTimeout(async () => {
     try {
       const pack = game.packs.find(p => p.metadata.name === "talents" && p.metadata.packageName === "singularity");
@@ -4288,7 +4288,8 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         "Bastion's Resistance",
         "Enlarged Presence",
         "Ironbound",
-        "Protect the Weak"
+        "Protect the Weak",
+        "Defensive Stance"
       ];
       
       const allExist = bastionTalentNames.every(name => 
@@ -4296,8 +4297,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
       );
       
       if (allExist) {
-        console.log("Singularity | All Level 1 Bastion talents already exist in compendium");
-        return;
+        console.log("Singularity | All Bastion talents already exist in compendium; verifying metadata");
       }
 
       const wasLocked = pack.locked;
@@ -4306,10 +4306,11 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // Define all Level 1 Bastion talents
-      const level1BastionTalents = [
+      // Define all Bastion talents
+      const bastionTalents = [
         {
           name: "Bastion's Resistance",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your body (through training, mutation, armor, or sheer will) is built to endure punishment, allowing you to shrug off specific types of environmental or combat-related harm.</p>
 
@@ -4326,6 +4327,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Enlarged Presence",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your body, armor, or protective field expands beyond normal limits, making you an immovable presence on the battlefield.</p>
 
@@ -4343,6 +4345,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Ironbound",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your hero's physique is exceptionally resilient, allowing them to endure far more punishment than others with similar builds. This may stem from dense muscle and bone structure, accelerated cellular regeneration, or simply an iron constitution.</p>
 
@@ -4357,7 +4360,25 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
           prerequisites: "Bastion 1"
         },
         {
+          name: "Defensive Stance",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>You adopt a defensive posture that makes you harder to hit, whether through careful positioning, shield work, or simply making yourself a smaller target.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Bastion 3</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You can spend 1 energy to enter a defensive stance. While in this stance, you gain a <strong>+2 bonus to AC</strong>.</p>
+<p>The stance ends if you move, or you can end it on your turn as a free action.</p>`,
+          type: "bastion",
+          prerequisites: "Bastion 3"
+        },
+        {
           name: "Protect the Weak",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You draw enemy attention through presence alone, whether by sheer size, intimidation, or commanding presence.</p>
 
@@ -4383,11 +4404,27 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
 
       // Create all talents
       const itemsToCreate = [];
-      for (const talentData of level1BastionTalents) {
+      for (const talentData of bastionTalents) {
         // Check if it already exists
         const exists = pack.index.find(i => i.name === talentData.name);
         if (exists) {
-          console.log(`Singularity | ${talentData.name} already exists, skipping`);
+          try {
+            const existingDoc = await pack.getDocument(exists._id);
+            const updates = {};
+            if (talentData.level && existingDoc?.system?.basic?.level !== talentData.level) {
+              updates["system.basic.level"] = talentData.level;
+            }
+            if (talentData.prerequisites && existingDoc?.system?.basic?.prerequisites !== talentData.prerequisites) {
+              updates["system.basic.prerequisites"] = talentData.prerequisites;
+            }
+            if (Object.keys(updates).length) {
+              await existingDoc.update(updates);
+              console.log(`Singularity | Updated ${talentData.name} metadata`);
+            }
+          } catch (updateErr) {
+            console.warn(`Singularity | Could not update ${talentData.name}:`, updateErr);
+          }
+          console.log(`Singularity | ${talentData.name} already exists, skipping create`);
           continue;
         }
 
@@ -4398,7 +4435,8 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
             description: talentData.description,
             basic: {
               type: talentData.type,
-              prerequisites: talentData.prerequisites
+              prerequisites: talentData.prerequisites,
+              level: talentData.level || 1
             },
             archived: false
           },
@@ -4435,6 +4473,8 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
           }
         }
       }
+
+      if (wasLocked) await pack.configure({ locked: true });
 
       // Wait for imports to complete
       await new Promise(resolve => setTimeout(resolve, 1000));

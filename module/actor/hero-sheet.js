@@ -83,6 +83,25 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     return this.title;
   }
 
+  _captureScrollPositions() {
+    if (!this.element) return;
+    const $html = this.element instanceof jQuery ? this.element : $(this.element);
+    const $activeTab = $html.find(".tab.active");
+    const tabName = $activeTab.data("tab");
+    if (!tabName) return;
+    this._preferredTab = tabName;
+    this._scrollPositions = {
+      ...(this._scrollPositions || {}),
+      [tabName]: $activeTab.scrollTop()
+    };
+  }
+
+  /** @override */
+  render(...args) {
+    this._captureScrollPositions();
+    return super.render(...args);
+  }
+
   /** @override */
   async _prepareContext(options = {}) {
     return this.getData(options);
@@ -6956,7 +6975,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }).render(true);
   }
 
-  _showBastionResistanceDialog() {
+  _showBastionResistanceDialog(level = 1) {
     const damageTypes = [
       "Energy",
       "Kinetic",
@@ -6971,6 +6990,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       "Force",
       "Thunder"
     ];
+
+    const levelKey = `level${level}`;
+    const existingResistances = (this.actor.system.resistances || [])
+      .filter(r => r?.source === "Bastion's Resistance")
+      .map(r => String(r.type || "").toLowerCase());
+    const existingResistanceSet = new Set(existingResistances);
     
     const dialogContent = `
       <form>
@@ -6981,7 +7006,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           <label>Damage Type:</label>
           <select id="bastion-resistance-type" required>
             <option value="">Choose Damage Type...</option>
-            ${damageTypes.map(type => `<option value="${type}">${type}</option>`).join('')}
+            ${damageTypes.map(type => {
+              const isTaken = existingResistanceSet.has(type.toLowerCase());
+              const label = isTaken ? `${type} (already chosen)` : type;
+              const disabled = isTaken ? " disabled" : "";
+              return `<option value="${type}"${disabled}>${label}</option>`;
+            }).join('')}
           </select>
         </div>
         <p style="font-size: 12px; color: #a0aec0; margin-top: 10px;">
@@ -7040,7 +7070,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const newResistance = {
               type: damageType,
               value: null, // null means it's calculated dynamically
-              source: "Bastion's Resistance" // Track that this came from the talent
+              source: "Bastion's Resistance", // Track that this came from the talent
+              sourceLevel: levelKey
             };
             
             resistances.push(newResistance);
@@ -7048,7 +7079,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             // Store the chosen damage type in progression data
             const updateData = {
               "system.resistances": resistances,
-              "system.progression.level1.bastionTalentResistanceType": damageType
+              [`system.progression.${levelKey}.bastionTalentResistanceType`]: damageType
             };
             
             await this.actor.update(updateData);
@@ -9680,7 +9711,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           normalizedName.includes("saving throw") && normalizedName.includes("apprentice") ||
           normalizedName.includes("skill training") && normalizedName.includes("apprentice") ||
           normalizedName.includes("weapon training") ||
-          normalizedName.includes("blast");
+          normalizedName.includes("blast") ||
+          (normalizedName.includes("bastion") && normalizedName.includes("resistance"));
         if (!canRepeatWithVariations) {
           continue;
         }
@@ -9797,7 +9829,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       if (selectedTalents.has(normalizedName)) {
         const canRepeat = normalizedName.includes("saving throw") && normalizedName.includes("apprentice") ||
           normalizedName.includes("skill training") && normalizedName.includes("apprentice") ||
-          normalizedName.includes("weapon training") || normalizedName.includes("blast");
+          normalizedName.includes("weapon training") ||
+          normalizedName.includes("blast") ||
+          (normalizedName.includes("bastion") && normalizedName.includes("resistance"));
         if (!canRepeat) {
           ui.notifications.warn(`You have already selected "${talentName}".`);
           return;
@@ -9851,7 +9885,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
       const talentNameLower = (talent.name || "").toLowerCase();
       if (talentNameLower.includes("bastion") && talentNameLower.includes("resistance")) {
-        setTimeout(() => self._showBastionResistanceDialog(), 100);
+        setTimeout(() => self._showBastionResistanceDialog(level), 100);
       }
       if (talentNameLower.includes("enlarged") && talentNameLower.includes("presence")) {
         const currentSize = self.actor.system.basic.size || "Medium";
@@ -10626,15 +10660,21 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     
     // If deleting a Bastion talent slot, check if it's Bastion's Resistance and remove the corresponding resistance
-    if (slotType === "bastionTalent") {
+    if (slotType === "bastionTalent" || slotType === "powersetTalent") {
       const talentName = this.actor.system.progression?.[levelKey]?.[`${slotType}Name`];
       const talentNameLower = (talentName || "").toLowerCase();
       
       // If deleting Bastion's Resistance, remove the resistance(s) added by it
       if (talentNameLower.includes("bastion") && talentNameLower.includes("resistance")) {
+        const storedType = this.actor.system.progression?.[levelKey]?.bastionTalentResistanceType;
         const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
-        // Remove all resistances that came from Bastion's Resistance
-        const filteredResistances = resistances.filter(r => r.source !== "Bastion's Resistance");
+        // Remove only the resistance tied to this level (or matching stored type)
+        const filteredResistances = resistances.filter(r => {
+          if (r.source !== "Bastion's Resistance") return true;
+          if (r.sourceLevel && r.sourceLevel === levelKey) return false;
+          if (storedType && r.type === storedType) return false;
+          return true;
+        });
         if (filteredResistances.length !== resistances.length) {
           updateData["system.resistances"] = filteredResistances;
         }

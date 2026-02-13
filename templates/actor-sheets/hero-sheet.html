@@ -1218,10 +1218,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level3.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level3.powersetTalentImg}}" alt="{{actor.system.progression.level3.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level3.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level3.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level3.powersetTalentName "Bastions Resistance")) actor.system.progression.level3.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level3.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="3" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1283,10 +1292,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level5.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level5.powersetTalentImg}}" alt="{{actor.system.progression.level5.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level5.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level5.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level5.powersetTalentName "Bastions Resistance")) actor.system.progression.level5.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level5.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="5" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1327,10 +1345,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level7.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level7.powersetTalentImg}}" alt="{{actor.system.progression.level7.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level7.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level7.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level7.powersetTalentName "Bastions Resistance")) actor.system.progression.level7.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level7.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="7" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1392,10 +1419,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level9.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level9.powersetTalentImg}}" alt="{{actor.system.progression.level9.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level9.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level9.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level9.powersetTalentName "Bastions Resistance")) actor.system.progression.level9.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level9.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="9" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1435,10 +1471,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level10.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level10.powersetTalentImg}}" alt="{{actor.system.progression.level10.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level10.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level10.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level10.powersetTalentName "Bastions Resistance")) actor.system.progression.level10.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level10.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="10" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1479,10 +1524,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level12.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level12.powersetTalentImg}}" alt="{{actor.system.progression.level12.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level12.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level12.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level12.powersetTalentName "Bastions Resistance")) actor.system.progression.level12.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level12.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="12" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1544,10 +1598,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level14.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level14.powersetTalentImg}}" alt="{{actor.system.progression.level14.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level14.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level14.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level14.powersetTalentName "Bastions Resistance")) actor.system.progression.level14.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level14.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="14" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1587,10 +1650,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level15.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level15.powersetTalentImg}}" alt="{{actor.system.progression.level15.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level15.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level15.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level15.powersetTalentName "Bastions Resistance")) actor.system.progression.level15.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level15.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="15" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1631,10 +1703,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level17.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level17.powersetTalentImg}}" alt="{{actor.system.progression.level17.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level17.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level17.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level17.powersetTalentName "Bastions Resistance")) actor.system.progression.level17.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level17.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="17" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1696,10 +1777,19 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level19.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level19.powersetTalentImg}}" alt="{{actor.system.progression.level19.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level19.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level19.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level19.powersetTalentName "Bastions Resistance")) actor.system.progression.level19.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level19.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="19" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>
@@ -1739,10 +1829,13 @@
                   <div class="slot-item" data-item-id="{{actor.system.progression.level20.powersetTalent}}">
                     <img class="item-icon" src="{{actor.system.progression.level20.powersetTalentImg}}" alt="{{actor.system.progression.level20.powersetTalentName}}">
                     <span class="item-name">{{actor.system.progression.level20.powersetTalentName}}</span>
+                    {{#if (and (or (eq actor.system.progression.level20.powersetTalentName "Bastion's Resistance") (eq actor.system.progression.level20.powersetTalentName "Bastions Resistance")) actor.system.progression.level20.bastionTalentResistanceType)}}
+                      <span class="talent-detail">({{actor.system.progression.level20.bastionTalentResistanceType}})</span>
+                    {{/if}}
                     <a class="slot-delete" data-level="20" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Drop Powerset Talent here</div>
+                  <div class="slot-placeholder">Powerset Talent: Click to choose</div>
                 {{/if}}
               </div>
             </div>
