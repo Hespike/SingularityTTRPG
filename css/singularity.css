@@ -3493,6 +3493,27 @@ button.weapon-attack:hover {
   line-height: 1.6 !important;
 }
 
+.progression-slot.progression-locked {
+  opacity: 0.6;
+}
+
+.progression-slot.progression-locked .slot-delete {
+  pointer-events: none;
+  opacity: 0.4;
+}
+
+.progression-slot.progression-locked .slot-placeholder,
+.progression-slot.progression-locked .slot-item {
+  cursor: not-allowed;
+}
+
+.progression-slot.progression-locked select,
+.progression-slot.progression-locked input,
+.progression-slot.progression-locked button,
+.progression-slot.progression-locked textarea {
+  cursor: not-allowed;
+}
+
 .ability-display {
   display: flex;
   align-items: center;

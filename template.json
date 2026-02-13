@@ -97,6 +97,8 @@
         },
         "level3": {
           "abilityScoreImprovement": false,
+          "abilityScoreImprovement1": null,
+          "abilityScoreImprovement2": null,
           "powersetTalent": null
         },
         "level4": {
@@ -104,6 +106,8 @@
         },
         "level5": {
           "abilityScoreImprovement": false,
+          "abilityScoreImprovement1": null,
+          "abilityScoreImprovement2": null,
           "powersetTalent": null
         },
         "level6": {
@@ -114,6 +118,8 @@
         },
         "level8": {
           "abilityScoreImprovement": false,
+          "abilityScoreImprovement1": null,
+          "abilityScoreImprovement2": null,
           "genericTalent": null
         },
         "level9": {
@@ -121,6 +127,8 @@
         },
         "level10": {
           "abilityScoreImprovement": false,
+          "abilityScoreImprovement1": null,
+          "abilityScoreImprovement2": null,
           "powersetTalent": null
         },
         "level11": {
@@ -131,6 +139,8 @@
         },
         "level13": {
           "abilityScoreImprovement": false,
+          "abilityScoreImprovement1": null,
+          "abilityScoreImprovement2": null,
           "genericTalent": null
         },
         "level14": {
@@ -138,6 +148,8 @@
         },
         "level15": {
           "abilityScoreImprovement": false,
+          "abilityScoreImprovement1": null,
+          "abilityScoreImprovement2": null,
           "powersetTalent": null
         },
         "level16": {
@@ -148,6 +160,8 @@
         },
         "level18": {
           "abilityScoreImprovement": false,
+          "abilityScoreImprovement1": null,
+          "abilityScoreImprovement2": null,
           "genericTalent": null
         },
         "level19": {
@@ -155,6 +169,8 @@
         },
         "level20": {
           "abilityScoreImprovement": false,
+          "abilityScoreImprovement1": null,
+          "abilityScoreImprovement2": null,
           "powersetTalent": null
         }
       },

@@ -780,6 +780,18 @@ Hooks.once("init", function() {
             abilityBonuses[boostAbility] += 1;
           }
         }
+        if (levelData.abilityScoreImprovement1) {
+          const boostAbility = levelData.abilityScoreImprovement1;
+          if (abilityBonuses.hasOwnProperty(boostAbility)) {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
+        if (levelData.abilityScoreImprovement2) {
+          const boostAbility = levelData.abilityScoreImprovement2;
+          if (abilityBonuses.hasOwnProperty(boostAbility)) {
+            abilityBonuses[boostAbility] += 1;
+          }
+        }
       }
 
       return abilityBonuses[ability] ?? 0;

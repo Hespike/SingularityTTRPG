@@ -416,6 +416,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
     
+    const asiLevels = [3, 5, 8, 10, 13, 15, 18, 20];
+
     // Check Bastion powerset benefits
     if (powersetName === "Bastion") {
       // +1 Endurance boost at level 1
@@ -469,6 +471,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const ability2 = actorData.system.progression.level1.marksmanAbilityBoost2;
         if (abilityBonuses.hasOwnProperty(ability2) && ability2 !== "agility") {
           abilityBonuses[ability2] += 1;
+        }
+      }
+    }
+
+    // Apply Ability Score Improvements from later levels
+    for (const level of asiLevels) {
+      const levelKey = `level${level}`;
+      const levelData = actorData.system.progression?.[levelKey] || {};
+      const boosts = [levelData.abilityScoreImprovement1, levelData.abilityScoreImprovement2];
+      for (const boost of boosts) {
+        if (boost && abilityBonuses.hasOwnProperty(boost)) {
+          abilityBonuses[boost] += 1;
         }
       }
     }
@@ -543,6 +557,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }
       
+      // Add Ability Score Improvements from later levels
+      for (const level of asiLevels) {
+        const levelKey = `level${level}`;
+        const levelData = actorData.system.progression?.[levelKey] || {};
+        if (levelData.abilityScoreImprovement1 === ability) {
+          breakdown.sources.push({ name: `Ability Score Improvement (Level ${level})`, value: 1 });
+        }
+        if (levelData.abilityScoreImprovement2 === ability) {
+          breakdown.sources.push({ name: `Ability Score Improvement (Level ${level})`, value: 1 });
+        }
+      }
+
       // Calculate total
       breakdown.total = breakdown.sources.reduce((sum, source) => sum + source.value, 0);
       
@@ -2727,7 +2753,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     html.on("click", ".progression-slot .slot-item", this._onProgressionItemClick.bind(this));
     
     // Handle clicks on talent progression slots to open talent selection dialog (off first to prevent duplicate modals)
-    const talentSlotSelector = ".progression-slot[data-slot-type='genericTalent'], .progression-slot[data-slot-type='humanGenericTalent'], .progression-slot[data-slot-type='terranGenericTalent'], .progression-slot[data-slot-type='bastionTalent'], .progression-slot[data-slot-type='paragonTalent'], .progression-slot[data-slot-type='gadgeteerTalent'], .progression-slot[data-slot-type='marksmanTalent']";
+    const talentSlotSelector = ".progression-slot[data-slot-type='genericTalent'], .progression-slot[data-slot-type='humanGenericTalent'], .progression-slot[data-slot-type='terranGenericTalent'], .progression-slot[data-slot-type='powersetTalent'], .progression-slot[data-slot-type='bastionTalent'], .progression-slot[data-slot-type='paragonTalent'], .progression-slot[data-slot-type='gadgeteerTalent'], .progression-slot[data-slot-type='marksmanTalent']";
     html.off("click", talentSlotSelector);
     html.on("click", talentSlotSelector, this._onTalentSlotClick.bind(this));
     
@@ -2812,6 +2838,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       })
       .on("change", this._onInlineEdit.bind(this))
       .on("blur", this._onInlineEdit.bind(this));
+
+    this._applyProgressionLockState(html);
   }
 
   _activateTab(html, tabName) {
@@ -2822,6 +2850,94 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     html.find(`.sheet-tabs .item[data-tab="${tabName}"]`).addClass("active");
     html.find(`.sheet-body .tab[data-tab="${tabName}"]`).addClass("active");
     this._preferredTab = tabName;
+  }
+
+  _applyProgressionLockState(html) {
+    const primeLevel = Number(this.actor?.system?.basic?.primeLevel) || 1;
+    html.find(".progression-slot[data-level]").each((_, slot) => {
+      const $slot = $(slot);
+      const level = Number($slot.data("level"));
+      const isLocked = Number.isFinite(level) && level < primeLevel;
+
+      if (isLocked) {
+        $slot.addClass("progression-locked").attr("data-locked", "true");
+        $slot.find("select, input, button, textarea").each((__, control) => {
+          if (!control.disabled) {
+            control.dataset.lockedDisabled = "true";
+            control.disabled = true;
+          }
+        });
+        $slot.find(".slot-delete").addClass("is-disabled").attr("aria-disabled", "true").attr("tabindex", "-1");
+      } else {
+        $slot.removeClass("progression-locked").removeAttr("data-locked");
+        $slot.find("select, input, button, textarea").each((__, control) => {
+          if (control.dataset.lockedDisabled === "true") {
+            control.disabled = false;
+            delete control.dataset.lockedDisabled;
+          }
+        });
+        $slot.find(".slot-delete").removeClass("is-disabled").removeAttr("aria-disabled").removeAttr("tabindex");
+      }
+    });
+  }
+
+  _getIncompleteProgressionLevels(maxLevel, htmlOverride) {
+    const root = htmlOverride || this.element;
+    const container = root instanceof jQuery ? root : $(root);
+    if (!container || !container.length) return [];
+
+    const incomplete = [];
+    for (let lvl = 1; lvl < maxLevel; lvl++) {
+      const slots = container.find(`.progression-slot[data-level="${lvl}"]`);
+      let levelIncomplete = false;
+
+      slots.each((_, slot) => {
+        if (levelIncomplete) return;
+        const $slot = $(slot);
+
+        if ($slot.find(".slot-placeholder").length) {
+          levelIncomplete = true;
+          return;
+        }
+
+        $slot.find("select.ability-boost-select").each((__, select) => {
+          if (levelIncomplete || select.disabled) return;
+          if (!String(select.value || "").trim()) {
+            levelIncomplete = true;
+          }
+        });
+
+        $slot.find("input[data-manual-save='true'], input.marksman-skill-input").each((__, input) => {
+          if (levelIncomplete || input.disabled) return;
+          if (!String(input.value || "").trim()) {
+            levelIncomplete = true;
+          }
+        });
+      });
+
+      if (levelIncomplete) {
+        incomplete.push(lvl);
+      }
+    }
+
+    return incomplete;
+  }
+
+  _canAccessProgressionLevel(level, htmlOverride) {
+    const primeLevel = Number(this.actor?.system?.basic?.primeLevel) || 1;
+    if (Number.isFinite(level) && level > primeLevel) {
+      ui.notifications.warn("Increase Prime Level before selecting higher-level progression slots.");
+      return false;
+    }
+
+    const incomplete = this._getIncompleteProgressionLevels(level, htmlOverride);
+    if (incomplete.length) {
+      const first = incomplete[0];
+      ui.notifications.warn(`Complete all Level ${first} selections before choosing higher levels.`);
+      return false;
+    }
+
+    return true;
   }
 
   async _onInlineFieldChange(event) {
@@ -5876,6 +5992,14 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const currentLevel = this.actor.system.basic.primeLevel || 1;
     if (currentLevel >= 20) {
       ui.notifications.warn("Maximum level is 20.");
+      this._updatingPrimeLevel = false;
+      return;
+    }
+
+    const incomplete = this._getIncompleteProgressionLevels(currentLevel + 1);
+    if (incomplete.length) {
+      const first = incomplete[0];
+      ui.notifications.warn(`Complete all Level ${first} selections before leveling up.`);
       this._updatingPrimeLevel = false;
       return;
     }
@@ -9033,6 +9157,116 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
   }
 
+  async _ensureGenericLevel2Talents(talentsPack) {
+    if (!talentsPack) return;
+
+    let index;
+    try {
+      index = await talentsPack.getIndex();
+    } catch (err) {
+      console.warn("Singularity | Failed to read talents compendium index:", err);
+      return;
+    }
+
+    const existing = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const talentDefinitions = [
+      {
+        name: "Medium Armor Training",
+        type: "generic",
+        level: 2,
+        prerequisites: "Prime Level 2; Light Armor Training",
+        description: "<p><strong>Requirements</strong> Prime Level 2; Light Armor Training</p><p>Your character learns to wear medium armor effectively, balancing protection and mobility.</p><p><strong>Effect</strong> You are now trained in Medium Armor. You can wear medium armor without penalties to movement or defense.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Power Strike",
+        type: "generic",
+        level: 2,
+        prerequisites: "Prime Level 2",
+        description: "<p><strong>Requirements</strong> Prime Level 2</p><p>You've mastered channeling your strength into devastating melee strikes. When you put your full force behind an attack, your blows carry significantly more destructive power, leaving enemies reeling from the impact.</p><p><strong>Effect</strong> Before making a melee weapon attack, you can choose to spend 1 additional energy beyond the normal attack cost. If you do, you add +2 to your damage roll for that attack only. This effect applies only to the next attack you make, and can be used with any melee weapon attack, including unarmed strikes.</p>",
+        img: "icons/svg/sword.svg"
+      },
+      {
+        name: "Wall Crawler",
+        type: "generic",
+        level: 2,
+        prerequisites: "Prime Level 2",
+        description: "<p><strong>Requirements</strong> Prime Level 2</p><p>You can scale walls and obstacles with greater ease than most, finding handholds and footholds that others miss. Your movements are fluid and instinctive, allowing you to traverse vertical surfaces that would challenge others.</p><p><strong>Effect</strong> You gain a climbing speed of 15 feet. You can climb without making ability checks on surfaces that would normally require them, as long as you have one hand free to grip holds.</p><p><strong>Notes</strong> You must have at least one hand free to use your climbing speed. While climbing, you suffer the same penalties as other climbing creatures. See Restricted Ranged Combat for details.</p>",
+        img: "icons/svg/upgrade.svg"
+      }
+    ];
+
+    if (talentsPack.locked) {
+      console.warn("Singularity | Talents compendium is locked; cannot seed level 2 talents.");
+      return;
+    }
+
+    for (const def of talentDefinitions) {
+      if (!existing.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update existing level 2 talent:", err);
+      }
+    }
+
+    const toCreate = talentDefinitions
+      .filter(def => !existing.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
+    if (!toCreate.length) return;
+
+    try {
+      const createdItems = await Item.createDocuments(toCreate, { render: false });
+      for (const item of createdItems) {
+        await talentsPack.importDocument(item);
+        await item.delete();
+      }
+      await talentsPack.getIndex({ force: true });
+    } catch (err) {
+      console.warn("Singularity | Failed to seed generic level 2 talents:", err);
+    }
+  }
+
   async _onTalentSlotClick(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -9063,14 +9297,20 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     if (!level || !slotType) {
       return;
     }
+
+    if (!this._canAccessProgressionLevel(level)) {
+      return;
+    }
     
     // Open talent selection dialog (pass the slot we clicked so the chosen talent goes here)
     await this._openTalentSelectionDialog(level, slotType);
   }
 
   async _openTalentSelectionDialog(level, slotType) {
+    console.log("Singularity | _openTalentSelectionDialog called", { level, slotType });
     // Prevent opening a second talent dialog while one is already open
     if (this._talentSelectionDialogOpen) {
+      console.log("Singularity | Dialog already open, returning");
       return;
     }
     this._talentSelectionDialogOpen = true;
@@ -9081,10 +9321,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       ui.notifications.error("Talents compendium not found!");
       return;
     }
+
+    await this._ensureGenericLevel2Talents(talentsPack);
     
     // Collect all already-selected talents from all progression slots
     const selectedTalents = new Map(); // Map of talent name -> { variations: Set, counts: number }
     const progression = this.actor.system.progression || {};
+    const primeLevel = this.actor.system.basic?.primeLevel || 1;
     
     // Helper function to add a selected talent
     const addSelectedTalent = (talentName, variation = null) => {
@@ -9196,12 +9439,29 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
     
+    const powersetNameForSlot = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+    let filterSlotType = slotType;
+    if (slotType === "powersetTalent") {
+      if (powersetNameForSlot === "Bastion") {
+        filterSlotType = "bastionTalent";
+      } else if (powersetNameForSlot === "Paragon") {
+        filterSlotType = "paragonTalent";
+      } else if (powersetNameForSlot === "Gadgeteer") {
+        filterSlotType = "gadgeteerTalent";
+      } else if (powersetNameForSlot === "Marksman") {
+        filterSlotType = "marksmanTalent";
+      } else {
+        ui.notifications.warn("Choose a Powerset before selecting Powerset talents.");
+        return;
+      }
+    }
+
     // Get the index of all talents (store for use in render callback)
     const index = await talentsPack.getIndex();
     let allTalents = Array.from(index.values());
     
     // Filter talents based on slot type
-    if (slotType === "bastionTalent") {
+    if (filterSlotType === "bastionTalent") {
       // Filter for Bastion talents only
       const bastionTalents = [];
       for (const talentIndex of allTalents) {
@@ -9226,7 +9486,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }
       allTalents = bastionTalents;
-    } else if (slotType === "paragonTalent") {
+    } else if (filterSlotType === "paragonTalent") {
       // Filter for Paragon talents only
       const paragonTalents = [];
       for (const talentIndex of allTalents) {
@@ -9255,7 +9515,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }
       allTalents = paragonTalents;
-    } else if (slotType === "gadgeteerTalent") {
+    } else if (filterSlotType === "gadgeteerTalent") {
       // Filter for Gadgeteer talents only
       const gadgeteerTalents = [];
       for (const talentIndex of allTalents) {
@@ -9282,7 +9542,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }
       allTalents = gadgeteerTalents;
-    } else if (slotType === "marksmanTalent") {
+    } else if (filterSlotType === "marksmanTalent") {
       // Filter for Marksman talents only
       const marksmanTalents = [];
       for (const talentIndex of allTalents) {
@@ -9315,7 +9575,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }
       allTalents = marksmanTalents;
-    } else if (slotType === "genericTalent" || slotType === "humanGenericTalent" || slotType === "terranGenericTalent") {
+    } else if (filterSlotType === "genericTalent" || filterSlotType === "humanGenericTalent" || filterSlotType === "terranGenericTalent") {
       // Filter OUT Bastion and Paragon talents for generic talent slots
       const genericTalents = [];
       const bastionTalentNames = [
@@ -9387,30 +9647,83 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       allTalents = genericTalents;
     }
     
-    // Group talents by level (for now, all are Level 1, but prepare for future)
-    // In the future, we can check talent.system.level or similar
     const talentsByLevel = {};
     const availableLevels = [];
-    
-    // Process all talents and group by level
-    for (const talent of allTalents) {
-      // For now, assume all talents are Level 1 unless specified
-      // Later: const talentLevel = talent.system?.level || 1;
-      const talentLevel = 1; // Default to Level 1 for now
-      
-      if (!talentsByLevel[talentLevel]) {
-        talentsByLevel[talentLevel] = [];
+    const normalizedSelected = Array.from(selectedTalents.keys());
+    const hasArmorTraining = normalizedSelected.some(name =>
+      name.includes("light armor training") || name.includes("medium armor training") || name.includes("heavy armor training")
+    );
+
+    const meetsTalentPrereqs = (talentDoc) => {
+      const name = (talentDoc.name || "").toLowerCase();
+      if (name === "medium armor training") {
+        return primeLevel >= 2 && hasArmorTraining;
       }
-      talentsByLevel[talentLevel].push({
-        ...talent,
+      return true;
+    };
+
+    const resolvedTalents = [];
+    for (const talentIndex of allTalents) {
+      let talentDoc;
+      try {
+        talentDoc = await talentsPack.getDocument(talentIndex._id);
+      } catch (err) {
+        continue;
+      }
+      if (!talentDoc || !meetsTalentPrereqs(talentDoc)) {
+        continue;
+      }
+
+      const normalizedName = (talentDoc.name || "").toLowerCase().trim();
+      if (selectedTalents.has(normalizedName)) {
+        const canRepeatWithVariations =
+          normalizedName.includes("saving throw") && normalizedName.includes("apprentice") ||
+          normalizedName.includes("skill training") && normalizedName.includes("apprentice") ||
+          normalizedName.includes("weapon training") ||
+          normalizedName.includes("blast");
+        if (!canRepeatWithVariations) {
+          continue;
+        }
+      }
+
+      let talentLevel = Number(talentDoc.system?.basic?.level) || 1;
+      if (talentLevel === 1) {
+        const nameLower = normalizedName;
+        if (nameLower === "medium armor training") {
+          talentLevel = 2;
+        }
+      }
+      resolvedTalents.push({
+        _id: talentDoc.id || talentIndex._id,
+        name: talentDoc.name,
+        img: talentDoc.img || "icons/svg/mystery-man.svg",
+        description: talentDoc.system?.description || talentDoc.system?.details?.description || "",
         level: talentLevel
       });
     }
+
+    for (const talent of resolvedTalents) {
+      if (!talentsByLevel[talent.level]) {
+        talentsByLevel[talent.level] = [];
+      }
+      talentsByLevel[talent.level].push(talent);
+    }
     
-    // Create level filter list
-    for (let lvl = 1; lvl <= 20; lvl++) {
+    const maxSelectableLevel = Number(level) || 1;
+    const levelsWithTalents = [];
+    for (let lvl = 1; lvl <= maxSelectableLevel; lvl++) {
       const count = talentsByLevel[lvl]?.length || 0;
-      if (count > 0 || lvl === level) { // Show level if it has talents or is the current level
+      if (count > 0) {
+        levelsWithTalents.push(lvl);
+      }
+    }
+
+    const initialLevel = level;
+
+    // Create level filter list (allow lower-level talents up to the current slot level)
+    for (let lvl = 1; lvl <= maxSelectableLevel; lvl++) {
+      const count = talentsByLevel[lvl]?.length || 0;
+      if (count > 0 || lvl === level) {
         availableLevels.push({
           level: lvl,
           count: count,
@@ -9431,8 +9744,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Get talents for the selected level and sort them
     const selectedLevelTalents = sortTalents(talentsByLevel[level] || []);
     
-    if (selectedLevelTalents.length === 0) {
-      ui.notifications.warn(`No talents available for Level ${level}.`);
+    if (selectedLevelTalents.length === 0 && levelsWithTalents.length === 0) {
+      ui.notifications.warn(`No talents available up to Level ${level}.`);
       return;
     }
     
@@ -9448,13 +9761,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Create and show dialog
     // Use a plain string title to avoid Foundry's localization/actor type formatting
           let dialogTitle = `Select Talent (Level ${level})`;
-          if (slotType === "bastionTalent") {
+          if (filterSlotType === "bastionTalent") {
             dialogTitle = `Select Bastion Talent (Level ${level})`;
-          } else if (slotType === "paragonTalent") {
+          } else if (filterSlotType === "paragonTalent") {
             dialogTitle = `Select Paragon Talent (Level ${level})`;
-          } else if (slotType === "gadgeteerTalent") {
+          } else if (filterSlotType === "gadgeteerTalent") {
             dialogTitle = `Select Gadgeteer Talent (Level ${level})`;
-          } else if (slotType === "marksmanTalent") {
+          } else if (filterSlotType === "marksmanTalent") {
             dialogTitle = `Select Marksman Talent (Level ${level})`;
           }
     
@@ -9574,10 +9887,14 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     };
 
     const renderTalentDialog = (html, dialogInstance) => {
+        console.log("Singularity | renderTalentDialog CALLED", { html, dialogInstance });
         const originalLevel = level;
         
         // Immediately fix the title in the HTML before Foundry can change it
-        const $html = $(html);
+      const $html = $(html instanceof HTMLElement ? html : html?.[0] || html);
+      const rootNode = dialogInstance?.element?.shadowRoot
+        ?? (dialogInstance?.element instanceof HTMLElement ? dialogInstance.element : dialogInstance?.element?.[0])
+        ?? (html instanceof HTMLElement ? html : html?.[0] || html);
         const dialogWindow = $html.closest('.window-app');
         if (dialogWindow.length) {
           dialogWindow.attr('data-dialog-id', dialogId);
@@ -9642,130 +9959,46 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         setTimeout(setTitleAndWidth, 200);
         
         // Helper function to update talent list
-        const updateTalentList = async (selectedLevel) => {
-          // Get all talents for the selected level
-          const talentsByLevel = {};
-          let allTalents = Array.from(index.values());
+        const updateTalentList = (selectedLevel) => {
+          const filteredTalents = (talentsByLevel[selectedLevel] || []).sort((a, b) => {
+            const nameA = a.name || "";
+            const nameB = b.name || "";
+            return nameA.localeCompare(nameB);
+          });
           
-          // Filter for Bastion talents if this is a bastionTalent slot
-          if (slotType === "bastionTalent") {
-            // Filter by type "bastion" if available, otherwise fall back to name matching
-            const bastionTalents = [];
-            for (const talentIndex of allTalents) {
-              try {
-                const talentDoc = await talentsPack.getDocument(talentIndex._id);
-                if (talentDoc && talentDoc.system?.basic?.type === "bastion") {
-                  bastionTalents.push(talentIndex);
-                }
-              } catch (err) {
-                // If we can't get the document, fall back to name matching
-                const name = (talentIndex.name || "").toLowerCase();
-                const bastionTalentNames = [
-                  "bastion's resistance", "bastions resistance", "bastion resistance",
-                  "enlarged presence", "ironbound", "protect the weak",
-                  "defensive stance", "increased resistance", "intercept attack",
-                  "regenerative fortitude", "protective barrier"
-                ];
-                if (name.includes("bastion") || 
-                    bastionTalentNames.some(btName => name.includes(btName.toLowerCase()))) {
-                  bastionTalents.push(talentIndex);
-                }
-              }
-            }
-            allTalents = bastionTalents;
-          } else if (slotType === "genericTalent" || slotType === "humanGenericTalent" || slotType === "terranGenericTalent") {
-            // Filter OUT Bastion talents for generic talent slots
-            const genericTalents = [];
-            const bastionTalentNames = [
-              "bastion's resistance", "bastions resistance", "bastion resistance",
-              "enlarged presence", "ironbound", "protect the weak",
-              "defensive stance", "increased resistance", "intercept attack",
-              "regenerative fortitude", "protective barrier"
-            ];
-            
-            for (const talentIndex of allTalents) {
-              try {
-                const talentDoc = await talentsPack.getDocument(talentIndex._id);
-                // Exclude talents with type "bastion"
-                if (talentDoc && talentDoc.system?.basic?.type !== "bastion") {
-                  genericTalents.push(talentIndex);
-                }
-              } catch (err) {
-                // If we can't get the document, fall back to name matching
-                const name = (talentIndex.name || "").toLowerCase();
-                const isBastionTalent = name.includes("bastion") || 
-                    bastionTalentNames.some(btName => name.includes(btName.toLowerCase()));
-                if (!isBastionTalent) {
-                  genericTalents.push(talentIndex);
-                }
-              }
-            }
-            allTalents = genericTalents;
-          }
-          
-          for (const talent of allTalents) {
-            const talentName = talent.name || "";
-            const normalizedName = talentName.toLowerCase().trim();
-            
-            // Check if this talent is already selected
-            if (selectedTalents.has(normalizedName)) {
-              const entry = selectedTalents.get(normalizedName);
-              
-              // Special handling for talents that can be taken multiple times with different variations
-              const canRepeatWithVariations = 
-                normalizedName.includes("saving throw") && normalizedName.includes("apprentice") ||
-                normalizedName.includes("skill training") && normalizedName.includes("apprentice") ||
-                normalizedName.includes("weapon training") ||
-                normalizedName.includes("blast");
-              
-              if (canRepeatWithVariations) {
-                // Allow this talent to show - the user can select a different variation
-                // (The actual variation checking happens when they select it)
-              } else {
-                // Skip this talent - it's already selected and can't be repeated
-                continue;
-              }
-            }
-            
-            const talentLevel = 1; // Default to Level 1 for now
-            if (!talentsByLevel[talentLevel]) {
-              talentsByLevel[talentLevel] = [];
-            }
-            talentsByLevel[talentLevel].push({
-              ...talent,
-              level: talentLevel
-            });
-          }
-          
-          // Sort talents alphabetically
-          const sortTalents = (talents) => {
-            return talents.sort((a, b) => {
-              const nameA = a.name || "";
-              const nameB = b.name || "";
-              return nameA.localeCompare(nameB);
-            });
-          };
-          
-          const filteredTalents = sortTalents(talentsByLevel[selectedLevel] || []);
+          console.log(`Singularity | updateTalentList called for level ${selectedLevel}, found ${filteredTalents.length} talents`);
           
           // Update the talent list
-          const talentList = html.find(".talent-list");
-          talentList.empty();
+          const listRoot = rootNode?.querySelector?.(".talent-list")
+            ?? $html[0]?.querySelector?.(".talent-list");
+          console.log("Singularity | listRoot element:", listRoot);
+          if (!listRoot) {
+            console.error("Singularity | Could not find .talent-list element!");
+            return;
+          }
+          console.log("Singularity | Clearing listRoot innerHTML, current children:", listRoot.children.length);
+          listRoot.innerHTML = "";
+          console.log("Singularity | After clear, children count:", listRoot.children.length);
           
           if (filteredTalents.length === 0) {
-            talentList.append(`<p style="color: #a0aec0; padding: 20px; text-align: center;">No talents available for Level ${selectedLevel}.</p>`);
+            console.log("Singularity | No talents, inserting empty message");
+            listRoot.insertAdjacentHTML("beforeend", `<p style="color: #a0aec0; padding: 20px; text-align: center;">No talents available for Level ${selectedLevel}.</p>`);
           } else {
-            filteredTalents.forEach(talent => {
-              const talentItem = $(`
+            console.log(`Singularity | Inserting ${filteredTalents.length} talents into listRoot`);
+            filteredTalents.forEach((talent, index) => {
+              const talentItemHtml = `
                 <div class="talent-item" data-talent-id="${talent._id}" data-talent-level="${talent.level}" role="button" tabindex="0">
                   <img class="talent-icon" src="${talent.img || 'icons/svg/mystery-man.svg'}" alt="${talent.name}" onerror="this.src='icons/svg/mystery-man.svg'">
                   <div class="talent-info">
                     <div class="talent-name">${talent.name}</div>
+                    ${talent.description ? `<div class="talent-description">${talent.description}</div>` : ""}
                   </div>
                 </div>
-              `);
-              talentList.append(talentItem);
+              `;
+              listRoot.insertAdjacentHTML("beforeend", talentItemHtml);
+              if (index === 0) console.log("Singularity | First talent HTML:", talentItemHtml.substring(0, 200));
             });
+            console.log("Singularity | After inserting, listRoot children count:", listRoot.children.length);
           }
           
           // Re-bind click handlers to new items (same pattern as item-selection)
@@ -9773,13 +10006,29 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         };
         
         // Handle level filter changes
-        html.find('input[name="levelFilter"]').on("change", async (event) => {
-          const selectedLevel = parseInt(event.target.value);
-          await updateTalentList(selectedLevel);
+        const levelInputs = rootNode?.querySelectorAll?.('input[name="levelFilter"]')
+          ?? $html[0]?.querySelectorAll?.('input[name="levelFilter"]')
+          ?? [];
+        console.log("Singularity | Found level filter inputs:", levelInputs.length);
+        levelInputs.forEach((input) => {
+          input.addEventListener("change", (event) => {
+            console.log("Singularity | Level filter changed to:", event.target.value);
+            const selectedLevel = parseInt(event.target.value);
+            updateTalentList(selectedLevel);
+          });
         });
         
         // Bind talent item clicks from dialog root (same as bindItemSelection for background/phenotype/etc.)
         if (dialogInstance) bindTalentSelection(dialogInstance);
+        
+        // Populate the initial list on render
+        setTimeout(() => {
+          const selectedInput = rootNode?.querySelector?.('input[name="levelFilter"]:checked')
+            ?? $html[0]?.querySelector?.('input[name="levelFilter"]:checked');
+          const selected = selectedInput?.value;
+          console.log("Singularity | Initial render, selected level:", selected);
+          if (selected) updateTalentList(parseInt(selected));
+        }, 100);
       };
     
     const clearDialogFlag = () => {
@@ -9807,6 +10056,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         ? (_app, html) => renderTalentDialog(html, dialogRef.current)
         : (html) => renderTalentDialog(html, dialogRef.current)
     };
+    console.log("Singularity | Creating dialog with options", { DialogClass: DialogClass?.name, dialogOptions });
     const dialog = new DialogClass(dialogOptions);
     dialogRef.current = dialog;
     
@@ -9821,7 +10071,20 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     dialog._singularityDialogTitle = dialogTitle;
     if (dialog.data) dialog.data.title = dialogTitle;
     
+    console.log("Singularity | About to render dialog", dialog);
     await dialog.render(true);
+    console.log("Singularity | Dialog rendered");
+    
+    // For DialogV2, the render callback in options doesn't work - manually call it after render
+    if (DialogClass?.name === "DialogV2") {
+      console.log("Singularity | Manually calling renderTalentDialog for DialogV2");
+      setTimeout(() => {
+        const html = dialog.element;
+        console.log("Singularity | DialogV2 element:", html);
+        renderTalentDialog(html, dialog);
+      }, 100);
+    }
+    
     const tryBind = () => bindTalentSelection(dialog);
     if (!tryBind()) {
       setTimeout(tryBind, 50);
@@ -9850,6 +10113,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     if (!level || !slotType) {
       return;
     }
+
+    if (!this._canAccessProgressionLevel(level)) {
+      return;
+    }
     
     // Open phenotype selection dialog
     await this._openItemSelectionDialog(level, slotType, "phenotypes", "Phenotype");
@@ -9873,6 +10140,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const slotType = $(event.currentTarget).data("slot-type");
     
     if (!level || !slotType) {
+      return;
+    }
+
+    if (!this._canAccessProgressionLevel(level)) {
       return;
     }
     
@@ -9909,6 +10180,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     if (!level || !slotType) {
       return;
     }
+
+    if (!this._canAccessProgressionLevel(level)) {
+      return;
+    }
     
     // Open background selection dialog
     await this._openItemSelectionDialog(level, slotType, "backgrounds", "Background");
@@ -9932,6 +10207,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const slotType = $(event.currentTarget).data("slot-type");
     
     if (!level || !slotType) {
+      return;
+    }
+
+    if (!this._canAccessProgressionLevel(level)) {
       return;
     }
     
@@ -10519,6 +10798,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const select = event.currentTarget;
     const value = select.value;
     const slotType = select.dataset.slotType || $(select).closest(".progression-slot").data("slot-type");
+    const level = Number($(select).closest(".progression-slot").data("level")) || null;
+    const levelKey = level ? `level${level}` : "level1";
+
+    if (level && !this._canAccessProgressionLevel(level)) {
+      this.render();
+      return;
+    }
 
     if (select.dataset?.manualSave === "true") {
       return;
@@ -10599,7 +10885,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         
         await this.actor.update({
           "system.skills": skills,
-          [`system.progression.level1.${slotType}`]: value
+          [`system.progression.${levelKey}.${slotType}`]: value
         });
         this.render();
         return;
@@ -10635,7 +10921,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         
         await this.actor.update({
           "system.skills": skills,
-          [`system.progression.level1.${slotType}`]: value
+          [`system.progression.${levelKey}.${slotType}`]: value
         });
         this.render();
         return;
@@ -10662,7 +10948,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     
     // Update the progression slot
     const updateData = {
-      [`system.progression.level1.${slotType}`]: value || null
+      [`system.progression.${levelKey}.${slotType}`]: value || null
     };
     
     // If this is the Bastion Saving Throw selection, update the saving throw rank
@@ -10772,8 +11058,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     
     // Get current progression data (including the new value we're about to set)
     const progression = foundry.utils.deepClone(this.actor.system.progression || {});
+    const levelData = progression[levelKey] || {};
+    levelData[slotType] = value || null;
+    progression[levelKey] = levelData;
     const level1 = progression.level1 || {};
-    level1[slotType] = value || null;
     
     // Calculate bonuses
     if (level1.humanAbilityBoost) {
@@ -10781,6 +11069,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     if (level1.terranAbilityBoost) {
       abilityBonuses[level1.terranAbilityBoost] += 1;
+    }
+    if (level1.backgroundAbilityBoost) {
+      abilityBonuses[level1.backgroundAbilityBoost] += 1;
     }
     
     // Check powerset benefits
@@ -10859,6 +11150,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
     
+    const asiLevels = [3, 5, 8, 10, 13, 15, 18, 20];
+    for (const asiLevel of asiLevels) {
+      const asiKey = `level${asiLevel}`;
+      const asiData = progression[asiKey] || {};
+      const boosts = [asiData.abilityScoreImprovement1, asiData.abilityScoreImprovement2];
+      for (const boost of boosts) {
+        if (boost && abilityBonuses.hasOwnProperty(boost)) {
+          abilityBonuses[boost] += 1;
+        }
+      }
+    }
+
     // Update ability scores based on bonuses (base is always 0)
     const abilities = ["might", "agility", "endurance", "wits", "charm"];
     for (const ability of abilities) {

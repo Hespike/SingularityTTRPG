@@ -1192,9 +1192,26 @@
               <h4>Level 3</h4>
             </div>
             <div class="progression-slots">
-              <div class="progression-slot asi-slot" data-level="3" data-slot-type="abilityScoreImprovement">
-                <input type="checkbox" name="system.progression.level3.abilityScoreImprovement" {{checked actor.system.progression.level3.abilityScoreImprovement}}/>
-                <label>Ability Score Improvement</label>
+              <div class="progression-slot asi-slot ability-boost-slot" data-level="3" data-slot-type="abilityScoreImprovement">
+                <label>Ability Score Improvement:</label>
+                <div class="asi-selects">
+                  <select name="system.progression.level3.abilityScoreImprovement1" class="ability-boost-select" data-slot-type="abilityScoreImprovement1">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level3.abilityScoreImprovement1 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level3.abilityScoreImprovement1 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level3.abilityScoreImprovement1 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level3.abilityScoreImprovement1 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level3.abilityScoreImprovement1 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                  <select name="system.progression.level3.abilityScoreImprovement2" class="ability-boost-select" data-slot-type="abilityScoreImprovement2">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level3.abilityScoreImprovement2 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level3.abilityScoreImprovement2 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level3.abilityScoreImprovement2 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level3.abilityScoreImprovement2 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level3.abilityScoreImprovement2 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                </div>
               </div>
               <div class="progression-slot" data-level="3" data-slot-type="powersetTalent" data-drop-zone="progression">
                 {{#if actor.system.progression.level3.powersetTalent}}
@@ -1240,9 +1257,26 @@
               <h4>Level 5</h4>
             </div>
             <div class="progression-slots">
-              <div class="progression-slot asi-slot" data-level="5" data-slot-type="abilityScoreImprovement">
-                <input type="checkbox" name="system.progression.level5.abilityScoreImprovement" {{checked actor.system.progression.level5.abilityScoreImprovement}}/>
-                <label>Ability Score Improvement</label>
+              <div class="progression-slot asi-slot ability-boost-slot" data-level="5" data-slot-type="abilityScoreImprovement">
+                <label>Ability Score Improvement:</label>
+                <div class="asi-selects">
+                  <select name="system.progression.level5.abilityScoreImprovement1" class="ability-boost-select" data-slot-type="abilityScoreImprovement1">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level5.abilityScoreImprovement1 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level5.abilityScoreImprovement1 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level5.abilityScoreImprovement1 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level5.abilityScoreImprovement1 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level5.abilityScoreImprovement1 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                  <select name="system.progression.level5.abilityScoreImprovement2" class="ability-boost-select" data-slot-type="abilityScoreImprovement2">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level5.abilityScoreImprovement2 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level5.abilityScoreImprovement2 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level5.abilityScoreImprovement2 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level5.abilityScoreImprovement2 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level5.abilityScoreImprovement2 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                </div>
               </div>
               <div class="progression-slot" data-level="5" data-slot-type="powersetTalent" data-drop-zone="progression">
                 {{#if actor.system.progression.level5.powersetTalent}}
@@ -1310,9 +1344,26 @@
               <h4>Level 8</h4>
             </div>
             <div class="progression-slots">
-              <div class="progression-slot asi-slot" data-level="8" data-slot-type="abilityScoreImprovement">
-                <input type="checkbox" name="system.progression.level8.abilityScoreImprovement" {{checked actor.system.progression.level8.abilityScoreImprovement}}/>
-                <label>Ability Score Improvement</label>
+              <div class="progression-slot asi-slot ability-boost-slot" data-level="8" data-slot-type="abilityScoreImprovement">
+                <label>Ability Score Improvement:</label>
+                <div class="asi-selects">
+                  <select name="system.progression.level8.abilityScoreImprovement1" class="ability-boost-select" data-slot-type="abilityScoreImprovement1">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level8.abilityScoreImprovement1 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level8.abilityScoreImprovement1 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level8.abilityScoreImprovement1 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level8.abilityScoreImprovement1 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level8.abilityScoreImprovement1 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                  <select name="system.progression.level8.abilityScoreImprovement2" class="ability-boost-select" data-slot-type="abilityScoreImprovement2">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level8.abilityScoreImprovement2 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level8.abilityScoreImprovement2 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level8.abilityScoreImprovement2 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level8.abilityScoreImprovement2 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level8.abilityScoreImprovement2 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                </div>
               </div>
               <div class="progression-slot talent-slot" data-level="8" data-slot-type="genericTalent" data-drop-zone="progression">
                 {{#if actor.system.progression.level8.genericTalent}}
@@ -1358,9 +1409,26 @@
               <h4>Level 10</h4>
             </div>
             <div class="progression-slots">
-              <div class="progression-slot asi-slot" data-level="10" data-slot-type="abilityScoreImprovement">
-                <input type="checkbox" name="system.progression.level10.abilityScoreImprovement" {{checked actor.system.progression.level10.abilityScoreImprovement}}/>
-                <label>Ability Score Improvement</label>
+              <div class="progression-slot asi-slot ability-boost-slot" data-level="10" data-slot-type="abilityScoreImprovement">
+                <label>Ability Score Improvement:</label>
+                <div class="asi-selects">
+                  <select name="system.progression.level10.abilityScoreImprovement1" class="ability-boost-select" data-slot-type="abilityScoreImprovement1">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level10.abilityScoreImprovement1 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level10.abilityScoreImprovement1 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level10.abilityScoreImprovement1 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level10.abilityScoreImprovement1 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level10.abilityScoreImprovement1 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                  <select name="system.progression.level10.abilityScoreImprovement2" class="ability-boost-select" data-slot-type="abilityScoreImprovement2">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level10.abilityScoreImprovement2 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level10.abilityScoreImprovement2 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level10.abilityScoreImprovement2 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level10.abilityScoreImprovement2 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level10.abilityScoreImprovement2 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                </div>
               </div>
               <div class="progression-slot" data-level="10" data-slot-type="powersetTalent" data-drop-zone="progression">
                 {{#if actor.system.progression.level10.powersetTalent}}
@@ -1428,9 +1496,26 @@
               <h4>Level 13</h4>
             </div>
             <div class="progression-slots">
-              <div class="progression-slot asi-slot" data-level="13" data-slot-type="abilityScoreImprovement">
-                <input type="checkbox" name="system.progression.level13.abilityScoreImprovement" {{checked actor.system.progression.level13.abilityScoreImprovement}}/>
-                <label>Ability Score Improvement</label>
+              <div class="progression-slot asi-slot ability-boost-slot" data-level="13" data-slot-type="abilityScoreImprovement">
+                <label>Ability Score Improvement:</label>
+                <div class="asi-selects">
+                  <select name="system.progression.level13.abilityScoreImprovement1" class="ability-boost-select" data-slot-type="abilityScoreImprovement1">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level13.abilityScoreImprovement1 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level13.abilityScoreImprovement1 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level13.abilityScoreImprovement1 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level13.abilityScoreImprovement1 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level13.abilityScoreImprovement1 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                  <select name="system.progression.level13.abilityScoreImprovement2" class="ability-boost-select" data-slot-type="abilityScoreImprovement2">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level13.abilityScoreImprovement2 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level13.abilityScoreImprovement2 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level13.abilityScoreImprovement2 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level13.abilityScoreImprovement2 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level13.abilityScoreImprovement2 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                </div>
               </div>
               <div class="progression-slot talent-slot" data-level="13" data-slot-type="genericTalent" data-drop-zone="progression">
                 {{#if actor.system.progression.level13.genericTalent}}
@@ -1476,9 +1561,26 @@
               <h4>Level 15</h4>
             </div>
             <div class="progression-slots">
-              <div class="progression-slot asi-slot" data-level="15" data-slot-type="abilityScoreImprovement">
-                <input type="checkbox" name="system.progression.level15.abilityScoreImprovement" {{checked actor.system.progression.level15.abilityScoreImprovement}}/>
-                <label>Ability Score Improvement</label>
+              <div class="progression-slot asi-slot ability-boost-slot" data-level="15" data-slot-type="abilityScoreImprovement">
+                <label>Ability Score Improvement:</label>
+                <div class="asi-selects">
+                  <select name="system.progression.level15.abilityScoreImprovement1" class="ability-boost-select" data-slot-type="abilityScoreImprovement1">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level15.abilityScoreImprovement1 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level15.abilityScoreImprovement1 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level15.abilityScoreImprovement1 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level15.abilityScoreImprovement1 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level15.abilityScoreImprovement1 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                  <select name="system.progression.level15.abilityScoreImprovement2" class="ability-boost-select" data-slot-type="abilityScoreImprovement2">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level15.abilityScoreImprovement2 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level15.abilityScoreImprovement2 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level15.abilityScoreImprovement2 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level15.abilityScoreImprovement2 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level15.abilityScoreImprovement2 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                </div>
               </div>
               <div class="progression-slot" data-level="15" data-slot-type="powersetTalent" data-drop-zone="progression">
                 {{#if actor.system.progression.level15.powersetTalent}}
@@ -1546,9 +1648,26 @@
               <h4>Level 18</h4>
             </div>
             <div class="progression-slots">
-              <div class="progression-slot asi-slot" data-level="18" data-slot-type="abilityScoreImprovement">
-                <input type="checkbox" name="system.progression.level18.abilityScoreImprovement" {{checked actor.system.progression.level18.abilityScoreImprovement}}/>
-                <label>Ability Score Improvement</label>
+              <div class="progression-slot asi-slot ability-boost-slot" data-level="18" data-slot-type="abilityScoreImprovement">
+                <label>Ability Score Improvement:</label>
+                <div class="asi-selects">
+                  <select name="system.progression.level18.abilityScoreImprovement1" class="ability-boost-select" data-slot-type="abilityScoreImprovement1">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level18.abilityScoreImprovement1 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level18.abilityScoreImprovement1 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level18.abilityScoreImprovement1 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level18.abilityScoreImprovement1 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level18.abilityScoreImprovement1 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                  <select name="system.progression.level18.abilityScoreImprovement2" class="ability-boost-select" data-slot-type="abilityScoreImprovement2">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level18.abilityScoreImprovement2 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level18.abilityScoreImprovement2 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level18.abilityScoreImprovement2 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level18.abilityScoreImprovement2 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level18.abilityScoreImprovement2 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                </div>
               </div>
               <div class="progression-slot talent-slot" data-level="18" data-slot-type="genericTalent" data-drop-zone="progression">
                 {{#if actor.system.progression.level18.genericTalent}}
@@ -1594,9 +1713,26 @@
               <h4>Level 20</h4>
             </div>
             <div class="progression-slots">
-              <div class="progression-slot asi-slot" data-level="20" data-slot-type="abilityScoreImprovement">
-                <input type="checkbox" name="system.progression.level20.abilityScoreImprovement" {{checked actor.system.progression.level20.abilityScoreImprovement}}/>
-                <label>Ability Score Improvement</label>
+              <div class="progression-slot asi-slot ability-boost-slot" data-level="20" data-slot-type="abilityScoreImprovement">
+                <label>Ability Score Improvement:</label>
+                <div class="asi-selects">
+                  <select name="system.progression.level20.abilityScoreImprovement1" class="ability-boost-select" data-slot-type="abilityScoreImprovement1">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level20.abilityScoreImprovement1 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level20.abilityScoreImprovement1 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level20.abilityScoreImprovement1 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level20.abilityScoreImprovement1 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level20.abilityScoreImprovement1 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                  <select name="system.progression.level20.abilityScoreImprovement2" class="ability-boost-select" data-slot-type="abilityScoreImprovement2">
+                    <option value="">Choose Ability...</option>
+                    <option value="might" {{#if (eq actor.system.progression.level20.abilityScoreImprovement2 "might")}}selected{{/if}}>Might</option>
+                    <option value="agility" {{#if (eq actor.system.progression.level20.abilityScoreImprovement2 "agility")}}selected{{/if}}>Agility</option>
+                    <option value="endurance" {{#if (eq actor.system.progression.level20.abilityScoreImprovement2 "endurance")}}selected{{/if}}>Endurance</option>
+                    <option value="wits" {{#if (eq actor.system.progression.level20.abilityScoreImprovement2 "wits")}}selected{{/if}}>Wits</option>
+                    <option value="charm" {{#if (eq actor.system.progression.level20.abilityScoreImprovement2 "charm")}}selected{{/if}}>Charm</option>
+                  </select>
+                </div>
               </div>
               <div class="progression-slot" data-level="20" data-slot-type="powersetTalent" data-drop-zone="progression">
                 {{#if actor.system.progression.level20.powersetTalent}}
