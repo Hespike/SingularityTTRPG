@@ -595,6 +595,7 @@
         <div class="gadget-slot-summary">
           <p>Level 0 slots: <strong>{{gadgetSlots.level0.available}}/{{gadgetSlots.level0.total}}</strong> available</p>
           <p>Level 1 slots: <strong>{{gadgetSlots.level1.available}}/{{gadgetSlots.level1.total}}</strong> available</p>
+          <p>Level 2 slots: <strong>{{gadgetSlots.level2.available}}/{{gadgetSlots.level2.total}}</strong> available</p>
         </div>
         
         {{#if (gt gadgetSlots.level0.total 0)}}
@@ -640,6 +641,31 @@
               {{else}}
                 <li class="gadget-slot-empty">
                   <button type="button" class="add-gadget" data-gadget-level="1" data-slot-index="{{slotIndex}}">+ Add Level 1 Gadget (Slot {{slot.slotNumber}}/{{../gadgetSlots.level1.total}})</button>
+                </li>
+              {{/if}}
+            {{/each}}
+          </ol>
+        </div>
+        {{/if}}
+
+        {{#if (gt gadgetSlots.level2.total 0)}}
+        <div class="gadget-level-section">
+          <h5>Level 2 Gadgets</h5>
+          <ol class="gadget-list">
+            {{#each gadgetSlotsArray.level2 as |slot slotIndex|}}
+              {{#if slot.gadget}}
+                <li class="gadget-item gadget-item-clickable" data-gadget-level="2" data-gadget-index="{{slotIndex}}" data-gadget-id="{{slot.gadget.id}}">
+                  <img class="gadget-icon item-icon" src="{{slot.gadget.img}}" alt="{{slot.gadget.name}}" onerror="this.src='icons/svg/mystery-man.svg'"/>
+                  <div class="gadget-name item-name">{{slot.gadget.name}}</div>
+                  <div class="gadget-controls">
+                    <button type="button" class="gadget-use" data-gadget-level="2" data-gadget-index="{{slotIndex}}" {{#if slot.gadget.used}}disabled{{/if}}>Use</button>
+                    <a class="gadget-remove" data-gadget-level="2" data-gadget-index="{{slotIndex}}" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                  {{#if slot.gadget.used}}<span class="gadget-used-badge">Used</span>{{/if}}
+                </li>
+              {{else}}
+                <li class="gadget-slot-empty">
+                  <button type="button" class="add-gadget" data-gadget-level="2" data-slot-index="{{slotIndex}}">+ Add Level 2 Gadget (Slot {{slot.slotNumber}}/{{../gadgetSlots.level2.total}})</button>
                 </li>
               {{/if}}
             {{/each}}

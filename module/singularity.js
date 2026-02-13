@@ -1073,6 +1073,7 @@ Hooks.once("init", function() {
       } catch (err) {
         console.warn("Singularity | Failed to load gadget for save roll:", err);
       }
+      const isSonicGrenade = String(gadgetName || "").trim().toLowerCase() === "sonic grenade";
 
       const dc = computeGadgetTuningDC(actor);
       const results = [];
@@ -1101,23 +1102,25 @@ Hooks.once("init", function() {
         }
 
         const effectsApplied = [];
-        if (degree === "Success") {
-          if (targetActor.isOwner || game.user.isGM) {
-            await applyStatusEffect(targetActor, "dazed");
-            effectsApplied.push("Dazed");
-          }
-        } else if (degree === "Failure") {
-          if (targetActor.isOwner || game.user.isGM) {
-            await applyStatusEffect(targetActor, "staggered", 1);
-            await applyStatusEffect(targetActor, "dazed");
-            effectsApplied.push("Staggered 1", "Dazed");
-          }
-        } else if (degree === "Extreme Failure") {
-          if (targetActor.isOwner || game.user.isGM) {
-            await applyStatusEffect(targetActor, "staggered", 2);
-            await applyStatusEffect(targetActor, "dazed");
-            await applyStatusEffect(targetActor, "deafened");
-            effectsApplied.push("Staggered 2", "Dazed", "Deafened");
+        if (isSonicGrenade) {
+          if (degree === "Success") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "dazed");
+              effectsApplied.push("Dazed");
+            }
+          } else if (degree === "Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "staggered", 1);
+              await applyStatusEffect(targetActor, "dazed");
+              effectsApplied.push("Staggered 1", "Dazed");
+            }
+          } else if (degree === "Extreme Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "staggered", 2);
+              await applyStatusEffect(targetActor, "dazed");
+              await applyStatusEffect(targetActor, "deafened");
+              effectsApplied.push("Staggered 2", "Dazed", "Deafened");
+            }
           }
         }
 
@@ -4751,7 +4754,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
     }
   }, 5500);
 
-  // Auto-create Level 1 Gadgeteer Talents in the talents compendium
+  // Auto-create Gadgeteer Talents in the talents compendium
   setTimeout(async () => {
     try {
       const pack = game.packs.find(p => p.metadata.name === "talents" && p.metadata.packageName === "singularity");
@@ -4765,7 +4768,8 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
       const gadgeteerTalentNames = [
         "Enough Prep Time",
         "Expanded Loadout",
-        "Improvised Gadget"
+        "Improvised Gadget",
+        "Rapid Deployment"
       ];
       
       const allExist = gadgeteerTalentNames.every(name => 
@@ -4773,8 +4777,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
       );
       
       if (allExist) {
-        console.log("Singularity | All Level 1 Gadgeteer talents already exist in compendium");
-        return;
+        console.log("Singularity | All Gadgeteer talents already exist in compendium; verifying metadata");
       }
 
       const wasLocked = pack.locked;
@@ -4783,9 +4786,10 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      const level1GadgeteerTalents = [
+      const gadgeteerTalents = [
         {
           name: "Enough Prep Time",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Given time to plan, analyze, and counter a specific threat, you tailor your gadgets and tactics for maximum effectiveness.</p>
 
@@ -4817,6 +4821,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Expanded Loadout",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You carry extra components, backup power cells, and modular housings, allowing you to prepare more gadgets than usual.</p>
 
@@ -4832,6 +4837,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Improvised Gadget",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You assemble functional devices from scraps, spare parts, and sheer ingenuity.</p>
 
@@ -4854,14 +4860,47 @@ Improvised Gadget talent</p>
 <p>You create one Level 0 gadget that you did not prepare. You can only use this gadget once per day.</p>`,
           type: "gadgeteer",
           prerequisites: "Gadgeteer 1"
+        },
+        {
+          name: "Rapid Deployment",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>Your gadgets are optimized for quick activation, allowing you to deploy them with minimal setup time.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 3</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use a gadget, you can reduce its energy cost by <strong>1</strong> (minimum <strong>1</strong> energy).</p>
+<p>You can use this ability a number of times per encounter equal to your <strong>Wits modifier</strong> (minimum <strong>1</strong>).</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 3"
         }
       ];
 
       const itemsToCreate = [];
-      for (const talentData of level1GadgeteerTalents) {
+      for (const talentData of gadgeteerTalents) {
         const exists = pack.index.find(i => i.name === talentData.name);
         if (exists) {
-          console.log(`Singularity | ${talentData.name} already exists, skipping`);
+          try {
+            const existingDoc = await pack.getDocument(exists._id);
+            const updates = {};
+            if (talentData.level && existingDoc?.system?.basic?.level !== talentData.level) {
+              updates["system.basic.level"] = talentData.level;
+            }
+            if (talentData.prerequisites && existingDoc?.system?.basic?.prerequisites !== talentData.prerequisites) {
+              updates["system.basic.prerequisites"] = talentData.prerequisites;
+            }
+            if (Object.keys(updates).length) {
+              await existingDoc.update(updates);
+              console.log(`Singularity | Updated ${talentData.name} metadata`);
+            }
+          } catch (updateErr) {
+            console.warn(`Singularity | Could not update ${talentData.name}:`, updateErr);
+          }
+          console.log(`Singularity | ${talentData.name} already exists, skipping create`);
           continue;
         }
         itemsToCreate.push({
@@ -4871,7 +4910,8 @@ Improvised Gadget talent</p>
             description: talentData.description,
             basic: {
               type: talentData.type,
-              prerequisites: talentData.prerequisites
+              prerequisites: talentData.prerequisites,
+              level: talentData.level || 1
             },
             archived: false
           },
@@ -4880,12 +4920,12 @@ Improvised Gadget talent</p>
       }
 
       if (itemsToCreate.length === 0) {
-        console.log("Singularity | All Level 1 Gadgeteer talents already exist");
+        console.log("Singularity | All Gadgeteer talents already exist");
         if (wasLocked) await pack.configure({ locked: true });
         return;
       }
 
-      console.log(`Singularity | Creating ${itemsToCreate.length} Level 1 Gadgeteer talents...`);
+      console.log(`Singularity | Creating ${itemsToCreate.length} Gadgeteer talents...`);
       const createdItems = await Item.createDocuments(itemsToCreate, { render: false });
       
       for (const item of createdItems) {
@@ -4907,14 +4947,14 @@ Improvised Gadget talent</p>
       
       if (wasLocked) await pack.configure({ locked: true });
       
-      ui.notifications.info(`Created ${itemsToCreate.length} Level 1 Gadgeteer talents in Talents compendium!`);
+      ui.notifications.info(`Created ${itemsToCreate.length} Gadgeteer talents in Talents compendium!`);
     } catch (error) {
-      console.error("Singularity | Could not auto-create Level 1 Gadgeteer talents:", error);
-      ui.notifications.error(`Failed to create Level 1 Gadgeteer talents: ${error.message}`);
+      console.error("Singularity | Could not auto-create Gadgeteer talents:", error);
+      ui.notifications.error(`Failed to create Gadgeteer talents: ${error.message}`);
     }
   }, 6000);
 
-  // Auto-create Level 1 Marksman Talents in the talents compendium
+  // Auto-create Marksman talents in the talents compendium
   setTimeout(async () => {
     try {
       const pack = game.packs.find(p => p.metadata.name === "talents" && p.metadata.packageName === "singularity");
@@ -4928,7 +4968,9 @@ Improvised Gadget talent</p>
       const marksmanTalentNames = [
         "Deadeye",
         "Quickdraw",
-        "Suppressive Fire"
+        "Suppressive Fire",
+        "Stabilized Movement",
+        "Fast Reload"
       ];
       
       const allExist = marksmanTalentNames.every(name => 
@@ -4936,8 +4978,7 @@ Improvised Gadget talent</p>
       );
       
       if (allExist) {
-        console.log("Singularity | All Level 1 Marksman talents already exist in compendium");
-        return;
+        console.log("Singularity | All Marksman talents already exist in compendium; verifying metadata");
       }
 
       const wasLocked = pack.locked;
@@ -4946,9 +4987,10 @@ Improvised Gadget talent</p>
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      const level1MarksmanTalents = [
+      const marksmanTalents = [
         {
           name: "Deadeye",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You steady your weapon with razor focus, lining up the perfect shot.</p>
 
@@ -4972,6 +5014,7 @@ Improvised Gadget talent</p>
         },
         {
           name: "Quickdraw",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your reflexes are lightning-fast, honed for the split-second between danger and response.</p>
 
@@ -4990,6 +5033,7 @@ Improvised Gadget talent</p>
         },
         {
           name: "Suppressive Fire",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You are trained to keep enemies pinned down with precise, suppressive shots.</p>
 
@@ -5003,16 +5047,67 @@ Improvised Gadget talent</p>
 <p>You can use the <strong>Suppressive Fire</strong> action.</p>`,
           type: "marksman",
           prerequisites: "Marksman 1"
+        },
+        {
+          name: "Stabilized Movement",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>Your posture and balance keep your weapon steady, even on the move.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 3</li>
+  <li>Deadeye</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use Deadeye, you do not lose its attack bonus if you move before making the attack.</p>
+<p>You still lose the bonus if the target moves.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 3; Deadeye"
+        },
+        {
+          name: "Fast Reload",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>Your hands move with practiced speed, reloading your weapon almost instinctively.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 3</li>
+  <li>You wield a ranged weapon that requires reloading.</li>
+</ul>
+
+<h3>Effect</h3>
+<p>Once per round, when you reload a ranged weapon, you reduce the energy cost by <strong>1</strong> (minimum <strong>1</strong> energy).</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 3; Reloading ranged weapon"
         }
       ];
 
       // Create all talent items
       const itemsToCreate = [];
-      for (const talentData of level1MarksmanTalents) {
+      for (const talentData of marksmanTalents) {
         // Check if it already exists
         const exists = pack.index.find(i => i.name === talentData.name);
         if (exists) {
-          console.log(`Singularity | ${talentData.name} already exists, skipping`);
+          try {
+            const existingDoc = await pack.getDocument(exists._id);
+            const updates = {};
+            if (talentData.level && existingDoc?.system?.basic?.level !== talentData.level) {
+              updates["system.basic.level"] = talentData.level;
+            }
+            if (talentData.prerequisites && existingDoc?.system?.basic?.prerequisites !== talentData.prerequisites) {
+              updates["system.basic.prerequisites"] = talentData.prerequisites;
+            }
+            if (Object.keys(updates).length) {
+              await existingDoc.update(updates);
+              console.log(`Singularity | Updated ${talentData.name} metadata`);
+            }
+          } catch (updateErr) {
+            console.warn(`Singularity | Could not update ${talentData.name}:`, updateErr);
+          }
+          console.log(`Singularity | ${talentData.name} already exists, skipping create`);
           continue;
         }
 
@@ -5023,7 +5118,8 @@ Improvised Gadget talent</p>
             description: talentData.description,
             basic: {
               type: talentData.type,
-              prerequisites: talentData.prerequisites
+              prerequisites: talentData.prerequisites,
+              level: talentData.level || 1
             },
             archived: false
           },
@@ -5067,7 +5163,7 @@ Improvised Gadget talent</p>
     }
   }, 6100);
 
-  // Auto-create Gadgets in the gadgets compendium (Level 0 and Level 1)
+  // Auto-create Gadgets in the gadgets compendium (Level 0 through Level 2)
   setTimeout(async () => {
     try {
       // First, check if gadgets compendium exists, if not, we'll need to create items in world
@@ -5107,7 +5203,7 @@ Improvised Gadget talent</p>
         }
       }
       
-      // Level 0 and Level 1 gadgets from handbook
+      // Level 0 through Level 2 gadgets from handbook
       const gadgetNames = {
         level0: [
           "Liquid Foam Spray",
@@ -5120,10 +5216,15 @@ Improvised Gadget talent</p>
           "Remote Med-Siphon",
           "Sonic Grenade",
           "Trauma Stabilizer"
+        ],
+        level2: [
+          "Electrostatic Web",
+          "Holo-Decoy",
+          "Shield Projector"
         ]
       };
       
-      const allGadgetNames = [...gadgetNames.level0, ...gadgetNames.level1];
+      const allGadgetNames = [...gadgetNames.level0, ...gadgetNames.level1, ...gadgetNames.level2];
       
       // Check which gadgets exist
       const existingGadgets = [];
@@ -5141,7 +5242,7 @@ Improvised Gadget talent</p>
       console.log("Singularity | Missing gadgets:", missingGadgets.length, missingGadgets);
       
       if (missingGadgets.length === 0) {
-        console.log("Singularity | All Level 0 and Level 1 gadgets already exist in compendium");
+        console.log("Singularity | All Level 0 through Level 2 gadgets already exist in compendium");
         // Still check and update icons even if all gadgets exist
         // Update existing gadgets that have the old cog.svg icon
         for (const gadgetIndex of pack.index) {
@@ -5178,7 +5279,7 @@ Improvised Gadget talent</p>
         }
       }
 
-      // Level 0 and Level 1 gadgets from handbook (matching gadgets.html exactly)
+      // Level 0 through Level 2 gadgets from handbook (matching gadgets.html exactly)
       const gadgets = [
         // Level 0 gadgets (from handbook)
         {
@@ -5324,6 +5425,64 @@ Improvised Gadget talent</p>
 
 <h3>Effect</h3>
 <p>The target creature immediately regains <strong>2d8 + Gadget Tuning</strong> HP.</p>`
+        },
+        // Level 2 gadgets
+        {
+          name: "Electrostatic Web",
+          level: 2,
+          description: `<h2>Description</h2>
+<p>You launch a canister that detonates mid-air, releasing conductive nanofilaments that form an electrified web, entangling and shocking enemies in a targeted area.</p>
+
+<h2>Electrostatic Web</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 30 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (1 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You target a <strong>15-foot burst</strong> within range. All creatures in the area must make an <strong>Agility saving throw</strong> against your <strong>Gadget Tuning DC</strong>. The effect depends on their result:</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The creature is unaffected.</li>
+  <li><strong>Success:</strong> The creature takes <strong>1d4 + Gadget Tuning rank Electricity damage</strong> and is <strong>Staggered 1</strong> for 1 round.</li>
+  <li><strong>Failure:</strong> The creature takes <strong>2d4 + Gadget Tuning rank Electricity damage</strong> and is <strong>Immobilized</strong> for 1 round, then is <strong>Staggered 1</strong> for 1 minute. The creature can attempt an <strong>Agility check</strong> (DC = your Gadget Tuning DC) as an action on their turn to escape, ending the Immobilized effect on a success.</li>
+  <li><strong>Extreme Failure:</strong> The creature takes <strong>3d4 + Gadget Tuning rank Electricity damage</strong> and is <strong>Immobilized</strong> for 1 minute. The creature can attempt an <strong>Agility check</strong> (DC = your Gadget Tuning DC) as an action on their turn to escape, ending the effect on a success.</li>
+</ul>
+<p>The affected area becomes <strong>difficult terrain</strong> while the web persists.</p>`
+        },
+        {
+          name: "Holo-Decoy",
+          level: 2,
+          description: `<h2>Description</h2>
+<p>You project a realistic holographic duplicate of yourself or an ally that moves autonomously, drawing enemy fire and creating tactical opportunities.</p>
+
+<h2>Holo-Decoy</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 30 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute</p>
+
+<h3>Effect</h3>
+<p>You create a holographic duplicate of yourself or a willing creature within range. The duplicate appears in an unoccupied space within range. The duplicate has the same appearance and size as the original, but creatures can attempt a <strong>Perception check</strong> (DC = your Gadget Tuning DC) to identify it as a hologram.</p>
+<p>The duplicate can move up to your speed each round as a free action on your turn. Enemies must make a <strong>Wits saving throw</strong> against your <strong>Gadget Tuning DC</strong> before attacking the duplicate; on a failure, they must attack the duplicate instead of the real target. The duplicate disappears if it takes any damage or at the end of the duration.</p>`
+        },
+        {
+          name: "Shield Projector",
+          level: 2,
+          description: `<h2>Description</h2>
+<p>You deploy a hardlight generator or electromagnetic field emitter that creates a semi-transparent barrier, providing cover and deflecting incoming attacks for you or an ally.</p>
+
+<h2>Shield Projector</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 30 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute</p>
+
+<h3>Effect</h3>
+<p>You create a barrier in a 5-foot square within range. This barrier provides <strong>standard cover</strong> to any creature behind it. The barrier has <strong>15 + Gadget Tuning rank HP</strong> and blocks line of effect. It is destroyed when reduced to 0 HP.</p>
+<p>As a reaction when an ally within 5 feet of the barrier would be hit by an attack, you can cause the barrier to intercept the attack, granting the ally a <strong>+2 bonus to AC</strong> against that attack. If the attack still hits, the barrier takes the damage instead.</p>`
         }
       ];
 
@@ -5351,7 +5510,7 @@ Improvised Gadget talent</p>
       }
 
       if (itemsToCreate.length === 0) {
-        console.log("Singularity | All Level 0 and Level 1 gadgets already exist");
+        console.log("Singularity | All Level 0 through Level 2 gadgets already exist");
         return;
       }
 

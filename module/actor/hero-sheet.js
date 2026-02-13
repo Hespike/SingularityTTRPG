@@ -1561,7 +1561,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
       
       // Get prepared gadgets from actor data
-      const preparedGadgetsData = actorData.system.gadgets?.prepared || { level0: [], level1: [] };
+      const preparedGadgetsData = actorData.system.gadgets?.prepared || { level0: [], level1: [], level2: [] };
       
       // Calculate available slots
       const gadgetSlots = {
@@ -1574,6 +1574,11 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           total: slots.level1 || 0,
           used: (preparedGadgetsData.level1 || []).length,
           available: Math.max(0, (slots.level1 || 0) - (preparedGadgetsData.level1 || []).length)
+        },
+        level2: {
+          total: slots.level2 || 0,
+          used: (preparedGadgetsData.level2 || []).length,
+          available: Math.max(0, (slots.level2 || 0) - (preparedGadgetsData.level2 || []).length)
         }
       };
       
@@ -1609,6 +1614,20 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
         return gadget;
       });
+      const paddedLevel2 = Array(slots.level2 || 0).fill(null).map((_, index) => {
+        const gadget = (preparedGadgetsData.level2 || [])[index] || null;
+        if (gadget) {
+          if (!gadget.img || gadget.img === "icons/svg/cog.svg") {
+            // Fix old cog.svg icon or set default image if missing
+            gadget.img = "icons/svg/item-bag.svg";
+          }
+          // Normalize legacy fields for display
+          gadget.damage = gadget.damage || gadget.damageFormula || gadget.damageRoll || gadget.attackDamage;
+          gadget.healing = gadget.healing || gadget.healingFormula || gadget.heal || gadget.healFormula;
+          gadget.canHeal = Boolean(gadget.healing) || /trauma\s*stabilizer/i.test(gadget.name || "");
+        }
+        return gadget;
+      });
       
       // Create slot arrays for template iteration (with index info)
       const level0SlotArray = paddedLevel0.map((gadget, index) => ({
@@ -1621,14 +1640,21 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         slotNumber: index + 1,
         isEmpty: !gadget
       }));
+      const level2SlotArray = paddedLevel2.map((gadget, index) => ({
+        gadget: gadget,
+        slotNumber: index + 1,
+        isEmpty: !gadget
+      }));
       
       context.preparedGadgets = {
         level0: paddedLevel0,
-        level1: paddedLevel1
+        level1: paddedLevel1,
+        level2: paddedLevel2
       };
       context.gadgetSlotsArray = {
         level0: level0SlotArray,
-        level1: level1SlotArray
+        level1: level1SlotArray,
+        level2: level2SlotArray
       };
       
       // Get Gadget Tuning rank
@@ -1702,8 +1728,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
       const gadgetAttackEntries = [];
       if (hasGadgeteer) {
-        const preparedGadgets = actorData.system.gadgets?.prepared || { level0: [], level1: [] };
-        const gadgetEntries = [...(preparedGadgets.level0 || []), ...(preparedGadgets.level1 || [])].filter(Boolean);
+        const preparedGadgets = actorData.system.gadgets?.prepared || { level0: [], level1: [], level2: [] };
+        const gadgetEntries = [
+          ...(preparedGadgets.level0 || []),
+          ...(preparedGadgets.level1 || []),
+          ...(preparedGadgets.level2 || [])
+        ].filter(Boolean);
         for (const gadgetEntry of gadgetEntries) {
           let damageFormula = gadgetEntry.damage || gadgetEntry.damageFormula || gadgetEntry.damageRoll || gadgetEntry.attackDamage;
           let damageType = gadgetEntry.damageType;
@@ -8106,7 +8136,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }, 100);
     
     // Get current prepared gadgets to check for duplicates (Level 0 only)
-    const currentGadgets = this.actor.system.gadgets?.prepared || { level0: [], level1: [] };
+    const currentGadgets = this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] };
     const levelKey = `level${gadgetLevel}`;
     const alreadyPrepared = (currentGadgets[levelKey] || []).filter(g => g && g.name).map(g => g.name.toLowerCase());
     
@@ -8222,7 +8252,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             console.warn(`Could not load gadget image for ${gadgetName}:`, err);
           }
       
-          const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
+          const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
           const damageFormula = this._getGadgetDamageFormulaFromBasic(gadgetBasic);
           const healingFormula = this._getGadgetHealingFormulaFromBasic(gadgetBasic);
           
@@ -8274,7 +8304,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
     const gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
     
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
     const levelKey = `level${gadgetLevel}`;
     
     if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
@@ -8396,7 +8426,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     this._preferredTab = "gadgets";
     const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
     const gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
     const levelKey = `level${gadgetLevel}`;
 
     if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
@@ -8643,19 +8673,27 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const canAttack = Boolean(damageFormula);
     const canDamage = Boolean(damageFormula);
     const canHeal = Boolean(healFormula);
-    const isSonicGrenade = String(gadgetDoc.name || "").trim().toLowerCase() === "sonic grenade";
-    if (!canAttack && !canHeal && !isSonicGrenade) return null;
+    const gadgetName = String(gadgetDoc.name || "").trim();
+    const gadgetKey = gadgetName.toLowerCase();
+    const saveAbilityMap = {
+      "sonic grenade": "agility",
+      "electrostatic web": "agility",
+      "holo-decoy": "wits"
+    };
+    const saveAbility = saveAbilityMap[gadgetKey];
+    const canSave = Boolean(saveAbility);
+    if (!canAttack && !canHeal && !canSave) return null;
 
     return {
       gadgetId: gadgetDoc.uuid || gadgetDoc.id,
-      gadgetName: gadgetDoc.name || "Gadget",
+      gadgetName: gadgetName || "Gadget",
       actorId: this.actor?.id,
       canAttack: canAttack,
       canDamage: canDamage,
       canHeal: canHeal,
       healFormula: healFormula,
-      canSave: isSonicGrenade,
-      saveAbility: "agility",
+      canSave: canSave,
+      saveAbility: saveAbility || "agility",
       showSaveButton: false
     };
   }
@@ -8722,7 +8760,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const gadgetLevel = parseInt($(event.currentTarget).data("gadget-level"));
     const gadgetIndex = parseInt($(event.currentTarget).data("gadget-index"));
     
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
     const levelKey = `level${gadgetLevel}`;
     
     if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
@@ -9014,7 +9052,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     updateData["system.wounds"] = remainingWounds;
     
     // 3. Refresh used gadgets (set used = false for all gadgets)
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [] });
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
     if (gadgets.level0) {
       gadgets.level0 = gadgets.level0.map(gadget => {
         if (gadget) {
@@ -9025,6 +9063,14 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     if (gadgets.level1) {
       gadgets.level1 = gadgets.level1.map(gadget => {
+        if (gadget) {
+          return { ...gadget, used: false };
+        }
+        return gadget;
+      });
+    }
+    if (gadgets.level2) {
+      gadgets.level2 = gadgets.level2.map(gadget => {
         if (gadget) {
           return { ...gadget, used: false };
         }
@@ -9712,6 +9758,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
       if (name === "improved impact control") {
         return normalizedSelected.includes("impact control");
+      }
+      if (name === "stabilized movement") {
+        return normalizedSelected.includes("deadeye");
       }
       return true;
     };
