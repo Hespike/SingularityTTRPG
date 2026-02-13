@@ -86,13 +86,16 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
   _captureScrollPositions() {
     if (!this.element) return;
     const $html = this.element instanceof jQuery ? this.element : $(this.element);
+    const $sheetBody = $html.find(".sheet-body");
     const $activeTab = $html.find(".tab.active");
     const tabName = $activeTab.data("tab");
-    if (!tabName) return;
-    this._preferredTab = tabName;
+    if (tabName) {
+      this._preferredTab = tabName;
+    }
     this._scrollPositions = {
       ...(this._scrollPositions || {}),
-      [tabName]: $activeTab.scrollTop()
+      [tabName]: $activeTab.scrollTop(),
+      sheetBody: $sheetBody.scrollTop()
     };
   }
 
@@ -123,6 +126,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       this._activateTab($html, tabToShow);
       if (this._scrollPositions?.[tabToShow] !== undefined) {
         $html.find(`.tab.${tabToShow}`).scrollTop(this._scrollPositions[tabToShow]);
+      }
+      if (this._scrollPositions?.sheetBody !== undefined) {
+        $html.find(".sheet-body").scrollTop(this._scrollPositions.sheetBody);
       }
     }
   }
@@ -2447,13 +2453,27 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       context.calculatedSwimmingSpeed = swimmingSpeed;
 
+      const hasEnhancedFlight = (() => {
+        for (let lvl = 1; lvl <= 20; lvl++) {
+          const levelData = progression[`level${lvl}`] || {};
+          const names = [
+            levelData.paragonTalentName,
+            levelData.powersetTalentName
+          ].filter(Boolean);
+          if (names.some(name => String(name).toLowerCase().includes("enhanced flight"))) {
+            return true;
+          }
+        }
+        return false;
+      })();
+
       // Calculate flying speed - check if Paragon is selected
       // Reuse powersetName that was already declared earlier in the function
       let calculatedFlyingSpeed = null;
       if (powersetName === "Paragon") {
         // Paragon grants 15 ft flying speed at level 1
-        calculatedFlyingSpeed = 15;
-        context.speeds.flying = 15;
+        calculatedFlyingSpeed = 15 + (hasEnhancedFlight ? 10 : 0);
+        context.speeds.flying = calculatedFlyingSpeed;
         console.log("Singularity | Paragon detected, flying speed set to 15 ft");
       }
       context.calculatedFlyingSpeed = calculatedFlyingSpeed;
@@ -9689,6 +9709,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       const name = (talentDoc.name || "").toLowerCase();
       if (name === "medium armor training") {
         return primeLevel >= 2 && hasArmorTraining;
+      }
+      if (name === "improved impact control") {
+        return normalizedSelected.includes("impact control");
       }
       return true;
     };

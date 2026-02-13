@@ -4491,7 +4491,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
     }
   }, 5000);
 
-  // Auto-create Level 1 Paragon Talents in the talents compendium
+  // Auto-create Paragon talents in the talents compendium
   setTimeout(async () => {
     try {
       const pack = game.packs.find(p => p.metadata.name === "talents" && p.metadata.packageName === "singularity");
@@ -4507,7 +4507,11 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         "Dominating Presence",
         "Impact Control",
         "Noble Presence",
-        "Supersonic Moment"
+        "Supersonic Moment",
+        "Crushing Blow",
+        "Enhanced Flight",
+        "Improved Impact Control",
+        "Space Breathing"
       ];
       
       const allExist = paragonTalentNames.every(name => 
@@ -4515,8 +4519,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
       );
       
       if (allExist) {
-        console.log("Singularity | All Level 1 Paragon talents already exist in compendium");
-        return;
+        console.log("Singularity | All Paragon talents already exist in compendium; verifying metadata");
       }
 
       const wasLocked = pack.locked;
@@ -4525,10 +4528,11 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // Define all Level 1 Paragon talents
-      const level1ParagonTalents = [
+      // Define all Paragon talents
+      const paragonTalents = [
         {
           name: "Dominating Presence",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your overwhelming physical presence and visible superiority inspire fear and hesitation in those who face you.</p>
 
@@ -4544,6 +4548,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Impact Control",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your body can instinctively absorb and redistribute extreme forces. A Paragon knows how to hit the ground without breaking it, or themselves.</p>
 
@@ -4559,6 +4564,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Noble Presence",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your overwhelming physical presence and visible superiority inspire respect and admiration in those who face you.</p>
 
@@ -4574,6 +4580,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Supersonic Moment",
+          level: 1,
           description: `<h2>Description</h2>
 <p>For a Paragon, speed isn't just for travel; it's the ultimate force multiplier. By accelerating to extreme velocities, you turn your body into a living projectile.</p>
 
@@ -4586,16 +4593,99 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
 <p>For every <strong>15 feet you fly</strong> in before making a melee attack in the same turn, you gain a <strong>+2 bonus to the damage</strong>.</p>`,
           type: "paragon",
           prerequisites: "Paragon 1"
+        },
+        {
+          name: "Crushing Blow",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>Your unarmed strikes carry devastating force. When you land a critical hit, the impact is truly crushing.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Paragon 3</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you score a critical hit with an unarmed attack, you deal an additional <strong>1d10 damage</strong>.</p>
+<p>This damage increases to <strong>2d10</strong> at Paragon level 10, <strong>3d10</strong> at Paragon level 15, and <strong>4d10</strong> at Paragon level 20.</p>`,
+          type: "paragon",
+          prerequisites: "Paragon 3"
+        },
+        {
+          name: "Enhanced Flight",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>Your flight capabilities have improved significantly. You move through the air with greater speed and precision.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Paragon 3</li>
+</ul>
+
+<h3>Effect</h3>
+<p>Your flying speed increases by <strong>10 feet</strong>.</p>`,
+          type: "paragon",
+          prerequisites: "Paragon 3"
+        },
+        {
+          name: "Improved Impact Control",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>Your mastery over impact forces has reached new heights. You can land from any height without harm, and even use your momentum to devastating effect.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Paragon 3</li>
+  <li>Impact Control</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You take <strong>no damage from falling</strong>.</p>`,
+          type: "paragon",
+          prerequisites: "Paragon 3; Impact Control"
+        },
+        {
+          name: "Space Breathing",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>Your physiology has adapted to survive in the vacuum of space. You can breathe normally in environments with no atmosphere, though you still require air when underwater.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Paragon 3</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You can breathe normally in environments with no atmosphere, including the vacuum of space.</p>
+<p>You still cannot breathe underwater and must hold your breath or find another means of respiration when submerged.</p>`,
+          type: "paragon",
+          prerequisites: "Paragon 3"
         }
       ];
 
       // Create all talents
       const itemsToCreate = [];
-      for (const talentData of level1ParagonTalents) {
+      for (const talentData of paragonTalents) {
         // Check if it already exists
         const exists = pack.index.find(i => i.name === talentData.name);
         if (exists) {
-          console.log(`Singularity | ${talentData.name} already exists, skipping`);
+          try {
+            const existingDoc = await pack.getDocument(exists._id);
+            const updates = {};
+            if (talentData.level && existingDoc?.system?.basic?.level !== talentData.level) {
+              updates["system.basic.level"] = talentData.level;
+            }
+            if (talentData.prerequisites && existingDoc?.system?.basic?.prerequisites !== talentData.prerequisites) {
+              updates["system.basic.prerequisites"] = talentData.prerequisites;
+            }
+            if (Object.keys(updates).length) {
+              await existingDoc.update(updates);
+              console.log(`Singularity | Updated ${talentData.name} metadata`);
+            }
+          } catch (updateErr) {
+            console.warn(`Singularity | Could not update ${talentData.name}:`, updateErr);
+          }
+          console.log(`Singularity | ${talentData.name} already exists, skipping create`);
           continue;
         }
 
@@ -4606,7 +4696,8 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
             description: talentData.description,
             basic: {
               type: talentData.type,
-              prerequisites: talentData.prerequisites
+              prerequisites: talentData.prerequisites,
+              level: talentData.level || 1
             },
             archived: false
           },
