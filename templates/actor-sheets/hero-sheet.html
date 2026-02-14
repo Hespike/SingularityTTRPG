@@ -183,6 +183,38 @@
       </div>
       {{/if}}
 
+      {{#if hasRegenerativeFortitude}}
+      <div class="regenerative-fortitude-section">
+        <h3>Regenerative Fortitude</h3>
+        <div class="regenerative-fortitude-controls">
+          <label class="regenerative-fortitude-toggle-label">
+            <input type="checkbox" name="system.combat.regenerativeFortitude.used" {{checked regenerativeFortitudeUsed}} class="regenerative-fortitude-toggle"/>
+            <span>Used</span>
+          </label>
+          {{#unless regenerativeFortitudeUsed}}
+          <span class="regenerative-fortitude-bonus-display">Reduce damage by {{regenerativeFortitudeReduction}}</span>
+          {{/unless}}
+        </div>
+        <p class="regenerative-fortitude-help-text">Once per day, when you take damage, you can use your reaction to reduce that damage by your Endurance score.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasProtectiveBarrier}}
+      <div class="protective-barrier-section">
+        <h3>Protective Barrier</h3>
+        <div class="protective-barrier-controls">
+          <label class="protective-barrier-toggle-label">
+            <input type="checkbox" name="system.combat.protectiveBarrier.active" {{checked protectiveBarrierActive}} class="protective-barrier-toggle"/>
+            <span>Active</span>
+          </label>
+          {{#if protectiveBarrierActive}}
+          <span class="protective-barrier-bonus-display">Allies within 15 ft gain +{{protectiveBarrierBonus}} AC</span>
+          {{/if}}
+        </div>
+        <p class="protective-barrier-help-text">Allies within 15 feet of you gain a +1 bonus to AC (+2 at Bastion 15, +3 at Bastion 20).</p>
+      </div>
+      {{/if}}
+
       {{#if hasEnoughPrepTime}}
       <div class="enough-prep-time-section">
         <h3>Enough Prep Time</h3>
@@ -282,7 +314,21 @@
             <div class="rwi-header">
               <h4>Resistances</h4>
               <button type="button" class="add-rwi" data-type="resistance" title="Add Resistance"><i class="fas fa-plus"></i></button>
+              {{#if hasAdaptiveDefense}}
+              <button type="button" class="adaptive-defense-add" title="Adaptive Defense"><i class="fas fa-shield-alt"></i></button>
+              <button type="button" class="adaptive-defense-reset" title="Reset Adaptive Defense"><i class="fas fa-undo"></i></button>
+              {{/if}}
             </div>
+            {{#if hasAdaptiveDefense}}
+            <div class="rwi-adaptive-defense">
+              <span class="rwi-adaptive-label">Adapted:</span>
+              {{#if adaptiveDefenseTypes.length}}
+              <span class="rwi-adaptive-types">{{adaptiveDefenseTypes}}</span>
+              {{else}}
+              <span class="rwi-adaptive-types">None</span>
+              {{/if}}
+            </div>
+            {{/if}}
             <ol class="rwi-list">
               {{#each resistances as |resistance id|}}
               <li class="rwi-item" data-id="{{id}}">
@@ -596,6 +642,7 @@
           <p>Level 0 slots: <strong>{{gadgetSlots.level0.available}}/{{gadgetSlots.level0.total}}</strong> available</p>
           <p>Level 1 slots: <strong>{{gadgetSlots.level1.available}}/{{gadgetSlots.level1.total}}</strong> available</p>
           <p>Level 2 slots: <strong>{{gadgetSlots.level2.available}}/{{gadgetSlots.level2.total}}</strong> available</p>
+          <p>Level 3 slots: <strong>{{gadgetSlots.level3.available}}/{{gadgetSlots.level3.total}}</strong> available</p>
         </div>
         
         {{#if (gt gadgetSlots.level0.total 0)}}
@@ -666,6 +713,31 @@
               {{else}}
                 <li class="gadget-slot-empty">
                   <button type="button" class="add-gadget" data-gadget-level="2" data-slot-index="{{slotIndex}}">+ Add Level 2 Gadget (Slot {{slot.slotNumber}}/{{../gadgetSlots.level2.total}})</button>
+                </li>
+              {{/if}}
+            {{/each}}
+          </ol>
+        </div>
+        {{/if}}
+
+        {{#if (gt gadgetSlots.level3.total 0)}}
+        <div class="gadget-level-section">
+          <h5>Level 3 Gadgets</h5>
+          <ol class="gadget-list">
+            {{#each gadgetSlotsArray.level3 as |slot slotIndex|}}
+              {{#if slot.gadget}}
+                <li class="gadget-item gadget-item-clickable" data-gadget-level="3" data-gadget-index="{{slotIndex}}" data-gadget-id="{{slot.gadget.id}}">
+                  <img class="gadget-icon item-icon" src="{{slot.gadget.img}}" alt="{{slot.gadget.name}}" onerror="this.src='icons/svg/mystery-man.svg'"/>
+                  <div class="gadget-name item-name">{{slot.gadget.name}}</div>
+                  <div class="gadget-controls">
+                    <button type="button" class="gadget-use" data-gadget-level="3" data-gadget-index="{{slotIndex}}" {{#if slot.gadget.used}}disabled{{/if}}>Use</button>
+                    <a class="gadget-remove" data-gadget-level="3" data-gadget-index="{{slotIndex}}" title="Remove"><i class="fas fa-times"></i></a>
+                  </div>
+                  {{#if slot.gadget.used}}<span class="gadget-used-badge">Used</span>{{/if}}
+                </li>
+              {{else}}
+                <li class="gadget-slot-empty">
+                  <button type="button" class="add-gadget" data-gadget-level="3" data-slot-index="{{slotIndex}}">+ Add Level 3 Gadget (Slot {{slot.slotNumber}}/{{../gadgetSlots.level3.total}})</button>
                 </li>
               {{/if}}
             {{/each}}

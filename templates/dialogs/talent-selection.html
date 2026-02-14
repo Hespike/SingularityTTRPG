@@ -15,6 +15,7 @@
     <div class="talent-content-area">
       <p class="dialog-description">Select a talent:</p>
       <div class="talent-list">
+        {{#if talents.length}}
         {{#each talents as |talent|}}
         <div class="talent-item" data-talent-id="{{talent._id}}" data-talent-level="{{talent.level}}">
           <img class="talent-icon" src="{{talent.img}}" alt="{{talent.name}}" onerror="this.src='icons/svg/mystery-man.svg'">
@@ -26,6 +27,9 @@
           </div>
         </div>
         {{/each}}
+        {{else}}
+        <div class="no-talents-message">No talents available at this level.</div>
+        {{/if}}
       </div>
     </div>
   </div>
@@ -188,6 +192,14 @@
 
 .talent-description p {
   margin: 0;
+}
+
+.no-talents-message {
+  color: #a0aec0;
+  font-size: 14px;
+  text-align: center;
+  padding: 30px 20px;
+  font-style: italic;
 }
 
 <!-- Styles moved to css/singularity.css -->

@@ -37,6 +37,210 @@ const syncTokenHpBars = async (actor) => {
   }
 };
 
+const hasProtectiveBarrierTalent = (actor) => {
+  if (!actor) return false;
+  const progression = actor.system?.progression || {};
+  for (let lvl = 1; lvl <= 20; lvl++) {
+    const levelKey = `level${lvl}`;
+    const levelData = progression[levelKey] || {};
+    const name = String(levelData.bastionTalentName || "").toLowerCase();
+    if (name.includes("protective barrier")) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const hasGuardianAuraTalent = (actor) => {
+  if (!actor) return false;
+  const progression = actor.system?.progression || {};
+  for (let lvl = 1; lvl <= 20; lvl++) {
+    const levelKey = `level${lvl}`;
+    const levelData = progression[levelKey] || {};
+    const name = String(levelData.bastionTalentName || "").toLowerCase();
+    if (name.includes("guardian aura")) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const hasUnbreakableTalent = (actor) => {
+  if (!actor) return false;
+  const progression = actor.system?.progression || {};
+  for (let lvl = 1; lvl <= 20; lvl++) {
+    const levelKey = `level${lvl}`;
+    const levelData = progression[levelKey] || {};
+    const name = String(levelData.bastionTalentName || "").toLowerCase();
+    if (name.includes("unbreakable")) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const getUnbreakableMaxUses = (actor) => {
+  if (!actor) return 1;
+  const getModifier = actor.getAbilityModifier?.bind(actor);
+  let enduranceMod = 0;
+  if (getModifier) {
+    enduranceMod = Number(getModifier("endurance")) || 0;
+  } else {
+    const enduranceScore = Number(actor.system?.abilities?.endurance || 0);
+    enduranceMod = Math.floor(enduranceScore / 2);
+  }
+  return Math.max(1, enduranceMod);
+};
+
+const isProtectiveBarrierActive = (actor) => {
+  const powersetName = actor?.system?.progression?.level1?.powersetName || actor?.system?.basic?.powerset;
+  if (powersetName !== "Bastion") return false;
+  const active = actor?.system?.combat?.protectiveBarrier?.active === true;
+  return active && hasProtectiveBarrierTalent(actor);
+};
+
+const getProtectiveBarrierBonus = (actor) => {
+  const level = Number(actor?.system?.basic?.primeLevel || 1);
+  if (level >= 20) return 3;
+  if (level >= 15) return 2;
+  return 1;
+};
+
+const getProtectiveBarrierRange = (actor) => {
+  return hasGuardianAuraTalent(actor) ? 25 : 15;
+};
+
+const getTokenCenter = (tokenDoc) => {
+  const token = tokenDoc?.object;
+  if (token?.center) return token.center;
+  const gridSize = canvas?.grid?.size || 1;
+  const width = Number(tokenDoc?.width || 1) * gridSize;
+  const height = Number(tokenDoc?.height || 1) * gridSize;
+  return {
+    x: Number(tokenDoc?.x || 0) + width / 2,
+    y: Number(tokenDoc?.y || 0) + height / 2
+  };
+};
+
+const measureTokenDistance = (tokenA, tokenB) => {
+  if (!canvas?.grid) return Number.POSITIVE_INFINITY;
+  const a = getTokenCenter(tokenA);
+  const b = getTokenCenter(tokenB);
+  return canvas.grid.measureDistance(a, b);
+};
+
+const getProtectiveBarrierEffect = (actor) => {
+  if (!actor) return null;
+  return actor.effects?.find(effect => effect.getFlag("singularity", "protectiveBarrier"));
+};
+
+const getGuardianAuraResistanceEffect = (actor) => {
+  if (!actor) return null;
+  return actor.effects?.find(effect => effect.getFlag("singularity", "guardianAuraResistance"));
+};
+
+const applyProtectiveBarrierEffect = async (actor, bonus) => {
+  if (!actor) return;
+  const existing = getProtectiveBarrierEffect(actor);
+  if (!bonus || bonus <= 0) {
+    if (existing) {
+      await existing.delete();
+    }
+    return;
+  }
+
+  const changes = [
+    {
+      key: "system.combat.ac",
+      mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+      value: bonus
+    }
+  ];
+
+  if (existing) {
+    const currentBonus = Number(existing.getFlag("singularity", "protectiveBarrierBonus") ?? 0);
+    if (currentBonus === bonus) return;
+    await existing.update({
+      changes,
+      "flags.singularity.protectiveBarrier": true,
+      "flags.singularity.protectiveBarrierBonus": bonus
+    });
+    return;
+  }
+
+  await actor.createEmbeddedDocuments("ActiveEffect", [
+    {
+      name: "Protective Barrier",
+      icon: "icons/svg/shield.svg",
+      changes,
+      disabled: false,
+      flags: {
+        singularity: {
+          protectiveBarrier: true,
+          protectiveBarrierBonus: bonus
+        }
+      }
+    }
+  ]);
+};
+
+const applyGuardianAuraResistanceEffect = async (actor, active) => {
+  if (!actor) return;
+  const existing = getGuardianAuraResistanceEffect(actor);
+  if (!active) {
+    if (existing) {
+      await existing.delete();
+    }
+    return;
+  }
+
+  if (existing) return;
+
+  await actor.createEmbeddedDocuments("ActiveEffect", [
+    {
+      name: "Guardian Aura",
+      icon: "icons/svg/shield.svg",
+      changes: [],
+      disabled: false,
+      flags: {
+        singularity: {
+          guardianAuraResistance: true,
+          guardianAuraResistanceValue: 5
+        }
+      }
+    }
+  ]);
+};
+
+const refreshProtectiveBarrierForScene = async (scene) => {
+  if (!scene || !canvas?.scene || scene.id !== canvas.scene.id) return;
+  const tokens = scene.tokens?.contents || [];
+  if (!tokens.length) return;
+
+  const bastionTokens = tokens.filter(tokenDoc => tokenDoc?.actor && isProtectiveBarrierActive(tokenDoc.actor));
+
+  for (const tokenDoc of tokens) {
+    const actor = tokenDoc?.actor;
+    if (!actor) continue;
+    let bestBonus = 0;
+    let hasGuardianAura = false;
+    for (const bastionToken of bastionTokens) {
+      if (bastionToken.id === tokenDoc.id) continue;
+      if (bastionToken.disposition !== tokenDoc.disposition) continue;
+      const distance = measureTokenDistance(bastionToken, tokenDoc);
+      const range = getProtectiveBarrierRange(bastionToken.actor);
+      if (distance <= range) {
+        bestBonus = Math.max(bestBonus, getProtectiveBarrierBonus(bastionToken.actor));
+        if (hasGuardianAuraTalent(bastionToken.actor)) {
+          hasGuardianAura = true;
+        }
+      }
+    }
+    await applyProtectiveBarrierEffect(actor, bestBonus);
+    await applyGuardianAuraResistanceEffect(actor, hasGuardianAura);
+  }
+};
+
 Hooks.on("preCreateActor", async function(actor, data, options, userId) {
   // Set default credits to 10 for new hero actors
   if (actor.type === "hero") {
@@ -1230,6 +1434,17 @@ Hooks.once("init", function() {
     await syncTokenHpBars(actor);
   });
 
+  Hooks.on("updateActor", async (actor, change) => {
+    const combatChange = change?.system?.combat?.protectiveBarrier;
+    const levelChange = change?.system?.basic?.primeLevel;
+    const progressionChange = change?.system?.progression;
+    if (!combatChange && !levelChange && !progressionChange) return;
+    const tokens = actor.getActiveTokens();
+    const scene = canvas?.scene;
+    if (!scene || !tokens.length) return;
+    await refreshProtectiveBarrierForScene(scene);
+  });
+
   Hooks.on("updateToken", async (tokenDoc, change) => {
     const actor = tokenDoc.actor;
     if (!actor) return;
@@ -1259,6 +1474,13 @@ Hooks.once("init", function() {
     } catch (err) {
       console.warn("Singularity | Failed to sync actor HP from token:", err);
     }
+  });
+
+  Hooks.on("updateToken", async (tokenDoc, changed) => {
+    if (!("x" in changed) && !("y" in changed) && !("disposition" in changed)) return;
+    const scene = tokenDoc?.scene || canvas?.scene;
+    if (!scene) return;
+    await refreshProtectiveBarrierForScene(scene);
   });
 
   Hooks.on("updateCombat", async (combat, changed) => {
@@ -1348,6 +1570,18 @@ Hooks.once("init", function() {
       ui.notifications?.warn("Paralyzed: cannot move.");
       return false;
     }
+  });
+
+  Hooks.on("createToken", async (tokenDoc) => {
+    const scene = tokenDoc?.scene || canvas?.scene;
+    if (!scene) return;
+    await refreshProtectiveBarrierForScene(scene);
+  });
+
+  Hooks.on("deleteToken", async (tokenDoc) => {
+    const scene = tokenDoc?.scene || canvas?.scene;
+    if (!scene) return;
+    await refreshProtectiveBarrierForScene(scene);
   });
 
   Hooks.on("deleteActiveEffect", (effect) => {
@@ -4356,7 +4590,9 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         "Enlarged Presence",
         "Ironbound",
         "Protect the Weak",
-        "Defensive Stance"
+        "Defensive Stance",
+        "Increased Resistance",
+        "Intercept Attack"
       ];
       
       const allExist = bastionTalentNames.every(name => 
@@ -4442,6 +4678,39 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
 <p>The stance ends if you move, or you can end it on your turn as a free action.</p>`,
           type: "bastion",
           prerequisites: "Bastion 3"
+        },
+        {
+          name: "Increased Resistance",
+          level: 5,
+          description: `<h2>Description</h2>
+<p>Your natural durability against your chosen element improves significantly.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Bastion 5</li>
+  <li>Bastion's Resistance</li>
+</ul>
+
+<h3>Effect</h3>
+<p>For the damage type chosen for <strong>Bastion's Resistance</strong>, your resistance increases to <strong>4 × your Bastion level</strong> (instead of 2).</p>`,
+          type: "bastion",
+          prerequisites: "Bastion 5; Bastion's Resistance"
+        },
+        {
+          name: "Intercept Attack",
+          level: 5,
+          description: `<h2>Description</h2>
+<p>You can position yourself to intercept attacks meant for your allies, taking the blow yourself.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Bastion 5</li>
+</ul>
+
+<h3>Effect</h3>
+<p>As a <strong>reaction</strong> when a willing ally within 5 feet of you would be hit by an attack, you can swap places with that ally. The attack targets you instead of your ally.</p>`,
+          type: "bastion",
+          prerequisites: "Bastion 5"
         },
         {
           name: "Protect the Weak",
@@ -4833,7 +5102,8 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         "Enough Prep Time",
         "Expanded Loadout",
         "Improvised Gadget",
-        "Rapid Deployment"
+        "Rapid Deployment",
+        "Improved Improvisation"
       ];
       
       const allExist = gadgeteerTalentNames.every(name => 
@@ -4924,6 +5194,23 @@ Improvised Gadget talent</p>
 <p>You create one Level 0 gadget that you did not prepare. You can only use this gadget once per day.</p>`,
           type: "gadgeteer",
           prerequisites: "Gadgeteer 1"
+        },
+        {
+          name: "Improved Improvisation",
+          level: 5,
+          description: `<h2>Description</h2>
+<p>Your ability to create gadgets on the fly has improved, allowing you to craft more powerful devices in the heat of battle.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 5</li>
+  <li>Improvised Gadget</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use <strong>Improvised Gadget</strong>, you can create a <strong>Level 1 gadget</strong> instead of a Level 0 gadget. The energy cost remains 2.</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 5; Improvised Gadget"
         },
         {
           name: "Rapid Deployment",
@@ -5227,7 +5514,7 @@ Improvised Gadget talent</p>
     }
   }, 6100);
 
-  // Auto-create Gadgets in the gadgets compendium (Level 0 through Level 2)
+  // Auto-create Gadgets in the gadgets compendium (Level 0 through Level 3)
   setTimeout(async () => {
     try {
       // First, check if gadgets compendium exists, if not, we'll need to create items in world
@@ -5267,7 +5554,7 @@ Improvised Gadget talent</p>
         }
       }
       
-      // Level 0 through Level 2 gadgets from handbook
+      // Level 0 through Level 3 gadgets from handbook
       const gadgetNames = {
         level0: [
           "Liquid Foam Spray",
@@ -5285,10 +5572,15 @@ Improvised Gadget talent</p>
           "Electrostatic Web",
           "Holo-Decoy",
           "Shield Projector"
+        ],
+        level3: [
+          "Adrenaline Injector",
+          "Force Cannon",
+          "Plasma Wall"
         ]
       };
       
-      const allGadgetNames = [...gadgetNames.level0, ...gadgetNames.level1, ...gadgetNames.level2];
+      const allGadgetNames = [...gadgetNames.level0, ...gadgetNames.level1, ...gadgetNames.level2, ...gadgetNames.level3];
       
       // Check which gadgets exist
       const existingGadgets = [];
@@ -5306,7 +5598,7 @@ Improvised Gadget talent</p>
       console.log("Singularity | Missing gadgets:", missingGadgets.length, missingGadgets);
       
       if (missingGadgets.length === 0) {
-        console.log("Singularity | All Level 0 through Level 2 gadgets already exist in compendium");
+        console.log("Singularity | All Level 0 through Level 3 gadgets already exist in compendium");
         // Still check and update icons even if all gadgets exist
         // Update existing gadgets that have the old cog.svg icon
         for (const gadgetIndex of pack.index) {
@@ -5343,7 +5635,7 @@ Improvised Gadget talent</p>
         }
       }
 
-      // Level 0 through Level 2 gadgets from handbook (matching gadgets.html exactly)
+      // Level 0 through Level 3 gadgets from handbook (matching gadgets.html exactly)
       const gadgets = [
         // Level 0 gadgets (from handbook)
         {
@@ -5547,6 +5839,68 @@ Improvised Gadget talent</p>
 <h3>Effect</h3>
 <p>You create a barrier in a 5-foot square within range. This barrier provides <strong>standard cover</strong> to any creature behind it. The barrier has <strong>15 + Gadget Tuning rank HP</strong> and blocks line of effect. It is destroyed when reduced to 0 HP.</p>
 <p>As a reaction when an ally within 5 feet of the barrier would be hit by an attack, you can cause the barrier to intercept the attack, granting the ally a <strong>+2 bonus to AC</strong> against that attack. If the attack still hits, the barrier takes the damage instead.</p>`
+        },
+        // Level 3 gadgets
+        {
+          name: "Adrenaline Injector",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>You administer a precise cocktail of performance-enhancing nanites and synthetic adrenaline through a rapid-injection device, dramatically boosting an ally's combat effectiveness.</p>
+
+<h2>Adrenaline Injector</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> Touch<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute</p>
+
+<h3>Effect</h3>
+<p>You or a willing creature within range gains the following benefits:</p>
+<ul>
+  <li><strong>+1 bonus to attack rolls</strong></li>
+  <li><strong>+10 feet to speed</strong></li>
+  <li><strong>+1 bonus to saving throws</strong></li>
+</ul>
+<p>When the effect ends, the target's <strong>Fatigued</strong> value increases by 1.</p>`
+        },
+        {
+          name: "Force Cannon",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>You fire a concentrated blast of repulsor energy from a shoulder-mounted or handheld cannon, dealing significant damage and potentially knocking targets off their feet.</p>
+
+<h2>Force Cannon</h2>
+<p><strong>Type:</strong> Ranged Attack<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Damage:</strong> 3d6 + Wits modifier Force damage</p>
+
+<h3>Effect</h3>
+<p>You use your <strong>Gadget Tuning</strong> skill for the attack roll. On a hit, the target takes damage and must make an <strong>Endurance saving throw</strong> against your <strong>Gadget Tuning DC</strong>. The effect depends on their result:</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The target is unaffected by the knockback effect.</li>
+  <li><strong>Success:</strong> The target is pushed back 5 feet.</li>
+  <li><strong>Failure:</strong> The target is knocked <strong>Prone</strong> and pushed back 10 feet.</li>
+  <li><strong>Extreme Failure:</strong> The target is knocked <strong>Prone</strong>, pushed back 20 feet, and is <strong>Staggered 1</strong> for 1 round.</li>
+</ul>`
+        },
+        {
+          name: "Plasma Wall",
+          level: 3,
+          description: `<h2>Description</h2>
+<p>You project a wall of superheated plasma between two points, creating both a defensive barrier and an offensive hazard that burns anything passing through.</p>
+
+<h2>Plasma Wall</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (1 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You create a straight wall of plasma up to 30 feet long and 10 feet high within range. The wall must be continuous and cannot pass through occupied spaces. The wall provides <strong>standard cover</strong> and blocks line of effect.</p>
+<p>Any creature that enters the wall's space or starts their turn there takes <strong>2d6 + Gadget Tuning rank Fire damage</strong>. The wall has <strong>3 × Gadget Tuning DC</strong> HP. When reduced to 0 HP, the wall disappears.</p>`
         }
       ];
 
@@ -5574,7 +5928,7 @@ Improvised Gadget talent</p>
       }
 
       if (itemsToCreate.length === 0) {
-        console.log("Singularity | All Level 0 through Level 2 gadgets already exist");
+        console.log("Singularity | All Level 0 through Level 3 gadgets already exist");
         return;
       }
 
@@ -6887,7 +7241,13 @@ const getCalculatedResistances = (actor) => {
           source: `Armor Mod: ${equippedArmor?.name || "Armor"}`
         }))
     : [];
-  return calculated.concat(armorResistances);
+  const guardianAuraValue = actor?.effects?.find(effect => effect.getFlag("singularity", "guardianAuraResistance"))
+    ? 5
+    : 0;
+  const guardianAuraResistances = guardianAuraValue > 0
+    ? [{ type: "All", calculatedValue: guardianAuraValue, source: "Guardian Aura" }]
+    : [];
+  return calculated.concat(armorResistances, guardianAuraResistances);
 };
 const getDamageAdjustment = (actor, damageType) => {
   const normalizedType = normalizeDamageType(damageType);
@@ -6960,12 +7320,34 @@ Hooks.on("renderChatMessageHTML", function(message, html, data) {
 
     const currentHp = targetActor.system?.combat?.hp?.value ?? 0;
     const maxHp = targetActor.system?.combat?.hp?.max ?? 0;
-    const newHp = Math.max(0, currentHp - appliedDamage);
-    await targetActor.update({ "system.combat.hp.value": newHp });
+    let finalHp = Math.max(0, currentHp - appliedDamage);
+    let unbreakableTriggered = false;
+    let unbreakableUsesLeft = null;
+    const updateData = { "system.combat.hp.value": finalHp };
+
+    if (finalHp <= 0 && currentHp > 0 && hasUnbreakableTalent(targetActor)) {
+      const unbreakableData = foundry.utils.deepClone(targetActor.system?.combat?.unbreakable || { used: 0 });
+      const used = Number(unbreakableData.used) || 0;
+      const maxUses = getUnbreakableMaxUses(targetActor);
+      if (used < maxUses) {
+        unbreakableTriggered = true;
+        unbreakableData.used = used + 1;
+        unbreakableUsesLeft = Math.max(0, maxUses - unbreakableData.used);
+        finalHp = 1;
+        updateData["system.combat.hp.value"] = finalHp;
+        updateData["system.combat.unbreakable"] = unbreakableData;
+      }
+    }
+
+    await targetActor.update(updateData);
 
     const targetName = targetToken.name || targetActor.name || "Target";
     const kindLabel = options.isCritical ? "Critical Applied" : "Damage Applied";
-    const flavor = `<div class="roll-flavor"><b>${attackName} - ${kindLabel}</b><br>Target: ${targetName}<br>Base: ${baseDamage} (${damageType})<br>${detailText}<br><strong>Applied: ${appliedDamage} (${damageType})</strong> (HP: ${currentHp} → ${newHp}${maxHp ? ` / ${maxHp}` : ""})</div>`;
+    if (unbreakableTriggered) {
+      const usesNote = unbreakableUsesLeft !== null ? ` (uses left ${unbreakableUsesLeft})` : "";
+      detailText = `${detailText}<br>Unbreakable: 1 HP instead, no wound gained${usesNote}`;
+    }
+    const flavor = `<div class="roll-flavor"><b>${attackName} - ${kindLabel}</b><br>Target: ${targetName}<br>Base: ${baseDamage} (${damageType})<br>${detailText}<br><strong>Applied: ${appliedDamage} (${damageType})</strong> (HP: ${currentHp} → ${finalHp}${maxHp ? ` / ${maxHp}` : ""})</div>`;
 
     await ChatMessage.create({
       speaker: message.speaker,

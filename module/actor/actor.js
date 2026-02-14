@@ -233,6 +233,16 @@ export class SingularityActor extends Actor {
     const powersetName = systemData.progression?.level1?.powersetName || systemData.basic?.powerset;
     
     if (powersetName === "Gadgeteer") {
+      const primeLevel = Number(systemData.basic?.primeLevel) || 1;
+      const rankOrder = {
+        "Novice": 0,
+        "Apprentice": 1,
+        "Competent": 2,
+        "Masterful": 3,
+        "Legendary": 4
+      };
+      const targetRank = primeLevel >= 5 ? "Competent" : "Apprentice";
+
       // Initialize skills if it doesn't exist
       if (!systemData.skills) {
         systemData.skills = {};
@@ -241,13 +251,17 @@ export class SingularityActor extends Actor {
       // Add Gadget Tuning skill if it doesn't exist
       if (!systemData.skills["Gadget Tuning"]) {
         systemData.skills["Gadget Tuning"] = {
-          rank: "Apprentice",
+          rank: targetRank,
           ability: "wits",
           otherBonuses: 0,
           lockedSource: "Gadgeteer Skill Training",
           lockedByPowerset: true
         };
       } else {
+        const currentRank = systemData.skills["Gadget Tuning"].rank || "Novice";
+        if ((rankOrder[currentRank] ?? 0) < (rankOrder[targetRank] ?? 0)) {
+          systemData.skills["Gadget Tuning"].rank = targetRank;
+        }
         systemData.skills["Gadget Tuning"].lockedSource = "Gadgeteer Skill Training";
         systemData.skills["Gadget Tuning"].lockedByPowerset = true;
       }

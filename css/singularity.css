@@ -4429,6 +4429,19 @@ button.weapon-attack:hover {
   color: #ffffff;
 }
 
+.rwi-adaptive-defense {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 6px 0 10px 0;
+  color: #a0aec0;
+  font-size: 12px;
+}
+
+.rwi-adaptive-types {
+  color: #d1d1d1;
+}
+
 .rwi-header .add-rwi i {
   margin: 0;
   font-size: 11px;

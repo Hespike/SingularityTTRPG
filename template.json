@@ -41,6 +41,18 @@
         "initiative": {
           "rank": "Novice",
           "otherBonuses": 0
+        },
+        "regenerativeFortitude": {
+          "used": false
+        },
+        "protectiveBarrier": {
+          "active": false
+        },
+        "unbreakable": {
+          "used": 0
+        },
+        "adaptiveDefense": {
+          "types": []
         }
       },
       "skills": {},
@@ -90,7 +102,15 @@
           "terranGenericTalentName": null,
           "terranGenericTalentImg": null,
           "backgroundAbilityBoost": null,
-          "backgroundSkillTraining": null
+          "backgroundSkillTraining": null,
+          "bastionAbilityBoost1": null,
+          "bastionAbilityBoost2": null,
+          "bastionSavingThrow": null,
+          "bastionAcBonus": null,
+          "bastionTalent": null,
+          "bastionTalentName": null,
+          "bastionTalentImg": null,
+          "bastionTalentResistanceType": null
         },
         "level2": {
           "genericTalent": null

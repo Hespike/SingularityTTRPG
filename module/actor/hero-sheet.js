@@ -4,9 +4,7 @@
  */
 console.log('Singularity | hero-sheet.js loaded');
 const BaseActorSheetV2 = foundry.applications.api.ActorSheetV2 || foundry.applications.api.DocumentSheetV2;
-export class SingularityActorSheetHero extends foundry.applications.api.HandlebarsApplicationMixin(
-  BaseActorSheetV2
-) {
+export class SingularityActorSheetHero extends foundry.applications.api.HandlebarsApplicationMixin(BaseActorSheetV2) {
   constructor(...args) {
     super(...args);
     
@@ -1130,6 +1128,70 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
     context.hasDeadeye = hasDeadeye;
+
+    // Check for Regenerative Fortitude talent (check all levels, but only if Bastion powerset is selected)
+    let hasRegenerativeFortitude = false;
+    if (powersetName === "Bastion") {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const bastionTalentName = levelData.bastionTalentName || "";
+        if (bastionTalentName && bastionTalentName.toLowerCase().includes("regenerative fortitude")) {
+          hasRegenerativeFortitude = true;
+          break;
+        }
+      }
+    }
+    context.hasRegenerativeFortitude = hasRegenerativeFortitude;
+
+    if (hasRegenerativeFortitude) {
+      const regenerativeData = actorData.system.combat?.regenerativeFortitude || { used: false };
+      context.regenerativeFortitudeUsed = !!regenerativeData.used;
+      context.regenerativeFortitudeReduction = calculatedAbilityScores.endurance || 0;
+    }
+
+    // Check for Protective Barrier talent (check all levels, but only if Bastion powerset is selected)
+    let hasProtectiveBarrier = false;
+    if (powersetName === "Bastion") {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const bastionTalentName = levelData.bastionTalentName || "";
+        if (bastionTalentName && bastionTalentName.toLowerCase().includes("protective barrier")) {
+          hasProtectiveBarrier = true;
+          break;
+        }
+      }
+    }
+    context.hasProtectiveBarrier = hasProtectiveBarrier;
+
+    if (hasProtectiveBarrier) {
+      const protectiveBarrierData = actorData.system.combat?.protectiveBarrier || { active: false };
+      const protectiveBarrierLevel = Number(actorData.system.basic?.primeLevel || 1);
+      let protectiveBarrierBonus = 1;
+      if (protectiveBarrierLevel >= 20) {
+        protectiveBarrierBonus = 3;
+      } else if (protectiveBarrierLevel >= 15) {
+        protectiveBarrierBonus = 2;
+      }
+      context.protectiveBarrierActive = !!protectiveBarrierData.active;
+      context.protectiveBarrierBonus = protectiveBarrierBonus;
+    }
+
+    // Check for Indomitable Will talent (check all levels, but only if Bastion powerset is selected)
+    let hasIndomitableWill = false;
+    if (powersetName === "Bastion") {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const bastionTalentName = levelData.bastionTalentName || "";
+        if (bastionTalentName && bastionTalentName.toLowerCase().includes("indomitable will")) {
+          hasIndomitableWill = true;
+          break;
+        }
+      }
+    }
+    context.hasIndomitableWill = hasIndomitableWill;
     
     // Check for Gadgeteer powerset (set flag early, but calculate slots after primeLevel is defined)
     const hasGadgeteer = powersetName === "Gadgeteer";
@@ -1241,6 +1303,14 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           rank: "Novice" 
         });
       }
+
+      if (hasIndomitableWill && (ability === "wits" || ability === "charm")) {
+        breakdown.otherBonuses += 2;
+        breakdown.sources.push({
+          name: "Indomitable Will",
+          bonus: 2
+        });
+      }
       
       savingThrows[ability] = {
         rank: breakdown.rank,
@@ -1261,7 +1331,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       // If value is null, calculate it dynamically (e.g., for Bastion's Resistance)
       if (resistance.value === null && resistance.source === "Bastion's Resistance") {
         const bastionLevel = safeBasic.primeLevel || 1;
-        resistanceCopy.calculatedValue = 2 * bastionLevel;
+        const multiplier = Number(resistance.bastionMultiplier) || 2;
+        resistanceCopy.calculatedValue = multiplier * bastionLevel;
       } else if (resistance.value !== null && resistance.value !== undefined) {
         resistanceCopy.calculatedValue = resistance.value;
       }
@@ -1561,7 +1632,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
       
       // Get prepared gadgets from actor data
-      const preparedGadgetsData = actorData.system.gadgets?.prepared || { level0: [], level1: [], level2: [] };
+      const preparedGadgetsData = actorData.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] };
       
       // Calculate available slots
       const gadgetSlots = {
@@ -1579,6 +1650,11 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           total: slots.level2 || 0,
           used: (preparedGadgetsData.level2 || []).length,
           available: Math.max(0, (slots.level2 || 0) - (preparedGadgetsData.level2 || []).length)
+        },
+        level3: {
+          total: slots.level3 || 0,
+          used: (preparedGadgetsData.level3 || []).length,
+          available: Math.max(0, (slots.level3 || 0) - (preparedGadgetsData.level3 || []).length)
         }
       };
       
@@ -1628,6 +1704,20 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
         return gadget;
       });
+      const paddedLevel3 = Array(slots.level3 || 0).fill(null).map((_, index) => {
+        const gadget = (preparedGadgetsData.level3 || [])[index] || null;
+        if (gadget) {
+          if (!gadget.img || gadget.img === "icons/svg/cog.svg") {
+            // Fix old cog.svg icon or set default image if missing
+            gadget.img = "icons/svg/item-bag.svg";
+          }
+          // Normalize legacy fields for display
+          gadget.damage = gadget.damage || gadget.damageFormula || gadget.damageRoll || gadget.attackDamage;
+          gadget.healing = gadget.healing || gadget.healingFormula || gadget.heal || gadget.healFormula;
+          gadget.canHeal = Boolean(gadget.healing) || /trauma\s*stabilizer/i.test(gadget.name || "");
+        }
+        return gadget;
+      });
       
       // Create slot arrays for template iteration (with index info)
       const level0SlotArray = paddedLevel0.map((gadget, index) => ({
@@ -1645,16 +1735,23 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         slotNumber: index + 1,
         isEmpty: !gadget
       }));
+      const level3SlotArray = paddedLevel3.map((gadget, index) => ({
+        gadget: gadget,
+        slotNumber: index + 1,
+        isEmpty: !gadget
+      }));
       
       context.preparedGadgets = {
         level0: paddedLevel0,
         level1: paddedLevel1,
-        level2: paddedLevel2
+        level2: paddedLevel2,
+        level3: paddedLevel3
       };
       context.gadgetSlotsArray = {
         level0: level0SlotArray,
         level1: level1SlotArray,
-        level2: level2SlotArray
+        level2: level2SlotArray,
+        level3: level3SlotArray
       };
       
       // Get Gadget Tuning rank
@@ -1728,11 +1825,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
       const gadgetAttackEntries = [];
       if (hasGadgeteer) {
-        const preparedGadgets = actorData.system.gadgets?.prepared || { level0: [], level1: [], level2: [] };
+        const preparedGadgets = actorData.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] };
         const gadgetEntries = [
           ...(preparedGadgets.level0 || []),
           ...(preparedGadgets.level1 || []),
-          ...(preparedGadgets.level2 || [])
+          ...(preparedGadgets.level2 || []),
+          ...(preparedGadgets.level3 || [])
         ].filter(Boolean);
         for (const gadgetEntry of gadgetEntries) {
           let damageFormula = gadgetEntry.damage || gadgetEntry.damageFormula || gadgetEntry.damageRoll || gadgetEntry.attackDamage;
@@ -2808,6 +2906,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
     // Enough Prep Time controls
     html.find(".enough-prep-time-toggle").on("change", this._onEnoughPrepTimeToggle.bind(this));
+
+    // Regenerative Fortitude controls
+    html.find(".regenerative-fortitude-toggle").on("change", this._onRegenerativeFortitudeToggle.bind(this));
+
+    // Protective Barrier controls
+    html.find(".protective-barrier-toggle").on("change", this._onProtectiveBarrierToggle.bind(this));
 
     // Gadgets management
     html.find(".add-gadget").click(this._onAddGadget.bind(this));
@@ -5670,10 +5774,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     
     let sourcesHtml = "";
     for (const source of breakdown.sources) {
+      const sourceValue = source.rank !== undefined
+        ? source.rank
+        : (Number.isFinite(source.bonus) ? `+${source.bonus}` : "");
       sourcesHtml += `
         <div class="breakdown-item">
           <label>${source.name}:</label>
-          <span class="breakdown-value">${source.rank}</span>
+          <span class="breakdown-value">${sourceValue}</span>
         </div>
       `;
     }
@@ -5812,6 +5919,24 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     
     // Check Powerset ability boosts
     const powersetName = progression.level1?.powersetName || actorData.basic?.powerset;
+    let hasIndomitableWill = false;
+    let hasImmovableObject = false;
+    if (powersetName === "Bastion") {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const bastionTalentName = levelData.bastionTalentName || "";
+        if (!bastionTalentName) continue;
+        const normalizedTalent = bastionTalentName.toLowerCase();
+        if (normalizedTalent.includes("indomitable will")) {
+          hasIndomitableWill = true;
+        }
+        if (normalizedTalent.includes("immovable object")) {
+          hasImmovableObject = true;
+        }
+        if (hasIndomitableWill && hasImmovableObject) break;
+      }
+    }
     if (powersetName === "Bastion") {
       abilityBonuses.endurance += 1;
       // Bastion additional ability boosts
@@ -5912,7 +6037,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       "Legendary": 16
     };
     const trainingBonus = trainingBonuses[savingThrow.rank] || 0;
-    const otherBonuses = Number(savingThrow.otherBonuses) || 0;
+    let otherBonuses = Number(savingThrow.otherBonuses) || 0;
+    if (hasIndomitableWill && (ability === "wits" || ability === "charm")) {
+      otherBonuses += 2;
+    }
 
     // Capitalize ability name for display
     const abilityDisplay = ability.charAt(0).toUpperCase() + ability.slice(1);
@@ -5941,6 +6069,22 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             <input type="text" id="extra-modifier" value="0" placeholder="0 or +1d6" class="editable-input"/>
           </div>
         </div>
+        ${hasIndomitableWill ? `
+        <div class="roll-options-row">
+          <label class="roll-option">
+            <input type="checkbox" id="indomitable-will-advantage"/>
+            <span>Advantage vs Paralyzed, Staggered, or Dazed</span>
+          </label>
+        </div>
+        ` : ""}
+        ${hasImmovableObject ? `
+        <div class="roll-options-row">
+          <label class="roll-option">
+            <input type="checkbox" id="immovable-object-advantage"/>
+            <span>Advantage vs Prone</span>
+          </label>
+        </div>
+        ` : ""}
         <p class="help-text">Add any extra bonuses (e.g., +2, +1d6, -1). Click "Roll Saving Throw" to roll 1d20 + ${abilityDisplay} + Competence Bonus + Other Bonuses + Extra Modifier.</p>
       </form>
     `;
@@ -5965,9 +6109,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const trainingBonus = parseFloat(container?.querySelector("#training-bonus")?.value || "0") || 0;
             const otherBonuses = parseFloat(container?.querySelector("#other-bonuses")?.value || "0") || 0;
             const extra = (container?.querySelector("#extra-modifier")?.value || "0").trim() || "0";
+            const useAdvantage = !!container?.querySelector("#indomitable-will-advantage")?.checked
+              || !!container?.querySelector("#immovable-object-advantage")?.checked;
+            const rollDie = useAdvantage ? "2d20kh" : "1d20";
             
             // Build roll formula: 1d20 + ability + training + other + extra
-            let rollFormula = `1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
+            let rollFormula = `${rollDie} + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
             if (fatiguedPenalty > 0) {
               rollFormula += ` - ${fatiguedPenalty}`;
             }
@@ -5981,7 +6128,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const otherText = otherBonuses !== 0 ? ` + ${otherBonuses} (Other)` : "";
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
             const fatiguedText = fatiguedPenalty > 0 ? ` - ${fatiguedPenalty} (Fatigued)` : "";
-            const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Saving Throw</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${savingThrow.rank})${otherText}${fatiguedText}${extraText} = <strong>${roll.total}</strong></div>`;
+            const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Saving Throw</b><br>${rollDie} + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${savingThrow.rank})${otherText}${fatiguedText}${extraText} = <strong>${roll.total}</strong></div>`;
             
             await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -6001,9 +6148,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 const trainingBonus = parseFloat(html.find("#training-bonus").val()) || 0;
                 const otherBonuses = parseFloat(html.find("#other-bonuses").val()) || 0;
                 const extra = html.find("#extra-modifier").val().trim() || "0";
+                const useAdvantage = html.find("#indomitable-will-advantage").is(":checked")
+                  || html.find("#immovable-object-advantage").is(":checked");
+                const rollDie = useAdvantage ? "2d20kh" : "1d20";
                 
                 // Build roll formula: 1d20 + ability + training + other + extra
-                let rollFormula = `1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
+                let rollFormula = `${rollDie} + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`;
                 if (fatiguedPenalty > 0) {
                   rollFormula += ` - ${fatiguedPenalty}`;
                 }
@@ -6017,7 +6167,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 const otherText = otherBonuses !== 0 ? ` + ${otherBonuses} (Other)` : "";
                 const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
                 const fatiguedText = fatiguedPenalty > 0 ? ` - ${fatiguedPenalty} (Fatigued)` : "";
-                const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Saving Throw</b><br>1d20 + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${savingThrow.rank})${otherText}${fatiguedText}${extraText} = <strong>${roll.total}</strong></div>`;
+                const flavor = `<div class="roll-flavor"><b>${abilityDisplay} Saving Throw</b><br>${rollDie} + ${abilityScore} (${abilityDisplay}) + ${trainingBonus} (${savingThrow.rank})${otherText}${fatiguedText}${extraText} = <strong>${roll.total}</strong></div>`;
                 
                 await roll.toMessage({
                   speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -6905,21 +7055,22 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }).render(true);
   }
 
-  _showSavingThrowTrainingDialog(level, slotType) {
+  _showSavingThrowTrainingDialog(level, slotType, targetRank = "Apprentice") {
     // Get current saving throws to check which ones are already trained
     const savingThrows = this.actor.system.savingThrows || {};
     const savingThrowAbilityNames = ["might", "agility", "endurance", "wits", "charm"];
+    const rankOrder = { "Novice": 0, "Apprentice": 1, "Competent": 2, "Masterful": 3, "Legendary": 4 };
+    const requiredRank = Object.keys(rankOrder).find(rank => rankOrder[rank] === rankOrder[targetRank] - 1) || "Novice";
     
-    // Filter out saving throws that are already at Apprentice rank or higher
+    // Filter to saving throws at the required rank for this upgrade
     const availableSavingThrows = savingThrowAbilityNames.filter(ability => {
       const savingThrow = savingThrows[ability] || {};
       const rank = savingThrow.rank || "Novice";
-      // Only show if it's Novice (not already trained)
-      return rank === "Novice";
+      return rank === requiredRank;
     });
     
     if (availableSavingThrows.length === 0) {
-      ui.notifications.warn("All saving throws are already trained! You cannot select Saving Throw Training (Apprentice) again.");
+      ui.notifications.warn(`No saving throws are currently ${requiredRank}. You cannot apply Saving Throw Training (${targetRank}).`);
       // Clear the talent selection since it can't be used
       const levelKey = `level${level}`;
       const updateData = {
@@ -6945,7 +7096,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           </select>
         </div>
         <p style="font-size: 12px; color: #a0aec0; margin-top: 10px;">
-          This will set the selected saving throw to <strong>Apprentice</strong> rank.
+          This will set the selected saving throw to <strong>${targetRank}</strong> rank.
         </p>
       </form>
       <style>
@@ -6971,62 +7122,111 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       </style>
     `;
     
-    new Dialog({
-      title: "Saving Throw Training - Choose Ability",
-      content: dialogContent,
-      buttons: {
-        save: {
-          icon: '<i class="fas fa-check"></i>',
-          label: "Train Saving Throw",
-          callback: async (html) => {
-            const ability = html.find("#saving-throw-training-ability").val();
-            
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    const dialogTitle = `Saving Throw Training (${targetRank}) - Choose Ability`;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: [
+            { action: "save", icon: '<i class="fas fa-check"></i>', label: "Train Saving Throw" },
+            { action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel" }
+          ],
+          default: "save",
+          submit: async (result, dialog) => {
+            const levelKey = `level${level}`;
+            if (result !== "save") {
+              const updateData = {
+                [`system.progression.${levelKey}.${slotType}`]: null,
+                [`system.progression.${levelKey}.${slotType}Name`]: null,
+                [`system.progression.${levelKey}.${slotType}Img`]: null
+              };
+              await this.actor.update(updateData);
+              this.render();
+              return;
+            }
+
+            const root = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+            const container = root?.shadowRoot || root;
+            const ability = container?.querySelector("#saving-throw-training-ability")?.value;
             if (!ability) {
               ui.notifications.warn("Please select a saving throw.");
               return;
             }
-            
-            // Update the saving throw rank to Apprentice
+
             const savingThrows = foundry.utils.deepClone(this.actor.system.savingThrows || {});
             if (!savingThrows[ability]) {
               savingThrows[ability] = {
-                rank: "Apprentice",
+                rank: targetRank,
                 otherBonuses: 0
               };
             } else {
-              savingThrows[ability].rank = "Apprentice";
+              savingThrows[ability].rank = targetRank;
             }
-            
-            // Store which saving throw was trained by this talent
-            const levelKey = `level${level}`;
+
             const updateData = {
               "system.savingThrows": savingThrows,
               [`system.progression.${levelKey}.${slotType}SavingThrow`]: ability
             };
-            
             await this.actor.update(updateData);
             this.render();
-            ui.notifications.info(`${ability.charAt(0).toUpperCase() + ability.slice(1)} saving throw set to Apprentice rank.`);
-          }
-        },
-        cancel: {
-          icon: '<i class="fas fa-times"></i>',
-          label: "Cancel",
-          callback: async () => {
-            // Clear the talent selection if cancelled
-            const levelKey = `level${level}`;
-            const updateData = {
-              [`system.progression.${levelKey}.${slotType}`]: null,
-              [`system.progression.${levelKey}.${slotType}Name`]: null,
-              [`system.progression.${levelKey}.${slotType}Img`]: null
-            };
-            await this.actor.update(updateData);
-            this.render();
+            ui.notifications.info(`${ability.charAt(0).toUpperCase() + ability.slice(1)} saving throw set to ${targetRank} rank.`);
           }
         }
-      },
-      default: "save"
-    }).render(true);
+      : {
+          title: dialogTitle,
+          content: dialogContent,
+          buttons: {
+            save: {
+              icon: '<i class="fas fa-check"></i>',
+              label: "Train Saving Throw",
+              callback: async (html) => {
+                const ability = html.find("#saving-throw-training-ability").val();
+                if (!ability) {
+                  ui.notifications.warn("Please select a saving throw.");
+                  return;
+                }
+
+                const savingThrows = foundry.utils.deepClone(this.actor.system.savingThrows || {});
+                if (!savingThrows[ability]) {
+                  savingThrows[ability] = {
+                    rank: targetRank,
+                    otherBonuses: 0
+                  };
+                } else {
+                  savingThrows[ability].rank = targetRank;
+                }
+
+                const levelKey = `level${level}`;
+                const updateData = {
+                  "system.savingThrows": savingThrows,
+                  [`system.progression.${levelKey}.${slotType}SavingThrow`]: ability
+                };
+                await this.actor.update(updateData);
+                this.render();
+                ui.notifications.info(`${ability.charAt(0).toUpperCase() + ability.slice(1)} saving throw set to ${targetRank} rank.`);
+              }
+            },
+            cancel: {
+              icon: '<i class="fas fa-times"></i>',
+              label: "Cancel",
+              callback: async () => {
+                const levelKey = `level${level}`;
+                const updateData = {
+                  [`system.progression.${levelKey}.${slotType}`]: null,
+                  [`system.progression.${levelKey}.${slotType}Name`]: null,
+                  [`system.progression.${levelKey}.${slotType}Img`]: null
+                };
+                await this.actor.update(updateData);
+                this.render();
+              }
+            }
+          },
+          default: "save"
+        };
+
+    const dialog = new DialogClass(dialogOptions);
+    dialog.render(true);
   }
 
   _showBastionResistanceDialog(level = 1) {
@@ -7125,6 +7325,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
               type: damageType,
               value: null, // null means it's calculated dynamically
               source: "Bastion's Resistance", // Track that this came from the talent
+              bastionMultiplier: 2,
               sourceLevel: levelKey
             };
             
@@ -7139,6 +7340,305 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             await this.actor.update(updateData);
             this.render();
             ui.notifications.info(`Added ${damageType} resistance from Bastion's Resistance.`);
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => {}
+        }
+      },
+      default: "save"
+    }).render(true);
+  }
+
+  _showAdaptiveDefenseDialog() {
+    const damageTypes = [
+      "Energy",
+      "Kinetic",
+      "Fire",
+      "Cold",
+      "Lightning",
+      "Acid",
+      "Poison",
+      "Psychic",
+      "Radiant",
+      "Necrotic",
+      "Force",
+      "Thunder"
+    ];
+
+    const adaptiveDefenseData = foundry.utils.deepClone(this.actor.system.combat?.adaptiveDefense || { types: [] });
+    const existingTypes = (adaptiveDefenseData.types || []).map(type => String(type || "").toLowerCase());
+    const existingTypeSet = new Set(existingTypes);
+
+    const dialogContent = `
+      <form>
+        <p style="color: #d1d1d1; margin-bottom: 20px;">
+          Choose the damage type you were just hit by. You gain <strong>Resistance 5</strong> to that type
+          for the remainder of the encounter.
+        </p>
+        <div class="form-group">
+          <label>Damage Type:</label>
+          <select id="adaptive-defense-type" required>
+            <option value="">Choose Damage Type...</option>
+            ${damageTypes.map(type => {
+              const isTaken = existingTypeSet.has(type.toLowerCase());
+              const label = isTaken ? `${type} (already adapted)` : type;
+              const disabled = isTaken ? " disabled" : "";
+              return `<option value="${type}"${disabled}>${label}</option>`;
+            }).join("")}
+          </select>
+        </div>
+      </form>
+      <style>
+        .form-group {
+          margin-bottom: 20px;
+        }
+        .form-group label {
+          display: block;
+          margin-bottom: 8px;
+          color: #d1d1d1;
+          font-weight: bold;
+          font-size: 14px;
+        }
+        .form-group select {
+          width: 100%;
+          padding: 10px;
+          background: rgba(30, 33, 45, 0.95);
+          border: 1px solid rgba(189, 95, 255, 0.4);
+          border-radius: 3px;
+          color: #ffffff;
+          font-size: 14px;
+        }
+      </style>
+    `;
+
+    new Dialog({
+      title: "Adaptive Defense - Choose Damage Type",
+      content: dialogContent,
+      buttons: {
+        save: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Apply",
+          callback: async (html) => {
+            const damageType = html.find("#adaptive-defense-type").val();
+            if (!damageType) {
+              ui.notifications.warn("Please select a damage type.");
+              return;
+            }
+
+            if (existingTypeSet.has(String(damageType).toLowerCase())) {
+              ui.notifications.warn(`${damageType} has already adapted this encounter.`);
+              return;
+            }
+
+            const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
+            resistances.push({
+              type: damageType,
+              value: 5,
+              source: "Adaptive Defense"
+            });
+
+            adaptiveDefenseData.types = [...(adaptiveDefenseData.types || []), damageType];
+
+            await this.actor.update({
+              "system.resistances": resistances,
+              "system.combat.adaptiveDefense": adaptiveDefenseData
+            });
+            this.render();
+            ui.notifications.info(`Adaptive Defense: gained resistance to ${damageType}.`);
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => {}
+        }
+      },
+      default: "save"
+    }).render(true);
+  }
+
+  _showBastionResistanceUpgradeDialog(level = 1) {
+    const levelKey = `level${level}`;
+    const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
+    const bastionResistances = resistances.filter(r => r?.source === "Bastion's Resistance");
+
+    if (bastionResistances.length === 0) {
+      ui.notifications.warn("You must take Bastion's Resistance before selecting Increased Resistance.");
+      return;
+    }
+
+    const dialogContent = `
+      <form>
+        <p style="color: #d1d1d1; margin-bottom: 20px;">
+          Choose one of your existing Bastion's Resistance types. That resistance increases to
+          <strong>4 × your Bastion level</strong>.
+        </p>
+        <div class="form-group">
+          <label>Resistance Type:</label>
+          <select id="bastion-increased-resistance-type" required>
+            <option value="">Choose Resistance...</option>
+            ${bastionResistances.map(resistance => {
+              const isEnhanced = Number(resistance.bastionMultiplier) === 4;
+              const label = isEnhanced ? `${resistance.type} (currently increased)` : resistance.type;
+              return `<option value="${resistance.type}">${label}</option>`;
+            }).join("")}
+          </select>
+        </div>
+      </form>
+      <style>
+        .form-group {
+          margin-bottom: 20px;
+        }
+        .form-group label {
+          display: block;
+          margin-bottom: 8px;
+          color: #d1d1d1;
+          font-weight: bold;
+          font-size: 14px;
+        }
+        .form-group select {
+          width: 100%;
+          padding: 10px;
+          background: rgba(30, 33, 45, 0.95);
+          border: 1px solid rgba(189, 95, 255, 0.4);
+          border-radius: 3px;
+          color: #ffffff;
+          font-size: 14px;
+        }
+      </style>
+    `;
+
+    new Dialog({
+      title: "Increased Resistance - Choose Type",
+      content: dialogContent,
+      buttons: {
+        save: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Apply",
+          callback: async (html) => {
+            const damageType = html.find("#bastion-increased-resistance-type").val();
+            if (!damageType) {
+              ui.notifications.warn("Please select a resistance type.");
+              return;
+            }
+
+            const updatedResistances = resistances.map(resistance => {
+              if (resistance.source !== "Bastion's Resistance") return resistance;
+              if (String(resistance.type).toLowerCase() === String(damageType).toLowerCase()) {
+                return { ...resistance, bastionMultiplier: 4 };
+              }
+              if (Number(resistance.bastionMultiplier) === 4) {
+                return { ...resistance, bastionMultiplier: 2 };
+              }
+              return resistance;
+            });
+
+            const updateData = {
+              "system.resistances": updatedResistances,
+              [`system.progression.${levelKey}.bastionTalentResistanceType`]: damageType
+            };
+
+            await this.actor.update(updateData);
+            this.render();
+            ui.notifications.info(`Increased ${damageType} resistance.`);
+          }
+        },
+        cancel: {
+          icon: '<i class="fas fa-times"></i>',
+          label: "Cancel",
+          callback: () => {}
+        }
+      },
+      default: "save"
+    }).render(true);
+  }
+
+  _showBastionTotalImmunityDialog(level = 1) {
+    const levelKey = `level${level}`;
+    const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
+    const increasedResistances = resistances.filter(r => r?.source === "Bastion's Resistance" && Number(r?.bastionMultiplier) === 4);
+
+    if (increasedResistances.length === 0) {
+      ui.notifications.warn("You must take Increased Resistance before selecting Total Immunity.");
+      return;
+    }
+
+    const dialogContent = `
+      <form>
+        <p style="color: #d1d1d1; margin-bottom: 20px;">
+          Choose the damage type you enhanced with Increased Resistance. You will gain Immunity to that type.
+        </p>
+        <div class="form-group">
+          <label>Damage Type:</label>
+          <select id="bastion-total-immunity-type" required>
+            <option value="">Choose Damage Type...</option>
+            ${increasedResistances.map(resistance => `<option value="${resistance.type}">${resistance.type}</option>`).join("")}
+          </select>
+        </div>
+      </form>
+      <style>
+        .form-group {
+          margin-bottom: 20px;
+        }
+        .form-group label {
+          display: block;
+          margin-bottom: 8px;
+          color: #d1d1d1;
+          font-weight: bold;
+          font-size: 14px;
+        }
+        .form-group select {
+          width: 100%;
+          padding: 10px;
+          background: rgba(30, 33, 45, 0.95);
+          border: 1px solid rgba(189, 95, 255, 0.4);
+          border-radius: 3px;
+          color: #ffffff;
+          font-size: 14px;
+        }
+      </style>
+    `;
+
+    new Dialog({
+      title: "Total Immunity - Choose Type",
+      content: dialogContent,
+      buttons: {
+        save: {
+          icon: '<i class="fas fa-check"></i>',
+          label: "Apply",
+          callback: async (html) => {
+            const damageType = html.find("#bastion-total-immunity-type").val();
+            if (!damageType) {
+              ui.notifications.warn("Please select a damage type.");
+              return;
+            }
+
+            const immunities = foundry.utils.deepClone(this.actor.system.immunities || []);
+            const existing = immunities.find(imm => imm.type === damageType && imm.source === "Total Immunity");
+            if (existing) {
+              ui.notifications.warn(`You already have ${damageType} immunity from Total Immunity.`);
+              return;
+            }
+
+            const newImmunity = {
+              type: damageType,
+              value: null,
+              source: "Total Immunity",
+              sourceLevel: levelKey
+            };
+            immunities.push(newImmunity);
+
+            const updateData = {
+              "system.immunities": immunities,
+              [`system.progression.${levelKey}.bastionTalentResistanceType`]: damageType
+            };
+
+            await this.actor.update(updateData);
+            this.render();
+            ui.notifications.info(`Added ${damageType} immunity.`);
           }
         },
         cancel: {
@@ -8056,6 +8556,44 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Don't call render() to preserve current tab state
   }
 
+  async _onRegenerativeFortitudeToggle(event) {
+    event.preventDefault();
+    const isUsed = event.currentTarget.checked;
+    const regenerativeData = foundry.utils.deepClone(this.actor.system.combat?.regenerativeFortitude || { used: false });
+    regenerativeData.used = isUsed;
+    await this.actor.update({ "system.combat.regenerativeFortitude": regenerativeData });
+    // Don't call render() to preserve current tab state
+  }
+
+  async _onProtectiveBarrierToggle(event) {
+    event.preventDefault();
+    const isActive = event.currentTarget.checked;
+    const protectiveBarrierData = foundry.utils.deepClone(this.actor.system.combat?.protectiveBarrier || { active: false });
+    protectiveBarrierData.active = isActive;
+    await this.actor.update({ "system.combat.protectiveBarrier": protectiveBarrierData });
+    // Don't call render() to preserve current tab state
+  }
+
+  async _onAdaptiveDefenseAdd(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    await this._showAdaptiveDefenseDialog();
+  }
+
+  async _onAdaptiveDefenseReset(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
+    const filteredResistances = resistances.filter(resistance => resistance.source !== "Adaptive Defense");
+    const adaptiveDefenseData = foundry.utils.deepClone(this.actor.system.combat?.adaptiveDefense || { types: [] });
+    adaptiveDefenseData.types = [];
+    await this.actor.update({
+      "system.resistances": filteredResistances,
+      "system.combat.adaptiveDefense": adaptiveDefenseData
+    });
+    this.render();
+  }
+
   async _onAddGadget(event) {
     event.preventDefault();
     const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
@@ -8143,7 +8681,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }, 100);
     
     // Get current prepared gadgets to check for duplicates (Level 0 only)
-    const currentGadgets = this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] };
+    const currentGadgets = this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] };
     const levelKey = `level${gadgetLevel}`;
     const alreadyPrepared = (currentGadgets[levelKey] || []).filter(g => g && g.name).map(g => g.name.toLowerCase());
     
@@ -8259,7 +8797,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             console.warn(`Could not load gadget image for ${gadgetName}:`, err);
           }
       
-          const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
+          const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] });
           const damageFormula = this._getGadgetDamageFormulaFromBasic(gadgetBasic);
           const healingFormula = this._getGadgetHealingFormulaFromBasic(gadgetBasic);
           
@@ -8311,7 +8849,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
     const gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
     
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] });
     const levelKey = `level${gadgetLevel}`;
     
     if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
@@ -8433,7 +8971,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     this._preferredTab = "gadgets";
     const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
     const gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] });
     const levelKey = `level${gadgetLevel}`;
 
     if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
@@ -8685,7 +9223,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const saveAbilityMap = {
       "sonic grenade": "agility",
       "electrostatic web": "agility",
-      "holo-decoy": "wits"
+      "holo-decoy": "wits",
+      "force cannon": "endurance"
     };
     const saveAbility = saveAbilityMap[gadgetKey];
     const canSave = Boolean(saveAbility);
@@ -8792,7 +9331,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const gadgetLevel = parseInt($(event.currentTarget).data("gadget-level"));
     const gadgetIndex = parseInt($(event.currentTarget).data("gadget-index"));
     
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] });
     const levelKey = `level${gadgetLevel}`;
     
     if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
@@ -9084,7 +9623,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     updateData["system.wounds"] = remainingWounds;
     
     // 3. Refresh used gadgets (set used = false for all gadgets)
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [] });
+    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] });
     if (gadgets.level0) {
       gadgets.level0 = gadgets.level0.map(gadget => {
         if (gadget) {
@@ -9109,7 +9648,23 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         return gadget;
       });
     }
+    if (gadgets.level3) {
+      gadgets.level3 = gadgets.level3.map(gadget => {
+        if (gadget) {
+          return { ...gadget, used: false };
+        }
+        return gadget;
+      });
+    }
     updateData["system.gadgets.prepared"] = gadgets;
+
+    const regenerativeData = foundry.utils.deepClone(this.actor.system.combat?.regenerativeFortitude || { used: false });
+    regenerativeData.used = false;
+    updateData["system.combat.regenerativeFortitude"] = regenerativeData;
+
+    const unbreakableData = foundry.utils.deepClone(this.actor.system.combat?.unbreakable || { used: 0 });
+    unbreakableData.used = 0;
+    updateData["system.combat.unbreakable"] = unbreakableData;
     
     await this.actor.update(updateData);
     this.render();
@@ -9289,6 +9844,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
   async _ensureGenericLevel2Talents(talentsPack) {
     if (!talentsPack) return;
 
+    const wasLocked = talentsPack.locked;
+    if (wasLocked) {
+      await talentsPack.configure({ locked: false });
+    }
+
+    try {
+
     let index;
     try {
       index = await talentsPack.getIndex();
@@ -9325,10 +9887,6 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     ];
 
-    if (talentsPack.locked) {
-      console.warn("Singularity | Talents compendium is locked; cannot seed level 2 talents.");
-      return;
-    }
 
     for (const def of talentDefinitions) {
       if (!existing.has(def.name.toLowerCase())) {
@@ -9346,6 +9904,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const needsUpdate = nextLevel !== def.level ||
           existingDoc.system?.basic?.type !== def.type ||
           existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          existingDoc.img !== def.img ||
           (existingDoc.system?.description || "") !== def.description;
 
         if (needsUpdate) {
@@ -9382,6 +9941,789 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }));
 
+    if (toCreate.length) {
+      try {
+        const createdItems = await Item.createDocuments(toCreate, { render: false });
+        for (const item of createdItems) {
+          await talentsPack.importDocument(item);
+          await item.delete();
+        }
+        await talentsPack.getIndex({ force: true });
+      } catch (err) {
+        console.warn("Singularity | Failed to seed generic level 2 talents:", err);
+      }
+    }
+
+    // Seed level 6 talents
+    index = await talentsPack.getIndex();
+    const existing6 = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const level6Definitions = [
+      {
+        name: "Blast (Competent)",
+        type: "generic",
+        level: 6,
+        prerequisites: "Prime Level 6; Blast (Apprentice)",
+        description: "<p><strong>Requirements</strong> Prime Level 6; Blast (Apprentice)</p><p>Through practice and refinement, you've learned to channel your blasts with greater precision and control. Your attacks are more accurate and reliable.</p><p><strong>Effect</strong> Your proficiency in Blast attacks increases to Competent.</p>",
+        img: "icons/svg/explosion.svg"
+      },
+      {
+        name: "Heavy Armor Training",
+        type: "generic",
+        level: 6,
+        prerequisites: "Prime Level 6; Medium Armor Training",
+        description: "<p><strong>Requirements</strong> Prime Level 6; Medium Armor Training</p><p>Your character masters wearing heavy armor, maximizing protection while tolerating its weight.</p><p><strong>Effect</strong> You are now trained in Heavy Armor. You can wear heavy armor without penalties to movement or defense.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Initiative Training (Competent)",
+        type: "generic",
+        level: 6,
+        prerequisites: "Prime Level 6; Initiative Training (Apprentice)",
+        description: "<p><strong>Requirements</strong> Prime Level 6; Initiative Training (Apprentice)</p><p>Your tactical awareness has developed beyond basic reactions. You've learned to read situations with professional expertise, positioning yourself optimally before conflicts even begin.</p><p><strong>Effect</strong> Your proficiency in Initiative checks increases to Competent.</p>",
+        img: "icons/svg/lightning.svg"
+      },
+      {
+        name: "Saving Throw Training (Competent)",
+        type: "generic",
+        level: 6,
+        prerequisites: "Prime Level 6; Saving Throw Training (Apprentice)",
+        description: "<p><strong>Requirements</strong> Prime Level 6; Saving Throw Training (Apprentice)</p><p>Through repeated exposure to danger and refined instinct, your character's ability to resist harmful effects becomes a professional standard.</p><p><strong>Effect</strong> Choose one saving throw in which your character is Apprentice. Your proficiency in that saving throw increases to Competent.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Skill Training (Competent)",
+        type: "generic",
+        level: 6,
+        prerequisites: "Prime Level 6; Skill Training (Apprentice)",
+        description: "<p><strong>Requirements</strong> Prime Level 6; Skill Training (Apprentice)</p><p>Your character pushes their expertise further, moving beyond basic proficiency toward professional mastery of a specific discipline.</p><p><strong>Effect</strong> Choose one skill in which your character is Apprentice. Your proficiency in that skill increases to Competent.</p>",
+        img: "icons/svg/book.svg"
+      },
+      {
+        name: "Weapon Training (Competent)",
+        type: "generic",
+        level: 6,
+        prerequisites: "Prime Level 6; Weapon Training (Apprentice)",
+        description: "<p><strong>Requirements</strong> Prime Level 6; Weapon Training (Apprentice)</p><p>Your character moves beyond basic martial knowledge, developing the muscle memory and tactical awareness required to be truly effective on the battlefield.</p><p><strong>Effect</strong> Choose one weapon category in which your character is currently Apprentice. Your training level in that category increases to Competent.</p><p><strong>Weapon Categories</strong> Unarmed Strikes, Light Melee Weapons, Heavy Melee Weapons, Thrown Weapons, Bows, Firearms, Improvised Weapons.</p>",
+        img: "icons/svg/sword.svg"
+      }
+    ];
+
+    for (const def of level6Definitions) {
+      if (!existing6.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          existingDoc.img !== def.img ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update existing level 6 talent:", err);
+      }
+    }
+
+    const toCreate6 = level6Definitions
+      .filter(def => !existing6.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
+    if (toCreate6.length) {
+      try {
+        const createdItems6 = await Item.createDocuments(toCreate6, { render: false });
+        for (const item of createdItems6) {
+          await talentsPack.importDocument(item);
+          await item.delete();
+        }
+        await talentsPack.getIndex({ force: true });
+      } catch (err) {
+        console.warn("Singularity | Failed to seed generic level 6 talents:", err);
+      }
+    }
+
+    // Seed level 8 talents
+    index = await talentsPack.getIndex();
+    const existing8 = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const level8Definitions = [
+      {
+        name: "Blast Damage Enhancement II",
+        type: "generic",
+        level: 8,
+        prerequisites: "Prime Level 8; Blast Damage Enhancement I",
+        description: "<p><strong>Requirements</strong> Prime Level 8; Blast Damage Enhancement I</p><p>Your mastery over energy channeling has reached new heights, allowing you to unleash even more devastating blasts.</p><p><strong>Effect</strong> Your Blast damage increases to 5d4 + chosen ability modifier (instead of 3d4 + chosen ability modifier).</p>",
+        img: "icons/svg/explosion.svg"
+      },
+      {
+        name: "Handless Climber",
+        type: "generic",
+        level: 8,
+        prerequisites: "Prime Level 8; Wall Crawler",
+        description: "<p><strong>Requirements</strong> Prime Level 8; Wall Crawler</p><p>You've developed techniques that allow you to scale surfaces using your feet, knees, and even minimal contact points, freeing your hands for combat or other tasks.</p><p><strong>Effect</strong> You no longer need a free hand to climb.</p><p><strong>Notes</strong> While climbing, you still suffer the same penalties as other climbing creatures.</p>",
+        img: "icons/svg/upgrade.svg"
+      }
+    ];
+
+    for (const def of level8Definitions) {
+      if (!existing8.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          existingDoc.img !== def.img ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update existing level 8 talent:", err);
+      }
+    }
+
+    const toCreate8 = level8Definitions
+      .filter(def => !existing8.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
+    if (toCreate8.length) {
+      try {
+        const createdItems8 = await Item.createDocuments(toCreate8, { render: false });
+        for (const item of createdItems8) {
+          await talentsPack.importDocument(item);
+          await item.delete();
+        }
+        await talentsPack.getIndex({ force: true });
+      } catch (err) {
+        console.warn("Singularity | Failed to seed generic level 8 talents:", err);
+      }
+    }
+
+    // Seed level 11 talents
+    index = await talentsPack.getIndex();
+    const existing11 = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const level11Definitions = [
+      {
+        name: "Blast (Masterful)",
+        type: "generic",
+        level: 11,
+        prerequisites: "Prime Level 11; Blast (Competent)",
+        description: "<p><strong>Requirements</strong> Prime Level 11; Blast (Competent)</p><p>Your mastery over energy manipulation has reached new heights. Your blasts strike with exceptional precision and consistency, finding their mark even in the most challenging situations.</p><p><strong>Effect</strong> Your proficiency in Blast attacks increases to Masterful.</p>",
+        img: "icons/svg/explosion.svg"
+      },
+      {
+        name: "Initiative Training (Masterful)",
+        type: "generic",
+        level: 11,
+        prerequisites: "Prime Level 11; Initiative Training (Competent)",
+        description: "<p><strong>Requirements</strong> Prime Level 11; Initiative Training (Competent)</p><p>Your reflexes have reached an almost supernatural level. You can sense danger before it manifests, moving with instinctive precision that leaves others struggling to keep pace.</p><p><strong>Effect</strong> Your proficiency in Initiative checks increases to Masterful.</p>",
+        img: "icons/svg/lightning.svg"
+      },
+      {
+        name: "Indomitable Will",
+        type: "bastion",
+        level: 10,
+        prerequisites: "Bastion 10",
+        description: "<h2>Description</h2><p>Your mental fortitude matches your physical resilience, allowing you to resist effects that would control or disable you.</p><h3>Requirements</h3><ul><li>Bastion 10</li></ul><h3>Effect</h3><p>You have advantage on saving throws against effects that would cause you to be Paralyzed, Staggered, or Dazed. Additionally, you gain a +2 bonus to all Wits and Charm saving throws.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Saving Throw Training (Masterful)",
+        type: "generic",
+        level: 11,
+        prerequisites: "Prime Level 11; Saving Throw Training (Competent)",
+        description: "<p><strong>Requirements</strong> Prime Level 11; Saving Throw Training (Competent)</p><p>Your character's reflexes, mental fortitude, and physical durability reach an elite level, allowing them to shrug off effects that would incapacitate others.</p><p><strong>Effect</strong> Choose one saving throw in which your character is Competent. Your proficiency in that saving throw increases to Masterful.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Skill Training (Masterful)",
+        type: "generic",
+        level: 11,
+        prerequisites: "Prime Level 11; Skill Training (Competent)",
+        description: "<p><strong>Requirements</strong> Prime Level 11; Skill Training (Competent)</p><p>Your character has reached the pinnacle of their craft, possessing a level of expertise that few in the world can match.</p><p><strong>Effect</strong> Choose one skill in which your character is Competent. Your proficiency in that skill increases to Masterful.</p>",
+        img: "icons/svg/book.svg"
+      },
+      {
+        name: "Weapon Training (Masterful)",
+        type: "generic",
+        level: 11,
+        prerequisites: "Prime Level 11; Weapon Training (Competent)",
+        description: "<p><strong>Requirements</strong> Prime Level 11; Weapon Training (Competent)</p><p>Your character has achieved an elite level of martial prowess. Your movements are fluid, precise, and deadly, allowing you to dominate combat with your chosen weaponry.</p><p><strong>Effect</strong> Choose one weapon category in which your character is currently Competent. Your training level in that category increases to Masterful.</p><p><strong>Weapon Categories</strong> Unarmed Strikes, Light Melee Weapons, Heavy Melee Weapons, Thrown Weapons, Bows, Firearms, Improvised Weapons.</p><p><strong>Notes</strong> If you have training in Light Melee Weapons, the bonus applies only when the weapon is used in melee. Throwing the weapon does not grant the bonus. If you have training in Thrown Weapons, the bonus applies only when the weapon is thrown. Using a thrown weapon in melee does not grant the bonus.</p>",
+        img: "icons/svg/sword.svg"
+      }
+    ];
+
+    for (const def of level11Definitions) {
+      if (!existing11.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          existingDoc.img !== def.img ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update existing level 11 talent:", err);
+      }
+    }
+
+    const toCreate11 = level11Definitions
+      .filter(def => !existing11.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
+    if (toCreate11.length) {
+      try {
+        const createdItems11 = await Item.createDocuments(toCreate11, { render: false });
+        for (const item of createdItems11) {
+          await talentsPack.importDocument(item);
+          await item.delete();
+        }
+        await talentsPack.getIndex({ force: true });
+      } catch (err) {
+        console.warn("Singularity | Failed to seed generic level 11 talents:", err);
+      }
+    }
+
+    // Seed level 13 talents
+    index = await talentsPack.getIndex();
+    const existing13 = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const level13Definitions = [
+      {
+        name: "Blast Damage Enhancement III",
+        type: "generic",
+        level: 13,
+        prerequisites: "Prime Level 13; Blast Damage Enhancement II",
+        description: "<p><strong>Requirements</strong> Prime Level 13; Blast Damage Enhancement II</p><p>Your control over destructive energy has become truly exceptional, enabling you to concentrate overwhelming force into each blast.</p><p><strong>Effect</strong> Your Blast damage increases to 7d4 + chosen ability modifier (instead of 5d4 + chosen ability modifier).</p>",
+        img: "icons/svg/explosion.svg"
+      }
+    ];
+
+    for (const def of level13Definitions) {
+      if (!existing13.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          existingDoc.img !== def.img ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update existing level 13 talent:", err);
+      }
+    }
+
+    const toCreate13 = level13Definitions
+      .filter(def => !existing13.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
+    if (toCreate13.length) {
+      try {
+        const createdItems13 = await Item.createDocuments(toCreate13, { render: false });
+        for (const item of createdItems13) {
+          await talentsPack.importDocument(item);
+          await item.delete();
+        }
+        await talentsPack.getIndex({ force: true });
+      } catch (err) {
+        console.warn("Singularity | Failed to seed generic level 13 talents:", err);
+      }
+    }
+
+    // Seed level 16 talents
+    index = await talentsPack.getIndex();
+    const existing16 = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const level16Definitions = [
+      {
+        name: "Blast (Legendary)",
+        type: "generic",
+        level: 16,
+        prerequisites: "Prime Level 16; Blast (Masterful)",
+        description: "<p><strong>Requirements</strong> Prime Level 16; Blast (Masterful)</p><p>Your control over destructive energy has transcended all limits. Your blasts strike with legendary precision and unwavering accuracy, never missing their intended target.</p><p><strong>Effect</strong> Your proficiency in Blast attacks increases to Legendary.</p>",
+        img: "icons/svg/explosion.svg"
+      },
+      {
+        name: "Initiative Training (Legendary)",
+        type: "generic",
+        level: 16,
+        prerequisites: "Prime Level 16; Initiative Training (Masterful)",
+        description: "<p><strong>Requirements</strong> Prime Level 16; Initiative Training (Masterful)</p><p>Your reaction time has transcended mortal limits. You operate in a state of constant readiness, reading the flow of battle like a conductor reads music. Your actions precede thought, and enemies find themselves reacting to moves you've already made.</p><p><strong>Effect</strong> Your proficiency in Initiative checks increases to Legendary.</p>",
+        img: "icons/svg/lightning.svg"
+      },
+      {
+        name: "Saving Throw Training (Legendary)",
+        type: "generic",
+        level: 16,
+        prerequisites: "Prime Level 16; Saving Throw Training (Masterful)",
+        description: "<p><strong>Requirements</strong> Prime Level 16; Saving Throw Training (Masterful)</p><p>Your character's resilience is absolute. They possess a mythic level of grit and presence of mind that makes them virtually unshakable in the face of disaster.</p><p><strong>Effect</strong> Choose one saving throw in which your character is Masterful. Your proficiency in that saving throw increases to Legendary.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Skill Training (Legendary)",
+        type: "generic",
+        level: 16,
+        prerequisites: "Prime Level 16; Skill Training (Masterful)",
+        description: "<p><strong>Requirements</strong> Prime Level 16; Skill Training (Masterful)</p><p>Your character's abilities have transcended human limits, becoming the stuff of myths and modern legends.</p><p><strong>Effect</strong> Choose one skill in which your character is Masterful. Your proficiency in that skill increases to Legendary.</p>",
+        img: "icons/svg/book.svg"
+      },
+      {
+        name: "Wall Runner's Flow",
+        type: "generic",
+        level: 16,
+        prerequisites: "Prime Level 16; Handless Climber",
+        description: "<p><strong>Requirements</strong> Prime Level 16; Handless Climber</p><p>You can maintain perfect aim and balance while climbing, allowing you to use ranged weapons with the same precision as if you were standing on solid ground.</p><p><strong>Effect</strong> You ignore the -5 penalty to ranged attack rolls from Restricted Ranged Combat while climbing.</p>",
+        img: "icons/svg/upgrade.svg"
+      },
+      {
+        name: "Weapon Training (Legendary)",
+        type: "generic",
+        level: 16,
+        prerequisites: "Prime Level 16; Weapon Training (Masterful)",
+        description: "<p><strong>Requirements</strong> Prime Level 16; Weapon Training (Masterful)</p><p>Your character's mastery of weaponry has reached a mythic status. You no longer merely use a weapon; it is an extension of your will, capable of performing feats that defy belief and dominate any battlefield.</p><p><strong>Effect</strong> Choose one weapon category in which your character is currently Masterful. Your training level in that category increases to Legendary.</p><p><strong>Weapon Categories</strong> Unarmed Strikes, Light Melee Weapons, Heavy Melee Weapons, Thrown Weapons, Bows, Firearms, Improvised Weapons.</p><p><strong>Notes</strong> If you have training in Light Melee Weapons, the bonus applies only when the weapon is used in melee. Throwing the weapon does not grant the bonus. If you have training in Thrown Weapons, the bonus applies only when the weapon is thrown. Using a thrown weapon in melee does not grant the bonus.</p>",
+        img: "icons/svg/sword.svg"
+      }
+    ];
+
+    for (const def of level16Definitions) {
+      if (!existing16.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          existingDoc.img !== def.img ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update existing level 16 talent:", err);
+      }
+    }
+
+    const toCreate16 = level16Definitions
+      .filter(def => !existing16.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
+    if (toCreate16.length) {
+      try {
+        const createdItems16 = await Item.createDocuments(toCreate16, { render: false });
+        for (const item of createdItems16) {
+          await talentsPack.importDocument(item);
+          await item.delete();
+        }
+        await talentsPack.getIndex({ force: true });
+      } catch (err) {
+        console.warn("Singularity | Failed to seed generic level 16 talents:", err);
+      }
+    }
+
+    // Seed level 18 talents
+    index = await talentsPack.getIndex();
+    const existing18 = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const level18Definitions = [
+      {
+        name: "Blast Damage Enhancement IV",
+        type: "generic",
+        level: 18,
+        prerequisites: "Prime Level 18; Blast Damage Enhancement III",
+        description: "<p><strong>Requirements</strong> Prime Level 18; Blast Damage Enhancement III</p><p>You have achieved the absolute pinnacle of energy manipulation. Your blasts now unleash cataclysmic force that can reshape battlefields and overwhelm even the most formidable defenses.</p><p><strong>Effect</strong> Your Blast damage increases to 9d4 + chosen ability modifier (instead of 7d4 + chosen ability modifier).</p>",
+        img: "icons/svg/explosion.svg"
+      }
+    ];
+
+    for (const def of level18Definitions) {
+      if (!existing18.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          existingDoc.img !== def.img ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update existing level 18 talent:", err);
+      }
+    }
+
+    const toCreate18 = level18Definitions
+      .filter(def => !existing18.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
+    if (toCreate18.length) {
+      try {
+        const createdItems18 = await Item.createDocuments(toCreate18, { render: false });
+        for (const item of createdItems18) {
+          await talentsPack.importDocument(item);
+          await item.delete();
+        }
+        await talentsPack.getIndex({ force: true });
+      } catch (err) {
+        console.warn("Singularity | Failed to seed generic level 18 talents:", err);
+      }
+    }
+    } finally {
+      if (wasLocked) {
+        await talentsPack.configure({ locked: true });
+      }
+    }
+  }
+
+  async _ensureBastionTalents(talentsPack) {
+    if (!talentsPack) return;
+
+    const wasLocked = talentsPack.locked;
+    if (wasLocked) {
+      await talentsPack.configure({ locked: false });
+    }
+
+    try {
+
+    let index;
+    try {
+      index = await talentsPack.getIndex();
+    } catch (err) {
+      console.warn("Singularity | Failed to read talents compendium index:", err);
+      return;
+    }
+
+    const existing = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const talentDefinitions = [
+      {
+        name: "Regenerative Fortitude",
+        type: "bastion",
+        level: 7,
+        prerequisites: "Bastion 7",
+        description: "<h2>Description</h2><p>Your body knits itself back together under duress, letting you shrug off severe hits.</p><h3>Requirements</h3><ul><li>Bastion 7</li></ul><h3>Effect</h3><p>Once per day, when you take damage, you can use your reaction to reduce that damage by an amount equal to your Endurance score.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Protective Barrier",
+        type: "bastion",
+        level: 9,
+        prerequisites: "Bastion 9",
+        description: "<h2>Description</h2><p>You project a protective aura that shields nearby allies from harm.</p><h3>Requirements</h3><ul><li>Bastion 9</li></ul><h3>Effect</h3><p>You may activate a Protective Barrier (free action). Allies within 15 feet gain a +1 bonus to AC. At levels 15 and 20, this bonus increases to +2 and +3, respectively.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Indomitable Will",
+        type: "bastion",
+        level: 10,
+        prerequisites: "Bastion 10",
+        description: "<h2>Description</h2><p>Your mental fortitude matches your physical resilience, allowing you to resist effects that would control or disable you.</p><h3>Requirements</h3><ul><li>Bastion 10</li></ul><h3>Effect</h3><p>You have advantage on saving throws against effects that would cause you to be Paralyzed, Staggered, or Dazed. Additionally, you gain a +2 bonus to all Wits and Charm saving throws.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Total Immunity",
+        type: "bastion",
+        level: 10,
+        prerequisites: "Bastion 10; Increased Resistance",
+        description: "<h2>Description</h2><p>Your defenses can fully shut down a single damage type.</p><h3>Requirements</h3><ul><li>Bastion 10</li><li>Increased Resistance</li></ul><h3>Effect</h3><p>Choose one damage type you currently have Resistance against from your Increased Resistance talent. You gain Immunity to that damage type.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Rapid Intercept",
+        type: "bastion",
+        level: 12,
+        prerequisites: "Bastion 12; Intercept Attack",
+        description: "<h2>Description</h2><p>Your reflexes and defensive training allow you to intercept attacks meant for allies even at greater distances, moving quickly to take the blow yourself.</p><h3>Requirements</h3><ul><li>Bastion 12</li><li>Intercept Attack</li></ul><h3>Effect</h3><p>When you use Intercept Attack, you can move up to your speed to reach the ally, rather than needing to be within 5 feet already. After you reach the ally, you swap places with them. The ally moves to the space you just occupied (where you reached them), not to your original starting position.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Adaptive Defense",
+        type: "bastion",
+        level: 14,
+        prerequisites: "Bastion 14",
+        description: "<h2>Description</h2><p>Your defenses adapt to incoming attacks, learning from each hit to better resist similar damage.</p><h3>Requirements</h3><ul><li>Bastion 14</li></ul><h3>Effect</h3><p>The first time you take damage of a specific type each encounter, you gain Resistance 5 to that damage type for the remainder of the encounter. This resistance stacks with other resistances you may have.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Legendary Resilience",
+        type: "bastion",
+        level: 15,
+        prerequisites: "Bastion 15",
+        description: "<h2>Description</h2><p>Your body has reached a state of near-perfect durability, allowing you to shrug off damage that would kill others.</p><h3>Requirements</h3><ul><li>Bastion 15</li></ul><h3>Effect</h3><p>You gain Resistance 10 to all damage types. This resistance applies before any other resistances or immunities you may have.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Guardian Aura",
+        type: "bastion",
+        level: 17,
+        prerequisites: "Bastion 17; Protective Barrier",
+        description: "<h2>Description</h2><p>Your protective presence extends further, creating a larger zone of safety for your allies.</p><h3>Requirements</h3><ul><li>Bastion 17</li><li>Protective Barrier</li></ul><h3>Effect</h3><p>The range of your Protective Barrier increases to 25 feet. Additionally, allies within this range also gain Resistance 5 to all damage types.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Immovable Object",
+        type: "bastion",
+        level: 19,
+        prerequisites: "Bastion 19",
+        description: "<h2>Description</h2><p>You become an anchor point in reality, impossible to move or displace against your will.</p><h3>Requirements</h3><ul><li>Bastion 19</li></ul><h3>Effect</h3><p>You cannot be moved against your will by any means, including forced movement, teleportation, or effects that would push, pull, or reposition you. You can still move voluntarily. Additionally, you have advantage on saving throws against effects that would knock you Prone.</p>",
+        img: "icons/svg/shield.svg"
+      },
+      {
+        name: "Unbreakable",
+        type: "bastion",
+        level: 20,
+        prerequisites: "Bastion 20",
+        description: "<h2>Description</h2><p>You have achieved the pinnacle of defensive mastery. Your will to survive is so strong that you can push through injuries that would fell others, refusing to fall even when your body should give out.</p><h3>Requirements</h3><ul><li>Bastion 20</li></ul><h3>Effect</h3><p>A number of times per day equal to your Endurance modifier (minimum 1), when you would be reduced to 0 HP and become unconscious, you are instead reduced to 1 HP and remain conscious. You do not gain a Wound from this instance of damage.</p>",
+        img: "icons/svg/shield.svg"
+      }
+    ];
+
+
+    for (const def of talentDefinitions) {
+      if (!existing.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          existingDoc.img !== def.img ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update Bastion talent:", err);
+      }
+    }
+
+    const toCreate = talentDefinitions
+      .filter(def => !existing.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
     if (!toCreate.length) return;
 
     try {
@@ -9392,7 +10734,122 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
       await talentsPack.getIndex({ force: true });
     } catch (err) {
-      console.warn("Singularity | Failed to seed generic level 2 talents:", err);
+      console.warn("Singularity | Failed to create Bastion talents:", err);
+    }
+    } finally {
+      if (wasLocked) {
+        await talentsPack.configure({ locked: true });
+      }
+    }
+  }
+
+  async _ensureGadgeteerTalents(talentsPack) {
+    if (!talentsPack) return;
+
+    const wasLocked = talentsPack.locked;
+    if (wasLocked) {
+      await talentsPack.configure({ locked: false });
+    }
+
+    try {
+
+    let index;
+    try {
+      index = await talentsPack.getIndex();
+    } catch (err) {
+      console.warn("Singularity | Failed to read talents compendium index:", err);
+      return;
+    }
+
+    const existing = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+    const talentDefinitions = [
+      {
+        name: "Rapid Deployment",
+        type: "gadgeteer",
+        level: 3,
+        prerequisites: "Gadgeteer 3",
+        description: "<h2>Description</h2><p>Your gadgets are optimized for quick activation, allowing you to deploy them with minimal setup time.</p><h3>Requirements</h3><ul><li>Gadgeteer 3</li></ul><h3>Effect</h3><p>When you use a gadget, you can reduce its energy cost by <strong>1</strong> (minimum <strong>1</strong> energy).</p><p>You can use this ability a number of times per encounter equal to your <strong>Wits modifier</strong> (minimum <strong>1</strong>).</p>",
+        img: "icons/svg/item-bag.svg"
+      },
+      {
+        name: "Improved Improvisation",
+        type: "gadgeteer",
+        level: 5,
+        prerequisites: "Gadgeteer 5; Improvised Gadget",
+        description: "<h2>Description</h2><p>Your ability to create gadgets on the fly has improved, allowing you to craft more powerful devices in the heat of battle.</p><h3>Requirements</h3><ul><li>Gadgeteer 5</li><li>Improvised Gadget</li></ul><h3>Effect</h3><p>When you use <strong>Improvised Gadget</strong>, you can create a <strong>Level 1 gadget</strong> instead of a Level 0 gadget. The energy cost remains 2.</p>",
+        img: "icons/svg/item-bag.svg"
+      }
+    ];
+
+
+    for (const def of talentDefinitions) {
+      if (!existing.has(def.name.toLowerCase())) {
+        continue;
+      }
+
+      const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+      if (!indexEntry?._id) continue;
+
+      try {
+        const existingDoc = await talentsPack.getDocument(indexEntry._id);
+        if (!existingDoc) continue;
+
+        const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+        const needsUpdate = nextLevel !== def.level ||
+          existingDoc.system?.basic?.type !== def.type ||
+          existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+          (existingDoc.system?.description || "") !== def.description;
+
+        if (needsUpdate) {
+          await existingDoc.update({
+            img: def.img,
+            system: {
+              description: def.description,
+              basic: {
+                type: def.type,
+                level: def.level,
+                prerequisites: def.prerequisites
+              }
+            }
+          });
+        }
+      } catch (err) {
+        console.warn("Singularity | Failed to update Gadgeteer talent:", err);
+      }
+    }
+
+    const toCreate = talentDefinitions
+      .filter(def => !existing.has(def.name.toLowerCase()))
+      .map(def => ({
+        name: def.name,
+        type: "talent",
+        img: def.img,
+        system: {
+          description: def.description,
+          basic: {
+            type: def.type,
+            level: def.level,
+            prerequisites: def.prerequisites
+          }
+        }
+      }));
+
+    if (!toCreate.length) return;
+
+    try {
+      const createdItems = await Item.createDocuments(toCreate, { render: false });
+      for (const item of createdItems) {
+        await talentsPack.importDocument(item);
+        await item.delete();
+      }
+      await talentsPack.getIndex({ force: true });
+    } catch (err) {
+      console.warn("Singularity | Failed to create Gadgeteer talents:", err);
+    }
+    } finally {
+      if (wasLocked) {
+        await talentsPack.configure({ locked: true });
+      }
     }
   }
 
@@ -9451,6 +10908,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       return;
     }
 
+    await this._ensureBastionTalents(talentsPack);
+    await this._ensureGadgeteerTalents(talentsPack);
     await this._ensureGenericLevel2Talents(talentsPack);
     
     // Collect all already-selected talents from all progression slots
@@ -9460,6 +10919,26 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const isBaseBlastTalentName = (name) => {
       const normalized = (name || "").toLowerCase().trim();
       return normalized === "blast (apprentice)" || normalized.startsWith("blast (");
+    };
+    const embeddedTalentNames = new Set(
+      (this.actor.items || [])
+        .filter(item => item?.type === "talent")
+        .map(item => String(item.name || "").toLowerCase().trim())
+    );
+    const talentNameCache = new Map();
+    const resolveTalentName = async (uuid) => {
+      if (!uuid) return "";
+      if (talentNameCache.has(uuid)) return talentNameCache.get(uuid);
+      try {
+        const doc = await fromUuid(uuid);
+        const name = doc?.name || "";
+        talentNameCache.set(uuid, name);
+        return name;
+      } catch (err) {
+        console.warn("Singularity | Failed to resolve talent name", err);
+        talentNameCache.set(uuid, "");
+        return "";
+      }
     };
     
     // Helper function to add a selected talent
@@ -9484,6 +10963,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       // Check generic talents
       if (levelData.genericTalentName) {
         addSelectedTalent(levelData.genericTalentName);
+      } else if (levelData.genericTalent) {
+        const resolvedName = await resolveTalentName(levelData.genericTalent);
+        if (resolvedName) addSelectedTalent(resolvedName);
       }
       
       // Check human generic talent
@@ -9535,6 +11017,21 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         } else {
           addSelectedTalent(levelData.bastionTalentName);
         }
+      }
+      
+      // Check gadgeteer talent
+      if (levelData.gadgeteerTalentName) {
+        addSelectedTalent(levelData.gadgeteerTalentName);
+      }
+      
+      // Check paragon talent
+      if (levelData.paragonTalentName) {
+        addSelectedTalent(levelData.paragonTalentName);
+      }
+      
+      // Check marksman talent
+      if (levelData.marksmanTalentName) {
+        addSelectedTalent(levelData.marksmanTalentName);
       }
     }
     
@@ -9610,7 +11107,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         "bastion's resistance", "bastions resistance", "bastion resistance",
         "enlarged presence", "ironbound", "protect the weak",
         "defensive stance", "increased resistance", "intercept attack",
-        "regenerative fortitude", "protective barrier"
+            "regenerative fortitude", "protective barrier", "indomitable will", "total immunity",
+            "rapid intercept", "adaptive defense", "legendary resilience", "guardian aura",
+            "immovable object", "unbreakable"
       ];
           if (name.includes("bastion") || 
               bastionTalentNames.some(btName => name.includes(btName.toLowerCase()))) {
@@ -9692,9 +11191,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             "fast reload", "stabilized movement",
             "surgical precision",
             "improved deadeye", "trick shot",
-            "rapid fire", "specialized ammunition",
-            "enhanced precision", "tripoint trauma",
-            "lightning reload", "perfect aim", "ricochet shot",
+            "inspiring presence", "legendary presence", "aerial mastery", "reinforced breaker",
+            "improved meteor slam", "overwhelming presence", "perfect flight", "unstoppable force",
             "master marksman", "pinpoint accuracy",
             "versatile arsenal",
             "deadly focus", "master ricochet", "penetrating shot",
@@ -9715,7 +11213,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         "bastion's resistance", "bastions resistance", "bastion resistance",
         "enlarged presence", "ironbound", "protect the weak",
         "defensive stance", "increased resistance", "intercept attack",
-        "regenerative fortitude", "protective barrier"
+        "regenerative fortitude", "protective barrier", "indomitable will", "total immunity",
+        "rapid intercept", "adaptive defense", "legendary resilience", "guardian aura",
+        "immovable object", "unbreakable"
       ];
       const paragonTalentNames = [
         "dominating presence", "impact control", "noble presence", "supersonic moment",
@@ -9789,20 +11289,198 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
     const meetsTalentPrereqs = (talentDoc) => {
       const name = (talentDoc.name || "").toLowerCase();
+      const hasTalent = (talentName) => {
+        const normalized = (talentName || "").toLowerCase().trim();
+        if (normalizedSelected.includes(normalized) || embeddedTalentNames.has(normalized)) {
+          return true;
+        }
+        const selectedMatch = normalizedSelected.some(selected => selected.includes(normalized));
+        if (selectedMatch) return true;
+        for (const embeddedName of embeddedTalentNames) {
+          if (embeddedName.includes(normalized)) return true;
+        }
+        return false;
+      };
       if (name === "medium armor training") {
         return primeLevel >= 2 && hasArmorTraining;
       }
       if (name === "blast damage enhancement i") {
-        return primeLevel >= 4 && normalizedSelected.includes("blast (apprentice)");
+        return primeLevel >= 4 && hasTalent("blast (apprentice)");
+      }
+      if (name === "blast damage enhancement ii") {
+        return primeLevel >= 8 && hasTalent("blast damage enhancement i");
+      }
+      if (name === "blast damage enhancement iii") {
+        return primeLevel >= 13 && hasTalent("blast damage enhancement ii");
+      }
+      if (name === "blast damage enhancement iv") {
+        return primeLevel >= 18 && hasTalent("blast damage enhancement iii");
+      }
+      if (name === "handless climber") {
+        return primeLevel >= 8 && hasTalent("wall crawler");
+      }
+      if (name === "wall runner's flow") {
+        return primeLevel >= 16 && hasTalent("handless climber");
+      }
+      if (name === "blast (competent)") {
+        return primeLevel >= 6 && hasTalent("blast (apprentice)");
+      }
+      if (name === "blast (masterful)") {
+        return primeLevel >= 11 && hasTalent("blast (competent)");
+      }
+      if (name === "blast (legendary)") {
+        return primeLevel >= 16 && hasTalent("blast (masterful)");
+      }
+      if (name === "heavy armor training") {
+        const alreadyHasHeavyArmor = hasTalent("heavy armor training");
+        return primeLevel >= 6 && hasTalent("medium armor training") && !alreadyHasHeavyArmor;
+      }
+      if (name === "initiative training (competent)") {
+        return primeLevel >= 6 && hasTalent("initiative training (apprentice)");
+      }
+      if (name === "initiative training (masterful)") {
+        return primeLevel >= 11 && hasTalent("initiative training (competent)");
+      }
+      if (name === "initiative training (legendary)") {
+        return primeLevel >= 16 && hasTalent("initiative training (masterful)");
+      }
+      if (name === "saving throw training (masterful)") {
+        const hasSavingThrowCompetent = normalizedSelected.some(talentName =>
+          talentName.includes("saving throw") && talentName.includes("competent")
+        ) || embeddedTalentNames.has("saving throw training (competent)");
+        const savingThrows = this.actor.system.savingThrows || {};
+        const hasCompetentFromProgression = Object.values(savingThrows).some(st => st?.rank === "Competent");
+        return primeLevel >= 11 && (hasSavingThrowCompetent || hasCompetentFromProgression);
+      }
+      if (name === "saving throw training (legendary)") {
+        const hasSavingThrowMasterful = normalizedSelected.some(talentName =>
+          talentName.includes("saving throw") && talentName.includes("masterful")
+        ) || embeddedTalentNames.has("saving throw training (masterful)");
+        const savingThrows = this.actor.system.savingThrows || {};
+        const hasMasterfulFromProgression = Object.values(savingThrows).some(st => st?.rank === "Masterful");
+        return primeLevel >= 16 && (hasSavingThrowMasterful || hasMasterfulFromProgression);
+      }
+      if (name === "saving throw training (competent)") {
+        // Check if player has any "Saving Throw Training (Apprentice)" talent
+        const hasSavingThrowApprentice = normalizedSelected.some(talentName => 
+          talentName.includes("saving throw") && talentName.includes("apprentice")
+        ) || embeddedTalentNames.has("saving throw training (apprentice)");
+        // Also check if player has any Apprentice rank saving throws from progression
+        const savingThrows = this.actor.system.savingThrows || {};
+        const hasApprenticeFromProgression = Object.values(savingThrows).some(st => st?.rank === "Apprentice");
+        return primeLevel >= 6 && (hasSavingThrowApprentice || hasApprenticeFromProgression);
+      }
+      if (name === "skill training (masterful)") {
+        const hasSkillTrainingCompetent = normalizedSelected.some(talentName =>
+          talentName.includes("skill training") && talentName.includes("competent")
+        ) || embeddedTalentNames.has("skill training (competent)");
+        const skills = this.actor.system.skills || {};
+        const hasCompetentFromProgression = Object.values(skills).some(skill => skill?.rank === "Competent");
+        return primeLevel >= 11 && (hasSkillTrainingCompetent || hasCompetentFromProgression);
+      }
+      if (name === "skill training (legendary)") {
+        const hasSkillTrainingMasterful = normalizedSelected.some(talentName =>
+          talentName.includes("skill training") && talentName.includes("masterful")
+        ) || embeddedTalentNames.has("skill training (masterful)");
+        const skills = this.actor.system.skills || {};
+        const hasMasterfulFromProgression = Object.values(skills).some(skill => skill?.rank === "Masterful");
+        return primeLevel >= 16 && (hasSkillTrainingMasterful || hasMasterfulFromProgression);
+      }
+      if (name === "skill training (competent)") {
+        // Check if player has any "Skill Training (Apprentice)" talent
+        const hasSkillTrainingApprentice = normalizedSelected.some(talentName => 
+          talentName.includes("skill training") && talentName.includes("apprentice")
+        ) || embeddedTalentNames.has("skill training (apprentice)");
+        // Also check if player has any Apprentice rank skills from progression
+        const skills = this.actor.system.skills || {};
+        const hasApprenticeSkillFromProgression = Object.values(skills).some(skill => skill?.rank === "Apprentice");
+        return primeLevel >= 6 && (hasSkillTrainingApprentice || hasApprenticeSkillFromProgression);
+      }
+      if (name === "weapon training (competent)") {
+        // Check if player has any "Weapon Training (Apprentice)" talent
+        const hasWeaponTrainingApprentice = normalizedSelected.some(talentName => 
+          talentName.includes("weapon training") && talentName.includes("apprentice")
+        ) || embeddedTalentNames.has("weapon training (apprentice)");
+        // Also check if player has any Apprentice rank weapons from progression/items
+        const weaponItems = this.actor.items.filter(item => item.type === "weapon");
+        const hasApprenticeWeaponFromProgression = weaponItems.some(weapon => weapon.system?.training?.rank === "Apprentice");
+        return primeLevel >= 6 && (hasWeaponTrainingApprentice || hasApprenticeWeaponFromProgression);
+      }
+      if (name === "weapon training (masterful)") {
+        const hasWeaponTrainingCompetent = normalizedSelected.some(talentName =>
+          talentName.includes("weapon training") && talentName.includes("competent")
+        ) || embeddedTalentNames.has("weapon training (competent)");
+        const weaponItems = this.actor.items.filter(item => item.type === "weapon");
+        const hasCompetentWeaponFromProgression = weaponItems.some(weapon => weapon.system?.training?.rank === "Competent");
+        return primeLevel >= 11 && (hasWeaponTrainingCompetent || hasCompetentWeaponFromProgression);
+      }
+      if (name === "weapon training (legendary)") {
+        const hasWeaponTrainingMasterful = normalizedSelected.some(talentName =>
+          talentName.includes("weapon training") && talentName.includes("masterful")
+        ) || embeddedTalentNames.has("weapon training (masterful)");
+        const weaponItems = this.actor.items.filter(item => item.type === "weapon");
+        const hasMasterfulWeaponFromProgression = weaponItems.some(weapon => weapon.system?.training?.rank === "Masterful");
+        return primeLevel >= 16 && (hasWeaponTrainingMasterful || hasMasterfulWeaponFromProgression);
       }
       if (name === "expert climber") {
-        return primeLevel >= 4 && normalizedSelected.includes("wall crawler");
+        return primeLevel >= 4 && hasTalent("wall crawler");
+      }
+      if (name === "increased resistance") {
+        const hasBastionResistance = [
+          "bastion's resistance",
+          "bastions resistance",
+          "bastion resistance"
+        ].some(hasTalent);
+        return primeLevel >= 5 && hasBastionResistance;
+      }
+      if (name === "improved improvisation") {
+        return primeLevel >= 5 && hasTalent("improvised gadget");
       }
       if (name === "improved impact control") {
-        return normalizedSelected.includes("impact control");
+        return hasTalent("impact control");
+      }
+      if (name === "regenerative fortitude") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 7 && powersetName === "Bastion";
+      }
+      if (name === "protective barrier") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 9 && powersetName === "Bastion";
+      }
+      if (name === "indomitable will") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 10 && powersetName === "Bastion";
+      }
+      if (name === "total immunity") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 10 && powersetName === "Bastion" && hasTalent("increased resistance");
+      }
+      if (name === "rapid intercept") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Bastion" && hasTalent("intercept attack");
+      }
+      if (name === "adaptive defense") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 14 && powersetName === "Bastion";
+      }
+      if (name === "legendary resilience") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 15 && powersetName === "Bastion";
+      }
+      if (name === "guardian aura") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 17 && powersetName === "Bastion" && hasTalent("protective barrier");
+      }
+      if (name === "immovable object") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 19 && powersetName === "Bastion";
+      }
+      if (name === "unbreakable") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 20 && powersetName === "Bastion";
       }
       if (name === "stabilized movement") {
-        return normalizedSelected.includes("deadeye");
+        return hasTalent("deadeye");
       }
       return true;
     };
@@ -9832,11 +11510,67 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }
 
-      let talentLevel = Number(talentDoc.system?.basic?.level) || 1;
+      const rawTalentLevel = talentDoc.system?.basic?.level;
+      let talentLevel = Number(rawTalentLevel);
+      if (!Number.isFinite(talentLevel) || talentLevel <= 0) {
+        const match = String(rawTalentLevel || "").match(/\d+/);
+        talentLevel = match ? Number(match[0]) : 1;
+      }
       if (talentLevel === 1) {
         const nameLower = normalizedName;
         if (nameLower === "medium armor training") {
           talentLevel = 2;
+        } else if (nameLower === "blast (competent)") {
+          talentLevel = 6;
+        } else if (nameLower === "heavy armor training") {
+          talentLevel = 6;
+        } else if (nameLower === "initiative training (competent)") {
+          talentLevel = 6;
+        } else if (nameLower === "saving throw training (competent)") {
+          talentLevel = 6;
+        } else if (nameLower === "skill training (competent)") {
+          talentLevel = 6;
+        } else if (nameLower === "weapon training (competent)") {
+          talentLevel = 6;
+        } else if (nameLower === "blast damage enhancement ii") {
+          talentLevel = 8;
+        } else if (nameLower === "handless climber") {
+          talentLevel = 8;
+        } else if (nameLower === "blast (masterful)") {
+          talentLevel = 11;
+        } else if (nameLower === "initiative training (masterful)") {
+          talentLevel = 11;
+        } else if (nameLower === "saving throw training (masterful)") {
+          talentLevel = 11;
+        } else if (nameLower === "skill training (masterful)") {
+          talentLevel = 11;
+        } else if (nameLower === "weapon training (masterful)") {
+          talentLevel = 11;
+        } else if (nameLower === "blast damage enhancement iii") {
+          talentLevel = 13;
+        } else if (nameLower === "blast (legendary)") {
+          talentLevel = 16;
+        } else if (nameLower === "initiative training (legendary)") {
+          talentLevel = 16;
+        } else if (nameLower === "saving throw training (legendary)") {
+          talentLevel = 16;
+        } else if (nameLower === "skill training (legendary)") {
+          talentLevel = 16;
+        } else if (nameLower === "wall runner's flow") {
+          talentLevel = 16;
+        } else if (nameLower === "weapon training (legendary)") {
+          talentLevel = 16;
+        } else if (nameLower === "blast damage enhancement iv") {
+          talentLevel = 18;
+        }
+      }
+      if (filterSlotType === "gadgeteerTalent") {
+        const gadgeteerTalentLevelMap = {
+          "rapid deployment": 3,
+          "improved improvisation": 5
+        };
+        if (gadgeteerTalentLevelMap[normalizedName]) {
+          talentLevel = gadgeteerTalentLevelMap[normalizedName];
         }
       }
       resolvedTalents.push({
@@ -9866,16 +11600,30 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
     const initialLevel = level;
 
-    // Create level filter list (allow lower-level talents up to the current slot level)
-    for (let lvl = 1; lvl <= maxSelectableLevel; lvl++) {
+    // Define which levels should appear in the filter for each slot type
+    let expectedLevelsForSlot = [];
+    if (filterSlotType === "bastionTalent") {
+      expectedLevelsForSlot = [1, 3, 5, 7, 9, 10, 12, 14, 17, 19, 20];
+    } else if (filterSlotType === "paragonTalent") {
+      expectedLevelsForSlot = [1, 3, 5, 7, 9, 10, 12, 14, 15, 17, 19, 20];
+    } else if (filterSlotType === "gadgeteerTalent") {
+      expectedLevelsForSlot = [1, 3, 5, 7, 9, 12, 14, 17, 19, 20];
+    } else if (filterSlotType === "marksmanTalent") {
+      expectedLevelsForSlot = [1, 3, 5, 7, 9, 12, 14, 17, 19, 20];
+    } else {
+      // Generic talents: 1, 2, 4, 6, 8, 11, 13, 16, 18
+      expectedLevelsForSlot = [1, 2, 4, 6, 8, 11, 13, 16, 18];
+    }
+
+    // Create level filter list (only show expected levels up to current level)
+    for (const lvl of expectedLevelsForSlot) {
+      if (lvl > maxSelectableLevel) break;
       const count = talentsByLevel[lvl]?.length || 0;
-      if (count > 0 || lvl === level) {
-        availableLevels.push({
-          level: lvl,
-          count: count,
-          selected: lvl === level
-        });
-      }
+      availableLevels.push({
+        level: lvl,
+        count: count,
+        selected: lvl === level
+      });
     }
     
     // Sort talents alphabetically by name
@@ -10000,6 +11748,32 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       const talentNameLower = (talent.name || "").toLowerCase();
       if (talentNameLower.includes("bastion") && talentNameLower.includes("resistance")) {
         setTimeout(() => self._showBastionResistanceDialog(level), 100);
+      }
+      if (talentNameLower === "increased resistance") {
+        setTimeout(() => self._showBastionResistanceUpgradeDialog(level), 100);
+      }
+      if (talentNameLower === "total immunity") {
+        setTimeout(() => self._showBastionTotalImmunityDialog(level), 100);
+      }
+      if (talentNameLower.includes("saving throw training")) {
+        let targetRank = "Apprentice";
+        if (talentNameLower.includes("competent")) targetRank = "Competent";
+        else if (talentNameLower.includes("masterful")) targetRank = "Masterful";
+        else if (talentNameLower.includes("legendary")) targetRank = "Legendary";
+        setTimeout(() => self._showSavingThrowTrainingDialog(level, slotType, targetRank), 100);
+      }
+      if (talentNameLower === "legendary resilience") {
+        const resistances = foundry.utils.deepClone(self.actor.system.resistances || []);
+        const existing = resistances.find(resistance => resistance.source === "Legendary Resilience");
+        if (!existing) {
+          resistances.push({
+            type: "All",
+            value: 10,
+            source: "Legendary Resilience",
+            sourceLevel: levelKey
+          });
+          await self.actor.update({ "system.resistances": resistances });
+        }
       }
       if (talentNameLower.includes("enlarged") && talentNameLower.includes("presence")) {
         const currentSize = self.actor.system.basic.size || "Medium";
@@ -10798,6 +12572,59 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         // Clear the stored damage type
         updateData[`system.progression.${levelKey}.bastionTalentResistanceType`] = null;
       }
+
+      // If deleting Increased Resistance, remove the enhancement from the chosen resistance
+      if (talentNameLower === "increased resistance") {
+        const storedType = this.actor.system.progression?.[levelKey]?.bastionTalentResistanceType;
+        const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
+        let updated = false;
+        const updatedResistances = resistances.map(resistance => {
+          if (resistance.source !== "Bastion's Resistance") return resistance;
+          if (storedType && String(resistance.type).toLowerCase() === String(storedType).toLowerCase()) {
+            updated = true;
+            return { ...resistance, bastionMultiplier: 2 };
+          }
+          return resistance;
+        });
+        if (updated) {
+          updateData["system.resistances"] = updatedResistances;
+        }
+        updateData[`system.progression.${levelKey}.bastionTalentResistanceType`] = null;
+      }
+
+      if (talentNameLower === "total immunity") {
+        const storedType = this.actor.system.progression?.[levelKey]?.bastionTalentResistanceType;
+        const immunities = foundry.utils.deepClone(this.actor.system.immunities || []);
+        const filteredImmunities = immunities.filter(imm => {
+          if (imm.source !== "Total Immunity") return true;
+          if (imm.sourceLevel && imm.sourceLevel === levelKey) return false;
+          if (storedType && String(imm.type).toLowerCase() === String(storedType).toLowerCase()) return false;
+          return true;
+        });
+        if (filteredImmunities.length !== immunities.length) {
+          updateData["system.immunities"] = filteredImmunities;
+        }
+        updateData[`system.progression.${levelKey}.bastionTalentResistanceType`] = null;
+      }
+
+      if (talentNameLower === "adaptive defense") {
+        const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
+        const filteredResistances = resistances.filter(resistance => resistance.source !== "Adaptive Defense");
+        if (filteredResistances.length !== resistances.length) {
+          updateData["system.resistances"] = filteredResistances;
+        }
+        const adaptiveDefenseData = foundry.utils.deepClone(this.actor.system.combat?.adaptiveDefense || { types: [] });
+        adaptiveDefenseData.types = [];
+        updateData["system.combat.adaptiveDefense"] = adaptiveDefenseData;
+      }
+
+      if (talentNameLower === "legendary resilience") {
+        const resistances = foundry.utils.deepClone(this.actor.system.resistances || []);
+        const filteredResistances = resistances.filter(resistance => resistance.source !== "Legendary Resilience");
+        if (filteredResistances.length !== resistances.length) {
+          updateData["system.resistances"] = filteredResistances;
+        }
+      }
       
       // If deleting Enlarged Presence, reset size to Medium (default)
       if (talentNameLower.includes("enlarged") && talentNameLower.includes("presence")) {
@@ -10810,30 +12637,63 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       const talentName = this.actor.system.progression?.[levelKey]?.[`${slotType}Name`];
       const talentNameLower = (talentName || "").toLowerCase();
       
-      // If deleting Saving Throw Training, reset the trained saving throw to Novice
-      if (talentNameLower.includes("saving throw") && talentNameLower.includes("apprentice")) {
-        const trainedSavingThrow = this.actor.system.progression?.[levelKey]?.[`${slotType}SavingThrow`];
-        if (trainedSavingThrow) {
-          const savingThrows = foundry.utils.deepClone(this.actor.system.savingThrows || {});
-          // Only reset if it's currently at Apprentice (might have been upgraded)
-          if (savingThrows[trainedSavingThrow] && savingThrows[trainedSavingThrow].rank === "Apprentice") {
-            savingThrows[trainedSavingThrow].rank = "Novice";
-            updateData["system.savingThrows"] = savingThrows;
-          }
-          // Clear the stored saving throw reference
-          updateData[`system.progression.${levelKey}.${slotType}SavingThrow`] = null;
-        } else {
-          // Fallback: if we don't have the stored reference, find any Apprentice saving throw that's not from Bastion
-          const savingThrows = foundry.utils.deepClone(this.actor.system.savingThrows || {});
-          const bastionSavingThrow = this.actor.system.progression?.level1?.bastionSavingThrow;
-          for (const [ability, st] of Object.entries(savingThrows)) {
-            if (st.rank === "Apprentice" && ability !== bastionSavingThrow) {
-              st.rank = "Novice";
-              updateData["system.savingThrows"] = savingThrows;
-              break; // Only reset one, in case there are multiple
+      // If deleting Saving Throw Training, recompute ranks based on remaining sources
+      if (talentNameLower.includes("saving throw training")) {
+        updateData[`system.progression.${levelKey}.${slotType}SavingThrow`] = null;
+        const progressionCopy = foundry.utils.deepClone(this.actor.system.progression || {});
+        const levelData = progressionCopy[levelKey] || {};
+        levelData[`${slotType}SavingThrow`] = null;
+        levelData[`${slotType}Name`] = null;
+        progressionCopy[levelKey] = levelData;
+
+        const savingThrows = foundry.utils.deepClone(this.actor.system.savingThrows || {});
+        const rankOrder = { Novice: 0, Apprentice: 1, Competent: 2, Masterful: 3, Legendary: 4 };
+        const rankFromTalent = (name) => {
+          const lower = (name || "").toLowerCase();
+          if (lower.includes("legendary")) return "Legendary";
+          if (lower.includes("masterful")) return "Masterful";
+          if (lower.includes("competent")) return "Competent";
+          return "Apprentice";
+        };
+
+        const desiredRanks = {
+          might: "Novice",
+          agility: "Novice",
+          endurance: "Novice",
+          wits: "Novice",
+          charm: "Novice"
+        };
+
+        const powersetName = progressionCopy.level1?.powersetName || this.actor.system.basic?.powerset;
+        const bastionSavingThrow = progressionCopy.level1?.bastionSavingThrow;
+        if (powersetName === "Bastion" && bastionSavingThrow) {
+          desiredRanks[bastionSavingThrow] = "Apprentice";
+        }
+
+        const savingThrowSlots = ["genericTalent", "humanGenericTalent", "terranGenericTalent"];
+        for (let lvl = 1; lvl <= 20; lvl++) {
+          const lvlKey = `level${lvl}`;
+          const lvlData = progressionCopy[lvlKey] || {};
+          for (const slot of savingThrowSlots) {
+            const name = lvlData[`${slot}Name`];
+            if (!name || !String(name).toLowerCase().includes("saving throw training")) continue;
+            const ability = lvlData[`${slot}SavingThrow`];
+            if (!ability || !desiredRanks[ability]) continue;
+            const rank = rankFromTalent(name);
+            if (rankOrder[rank] > rankOrder[desiredRanks[ability]]) {
+              desiredRanks[ability] = rank;
             }
           }
         }
+
+        for (const ability of Object.keys(desiredRanks)) {
+          if (!savingThrows[ability]) {
+            savingThrows[ability] = { rank: desiredRanks[ability], otherBonuses: 0 };
+          } else {
+            savingThrows[ability].rank = desiredRanks[ability];
+          }
+        }
+        updateData["system.savingThrows"] = savingThrows;
       }
       
       // If deleting Initiative Training, reset initiative rank to Novice
