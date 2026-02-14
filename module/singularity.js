@@ -4026,7 +4026,7 @@ Hooks.once("ready", async function() {
     }
   }, 4600);
 
-  // Auto-create Level 1 Talents in the talents compendium
+  // Auto-create Generic Talents in the talents compendium
   setTimeout(async () => {
     try {
       const pack = game.packs.find(p => p.metadata.name === "talents" && p.metadata.packageName === "singularity");
@@ -4039,8 +4039,10 @@ Hooks.once("ready", async function() {
       await pack.getIndex({ force: true });
       const existingTalents = [
         "Blast (Apprentice)",
+        "Blast Damage Enhancement I",
         "Controlled Descent",
         "Enhanced Vitality",
+        "Expert Climber",
         "Expert Swimmer",
         "Hard to Kill",
         "Initiative Training (Apprentice)",
@@ -4054,8 +4056,7 @@ Hooks.once("ready", async function() {
       
       const allExist = existingTalents.every(name => pack.index.find(i => i.name === name));
       if (allExist) {
-        console.log("Singularity | All Level 1 talents already exist in compendium");
-        return;
+        console.log("Singularity | All Generic talents already exist in compendium; verifying metadata");
       }
 
       const wasLocked = pack.locked;
@@ -4064,10 +4065,11 @@ Hooks.once("ready", async function() {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
 
-      // Define all Level 1 talents
-      const level1Talents = [
+      // Define all Generic talents
+      const genericTalents = [
         {
           name: "Blast (Apprentice)",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You unleash a focused burst of destructive energy, shaped by your chosen talent and technique. This blast may manifest as elemental force, technological firepower, or raw supernatural power, depending on how you wield it. You project a focused blast of destructive energy at a target.</p>
 
@@ -4093,7 +4095,25 @@ Hooks.once("ready", async function() {
           prerequisites: "Prime Level 1"
         },
         {
+          name: "Blast Damage Enhancement I",
+          level: 4,
+          description: `<h2>Description</h2>
+<p>You've learned to channel greater amounts of energy into your blasts, increasing their destructive potential significantly.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Prime Level 4</li>
+  <li>Blast (Apprentice)</li>
+</ul>
+
+<h3>Effect</h3>
+<p>Your Blast damage increases to <strong>3d4 + chosen ability modifier</strong> (instead of 1d4 + chosen ability modifier).</p>`,
+          type: "generic",
+          prerequisites: "Prime Level 4; Blast (Apprentice)"
+        },
+        {
           name: "Controlled Descent",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You instinctively reduce the danger of long falls. How this manifests is up to you: arcane forces slowing your fall, micro-thrusters or a jet-assisted suit, hardened physiology, perfect parkour technique, or even raw superhuman control over gravity.</p>
 
@@ -4104,6 +4124,7 @@ Hooks.once("ready", async function() {
         },
         {
           name: "Enhanced Vitality",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your hero is built tougher than most, with greater reserves of stamina and durability. This extra vitality allows them to withstand significantly more damage over the course of their adventures.</p>
 
@@ -4114,7 +4135,25 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
           prerequisites: ""
         },
         {
+          name: "Expert Climber",
+          level: 4,
+          description: `<h2>Description</h2>
+<p>Through dedicated practice and refinement of your climbing technique, you've elevated your vertical movement from natural talent to true expertise. Your climbing speed has increased dramatically, and you can scale surfaces with the confidence of a skilled mountaineer or urban free-runner. Your grip is sure, your movements are precise and efficient, and you can traverse vertical terrain that would challenge most others.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Prime Level 4</li>
+  <li>Wall Crawler</li>
+</ul>
+
+<h3>Effect</h3>
+<p>Your climbing speed increases by <strong>+15 feet</strong>.</p>`,
+          type: "generic",
+          prerequisites: "Prime Level 4; Wall Crawler"
+        },
+        {
           name: "Expert Swimmer",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You are naturally at home in the water, moving with grace and speed that rivals aquatic creatures.</p>
 
@@ -4125,6 +4164,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Hard to Kill",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your hero is exceptionally difficult to put down for good. Whether through raw physical toughness, unbreakable will, or sheer stubborn refusal to die, they can accumulate more traumatic wounds before their body gives out.</p>
 
@@ -4135,6 +4175,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Initiative Training (Apprentice)",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You have honed your tactical instincts to react faster when danger strikes. You are always one step ahead of the chaos.</p>
 
@@ -4145,6 +4186,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Light Armor Training",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your character learns to wear light armor effectively. This allows for better protection without compromising agility or movement.</p>
 
@@ -4155,6 +4197,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Marine Training",
+          level: 1,
           description: `<h2>Description</h2>
 <p>You have trained extensively in underwater combat, learning to use the resistance of the water to your advantage rather than letting it hinder your strikes.</p>
 
@@ -4165,6 +4208,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Saving Throw Training (Apprentice)",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your character's resilience improves through practice, study, or real-world experience.</p>
 
@@ -4175,6 +4219,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Skill Training (Apprentice)",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your character's skills improve through practice, study, or real-world experience.</p>
 
@@ -4185,6 +4230,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Swift Runner",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your training and reflexes allow you to move faster than normal.</p>
 
@@ -4195,6 +4241,7 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         },
         {
           name: "Weapon Training (Apprentice)",
+          level: 1,
           description: `<h2>Description</h2>
 <p>Your character improves their skill with weapons through training and practice. By focusing on a single weapon category, you can increase your training level and perform better in combat with those weapons.</p>
 
@@ -4207,11 +4254,27 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
 
       // Create all talents
       const itemsToCreate = [];
-      for (const talentData of level1Talents) {
+      for (const talentData of genericTalents) {
         // Check if it already exists
         const exists = pack.index.find(i => i.name === talentData.name);
         if (exists) {
-          console.log(`Singularity | ${talentData.name} already exists, skipping`);
+          try {
+            const existingDoc = await pack.getDocument(exists._id);
+            const updates = {};
+            if (talentData.level && existingDoc?.system?.basic?.level !== talentData.level) {
+              updates["system.basic.level"] = talentData.level;
+            }
+            if (talentData.prerequisites && existingDoc?.system?.basic?.prerequisites !== talentData.prerequisites) {
+              updates["system.basic.prerequisites"] = talentData.prerequisites;
+            }
+            if (Object.keys(updates).length) {
+              await existingDoc.update(updates);
+              console.log(`Singularity | Updated ${talentData.name} metadata`);
+            }
+          } catch (updateErr) {
+            console.warn(`Singularity | Could not update ${talentData.name}:`, updateErr);
+          }
+          console.log(`Singularity | ${talentData.name} already exists, skipping create`);
           continue;
         }
 
@@ -4222,7 +4285,8 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
             description: talentData.description,
             basic: {
               type: talentData.type,
-              prerequisites: talentData.prerequisites
+              prerequisites: talentData.prerequisites,
+              level: talentData.level || 1
             },
             archived: false
           },
@@ -4232,12 +4296,12 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
       }
 
       if (itemsToCreate.length === 0) {
-        console.log("Singularity | All Level 1 talents already exist");
+        console.log("Singularity | All Generic talents already exist");
         if (wasLocked) await pack.configure({ locked: true });
         return;
       }
 
-      console.log(`Singularity | Creating ${itemsToCreate.length} Level 1 talents...`);
+      console.log(`Singularity | Creating ${itemsToCreate.length} Generic talents...`);
       
       // Create items in world first
       const createdItems = await Item.createDocuments(itemsToCreate, { render: false });
@@ -4268,10 +4332,10 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
       
       if (wasLocked) await pack.configure({ locked: true });
 
-      ui.notifications.info(`Created ${itemsToCreate.length} Level 1 talents in Talents compendium!`);
+      ui.notifications.info(`Created ${itemsToCreate.length} Generic talents in Talents compendium!`);
     } catch (error) {
-      console.error("Singularity | Could not auto-create Level 1 talents:", error);
-      ui.notifications.error(`Failed to create Level 1 talents: ${error.message}`);
+      console.error("Singularity | Could not auto-create Generic talents:", error);
+      ui.notifications.error(`Failed to create Generic talents: ${error.message}`);
     }
   }, 4000);
 

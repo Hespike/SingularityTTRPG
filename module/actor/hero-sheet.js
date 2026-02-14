@@ -1795,6 +1795,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }
 
+      const hasBlastDamageEnhancement = this._hasBlastDamageEnhancement(actorData);
+
       // Process attacks to calculate dynamic attack bonuses and damage
       const attacksWithCalculations = ([...(actorData.system.attacks || []), ...gadgetAttackEntries]).map(attack => {
         const attackCopy = { ...attack };
@@ -1817,6 +1819,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const isUnarmed = attack.name && attack.name.toLowerCase() === "unarmed strike";
         attackCopy.isUnarmed = Boolean(isUnarmed);
         const isTalentAttack = !isGadgetAttack && (attack.isTalentAttack === true || (attack.name && attack.name.toLowerCase() === "blast"));
+        const isBlastAttack = isTalentAttack && (attack.name && attack.name.toLowerCase() === "blast");
         if (isTalentAttack) {
           attackCopy.isTalentAttack = true;
           if (!attackCopy.weaponImg) {
@@ -2136,13 +2139,14 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         
         // If attack has baseDamage and ability, calculate dynamic damage
         if (attack.baseDamage && attack.ability) {
+          const baseDamage = isBlastAttack && hasBlastDamageEnhancement ? "3d4" : attack.baseDamage;
           const currentAbilityScore = calculatedAbilityScores[attack.ability] || 0;
           if (currentAbilityScore > 0) {
-            attackCopy.calculatedDamage = `${attack.baseDamage}+${currentAbilityScore}`;
+            attackCopy.calculatedDamage = `${baseDamage}+${currentAbilityScore}`;
           } else if (currentAbilityScore < 0) {
-            attackCopy.calculatedDamage = `${attack.baseDamage}${currentAbilityScore}`;
+            attackCopy.calculatedDamage = `${baseDamage}${currentAbilityScore}`;
           } else {
-            attackCopy.calculatedDamage = attack.baseDamage;
+            attackCopy.calculatedDamage = baseDamage;
           }
         } else if (attack.damage) {
           // Legacy support: if damage exists but no baseDamage, use it as-is
@@ -7847,14 +7851,17 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Calculate dynamic damage formula
     let damageFormula = "";
     if (attack.baseDamage && attack.ability) {
+      const hasBlastDamageEnhancement = this._hasBlastDamageEnhancement(this.actor);
+      const isBlastAttack = (attack.name || "").toLowerCase().trim() === "blast";
+      const baseDamage = isBlastAttack && hasBlastDamageEnhancement ? "3d4" : attack.baseDamage;
       // New format: baseDamage + calculated ability score
       const currentAbilityScore = calculatedAbilityScores[attack.ability] || 0;
       if (currentAbilityScore > 0) {
-        damageFormula = `${attack.baseDamage}+${currentAbilityScore}`;
+        damageFormula = `${baseDamage}+${currentAbilityScore}`;
       } else if (currentAbilityScore < 0) {
-        damageFormula = `${attack.baseDamage}${currentAbilityScore}`;
+        damageFormula = `${baseDamage}${currentAbilityScore}`;
       } else {
-        damageFormula = attack.baseDamage;
+        damageFormula = baseDamage;
       }
     } else if (attack.damage) {
       // Legacy format: use stored damage
@@ -8711,6 +8718,31 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     return rankModifiers[gadgetTuningRank] || 0;
   }
 
+  _hasBlastDamageEnhancement(actorData) {
+    const data = actorData?.system ? actorData : this.actor;
+    const progression = data?.system?.progression || {};
+    const embeddedTalents = (data?.items || []).filter(i => i && i.type === "talent").map(t => t.name);
+    const progressionTalentNames = [];
+
+    for (let level = 1; level <= 20; level++) {
+      const levelData = progression[`level${level}`] || {};
+      if (level === 1) {
+        if (levelData.humanGenericTalentName) progressionTalentNames.push(levelData.humanGenericTalentName);
+        if (levelData.terranGenericTalentName) progressionTalentNames.push(levelData.terranGenericTalentName);
+        if (levelData.bastionTalentName) progressionTalentNames.push(levelData.bastionTalentName);
+        if (levelData.paragonTalentName) progressionTalentNames.push(levelData.paragonTalentName);
+        if (levelData.gadgeteerTalentName) progressionTalentNames.push(levelData.gadgeteerTalentName);
+        if (levelData.marksmanTalentName) progressionTalentNames.push(levelData.marksmanTalentName);
+      }
+      if (levelData.genericTalentName) progressionTalentNames.push(levelData.genericTalentName);
+      if (levelData.powersetTalentName) progressionTalentNames.push(levelData.powersetTalentName);
+    }
+
+    return [...embeddedTalents, ...progressionTalentNames].some(name =>
+      (name || "").toLowerCase().trim() === "blast damage enhancement i"
+    );
+  }
+
   async _buildGadgetAttackFromUuid(gadgetId) {
     if (!gadgetId) return null;
     let gadgetDoc = null;
@@ -9425,6 +9457,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const selectedTalents = new Map(); // Map of talent name -> { variations: Set, counts: number }
     const progression = this.actor.system.progression || {};
     const primeLevel = this.actor.system.basic?.primeLevel || 1;
+    const isBaseBlastTalentName = (name) => {
+      const normalized = (name || "").toLowerCase().trim();
+      return normalized === "blast (apprentice)" || normalized.startsWith("blast (");
+    };
     
     // Helper function to add a selected talent
     const addSelectedTalent = (talentName, variation = null) => {
@@ -9453,7 +9489,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       // Check human generic talent
       if (levelData.humanGenericTalentName) {
         // For Blast, check the damage type from the attack
-        if (levelData.humanGenericTalentName.toLowerCase().includes("blast")) {
+        if (isBaseBlastTalentName(levelData.humanGenericTalentName)) {
           const attacks = this.actor.system.attacks || [];
           const blastAttack = attacks.find(a => a.name === "Blast");
           if (blastAttack && blastAttack.damageType) {
@@ -9469,7 +9505,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       // Check terran generic talent
       if (levelData.terranGenericTalentName) {
         // For Blast, check the damage type from the attack
-        if (levelData.terranGenericTalentName.toLowerCase().includes("blast")) {
+        if (isBaseBlastTalentName(levelData.terranGenericTalentName)) {
           const attacks = this.actor.system.attacks || [];
           const blastAttack = attacks.find(a => a.name === "Blast");
           if (blastAttack && blastAttack.damageType) {
@@ -9756,6 +9792,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       if (name === "medium armor training") {
         return primeLevel >= 2 && hasArmorTraining;
       }
+      if (name === "blast damage enhancement i") {
+        return primeLevel >= 4 && normalizedSelected.includes("blast (apprentice)");
+      }
+      if (name === "expert climber") {
+        return primeLevel >= 4 && normalizedSelected.includes("wall crawler");
+      }
       if (name === "improved impact control") {
         return normalizedSelected.includes("impact control");
       }
@@ -9783,7 +9825,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           normalizedName.includes("saving throw") && normalizedName.includes("apprentice") ||
           normalizedName.includes("skill training") && normalizedName.includes("apprentice") ||
           normalizedName.includes("weapon training") ||
-          normalizedName.includes("blast") ||
+          normalizedName.startsWith("blast (") ||
           (normalizedName.includes("bastion") && normalizedName.includes("resistance"));
         if (!canRepeatWithVariations) {
           continue;
@@ -9902,7 +9944,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const canRepeat = normalizedName.includes("saving throw") && normalizedName.includes("apprentice") ||
           normalizedName.includes("skill training") && normalizedName.includes("apprentice") ||
           normalizedName.includes("weapon training") ||
-          normalizedName.includes("blast") ||
+          normalizedName.startsWith("blast (") ||
           (normalizedName.includes("bastion") && normalizedName.includes("resistance"));
         if (!canRepeat) {
           ui.notifications.warn(`You have already selected "${talentName}".`);
@@ -9941,7 +9983,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
         if (skillsUpdated) await self.actor.update({ "system.skills": skills });
       }
-      if (talent.name === "Blast (Apprentice)" || talent.name?.includes("Blast")) {
+      if (isBaseBlastTalentName(talent.name)) {
         setTimeout(() => self._showBlastAttackDialog(), 100);
       }
       if (talent.name?.toLowerCase().includes("initiative training")) {
@@ -10668,7 +10710,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         
         // Check if Human had Blast talent before clearing it
         const humanGenericTalentName = this.actor.system.progression?.[levelKey]?.humanGenericTalentName;
-        if (humanGenericTalentName && (humanGenericTalentName === "Blast (Apprentice)" || humanGenericTalentName.includes("Blast"))) {
+        const humanIsBaseBlast = (humanGenericTalentName || "").toLowerCase().trim().startsWith("blast (") || (humanGenericTalentName || "").toLowerCase().trim() === "blast (apprentice)";
+        if (humanIsBaseBlast) {
           // Remove the Blast attack if it exists
           const attacks = foundry.utils.deepClone(this.actor.system.attacks || []);
           const blastAttackIndex = attacks.findIndex(attack => attack.name === "Blast");
@@ -10695,7 +10738,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         
         // Check if Terran had Blast talent before clearing it
         const terranGenericTalentName = this.actor.system.progression?.[levelKey]?.terranGenericTalentName;
-        if (terranGenericTalentName && (terranGenericTalentName === "Blast (Apprentice)" || terranGenericTalentName.includes("Blast"))) {
+        const terranIsBaseBlast = (terranGenericTalentName || "").toLowerCase().trim().startsWith("blast (") || (terranGenericTalentName || "").toLowerCase().trim() === "blast (apprentice)";
+        if (terranIsBaseBlast) {
           // Remove the Blast attack if it exists
           const attacks = foundry.utils.deepClone(this.actor.system.attacks || []);
           const blastAttackIndex = attacks.findIndex(attack => attack.name === "Blast");
@@ -10714,9 +10758,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // If deleting a talent slot, check if it's Blast and remove the corresponding attack
     if (slotType === "genericTalent" || slotType === "humanGenericTalent" || slotType === "terranGenericTalent") {
       const talentName = this.actor.system.progression?.[levelKey]?.[`${slotType}Name`];
+      const isBaseBlastTalent = (talentName || "").toLowerCase().trim().startsWith("blast (") || (talentName || "").toLowerCase().trim() === "blast (apprentice)";
       
       // If deleting Blast talent, remove the Blast attack
-      if (talentName && (talentName === "Blast (Apprentice)" || talentName.includes("Blast"))) {
+      if (isBaseBlastTalent) {
         const attacks = foundry.utils.deepClone(this.actor.system.attacks || []);
         // Find and remove the Blast attack
         const blastAttackIndex = attacks.findIndex(attack => attack.name === "Blast");
