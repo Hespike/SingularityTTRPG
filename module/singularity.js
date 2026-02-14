@@ -1359,6 +1359,335 @@ Hooks.once("init", function() {
         speaker: ChatMessage.getSpeaker({ actor })
       });
     });
+
+    $html.off("click.singularity-talent-meteor-slam").on("click.singularity-talent-meteor-slam", ".singularity-talent-meteor-slam", async (ev) => {
+      ev.preventDefault();
+      const actor = getActorFromDataset(ev.currentTarget.dataset.actorId);
+      if (!actor) return;
+
+      const isFlying = actor.effects?.some(effect => effect.getFlag("core", "statusId") === "flying");
+      if (!isFlying) {
+        ui.notifications.warn("Meteor Slam requires you to be flying.");
+        return;
+      }
+
+      const targets = Array.from(game.user?.targets || []);
+      if (targets.length === 0) {
+        ui.notifications.warn("Select a target to use Meteor Slam.");
+        return;
+      }
+
+      const targetToken = targets[0];
+      const targetActor = targetToken?.actor;
+      if (!targetActor) return;
+
+      const targetAirborne = targetActor.effects?.some(effect => {
+        const statusId = effect.getFlag("core", "statusId");
+        return statusId === "flying" || statusId === "climbing";
+      });
+      if (!targetAirborne) {
+        ui.notifications.warn("Meteor Slam can only target a creature that is not on the ground (flying or climbing).");
+        return;
+      }
+
+      const hasImprovedMeteorSlam = (() => {
+        if (actor.items?.some(item => item.type === "talent" && String(item.name || "").toLowerCase().includes("improved meteor slam"))) {
+          return true;
+        }
+        const progression = actor.system?.progression || {};
+        for (let lvl = 1; lvl <= 20; lvl++) {
+          const levelData = progression[`level${lvl}`] || {};
+          const names = [levelData.paragonTalentName, levelData.powersetTalentName].filter(Boolean);
+          if (names.some(name => String(name).toLowerCase().includes("improved meteor slam"))) {
+            return true;
+          }
+        }
+        return false;
+      })();
+
+      const computeSavingThrowDc = (actorRef, ability) => {
+        const savingThrow = actorRef.system?.savingThrows?.[ability] || {};
+        const rank = savingThrow.rank || "Novice";
+        const trainingBonus = savingThrowRankBonuses[rank] || 0;
+        const otherBonuses = Number(savingThrow.otherBonuses) || 0;
+        const abilityScore = computeAbilityScore(actorRef, ability);
+        return 10 + abilityScore + trainingBonus + otherBonuses;
+      };
+
+      const computeSkillDc = (actorRef, skillName) => {
+        if (typeof actorRef.getSkillModifier === "function") {
+          const skillMod = Number(actorRef.getSkillModifier(skillName)) || 0;
+          return 10 + skillMod;
+        }
+        return 10 + computeAbilityScore(actorRef, skillName === "Athletics" ? "might" : "agility");
+      };
+
+      const mightDc = computeSavingThrowDc(targetActor, "might");
+      const agilityDc = computeSavingThrowDc(targetActor, "agility");
+      const athleticsDc = computeSkillDc(targetActor, "Athletics");
+      const acrobaticsDc = computeSkillDc(targetActor, "Acrobatics");
+
+      const baseDc = Math.max(mightDc, agilityDc);
+      const skillDc = Math.max(athleticsDc, acrobaticsDc);
+      const useSkillDc = skillDc > baseDc;
+      const targetDc = useSkillDc ? skillDc : baseDc;
+      const dcLabel = (() => {
+        if (useSkillDc) {
+          return athleticsDc >= acrobaticsDc ? "Athletics" : "Acrobatics";
+        }
+        return mightDc >= agilityDc ? "Might" : "Agility";
+      })();
+
+      const actorName = actor.name || "Attacker";
+      const targetName = targetToken?.name || targetActor.name || "Target";
+      const canUseAthletics = (actor.system?.skills?.["Athletics"]?.rank || "Novice") !== "Novice";
+
+      const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+      let dialog;
+      const getDialogRoot = () => {
+        const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element;
+        return el instanceof HTMLElement ? el : document;
+      };
+
+      const rollMeteorSlam = async (root) => {
+        const useAthletics = root?.querySelector("#meteor-slam-check")?.value === "athletics";
+        const checkLabel = useAthletics ? "Athletics" : "Might";
+        const baseModifier = useAthletics && typeof actor.getSkillModifier === "function"
+          ? Number(actor.getSkillModifier("Athletics")) || 0
+          : computeAbilityScore(actor, "might");
+
+        const fatiguedEffect = actor.effects?.find(effect => effect.getFlag("core", "statusId") === "fatigued");
+        const fatiguedPenalty = Math.max(0, Number(fatiguedEffect?.getFlag("singularity", "value") ?? 0));
+        const penaltyText = fatiguedPenalty ? ` - ${fatiguedPenalty}` : "";
+
+        const roll = new Roll(`1d20 + ${baseModifier}${penaltyText}`);
+        await roll.evaluate();
+
+        let degree = "Failure";
+        if (roll.total >= targetDc + 10) {
+          degree = "Extreme Success";
+        } else if (roll.total >= targetDc) {
+          degree = "Success";
+        } else if (roll.total <= targetDc - 10) {
+          degree = "Extreme Failure";
+        }
+
+        const mightScore = computeAbilityScore(actor, "might");
+        const baseDistance = Math.max(0, Number(mightScore) || 0) * 5;
+        const improvedMultiplier = hasImprovedMeteorSlam ? 2 : 1;
+        const slamDistance = degree === "Extreme Success"
+          ? baseDistance * 2 * improvedMultiplier
+          : baseDistance * improvedMultiplier;
+
+        const effects = [];
+        if (degree === "Extreme Failure") {
+          if (actor.isOwner || game.user.isGM) {
+            await applyStatusEffect(actor, "offbalance", null, 1);
+            effects.push("Off-balance (1 round)");
+          }
+        }
+
+        const distanceText = (degree === "Success" || degree === "Extreme Success")
+          ? `Drive ${targetName} downward <strong>${slamDistance} feet</strong>. If they hit a solid surface, they take falling damage for that distance and are knocked Prone.`
+          : "No movement occurs.";
+
+        const effectsText = effects.length ? `<br><em>Applied:</em> ${effects.join(", ")}` : "";
+        const flavor = `
+          <div class="roll-flavor">
+            <b>Meteor Slam</b><br>
+            ${actorName} vs ${targetName}<br>
+            ${checkLabel} Check: ${roll.total} vs ${dcLabel} DC ${targetDc} (${degree})${effectsText}
+            <br>${distanceText}
+          </div>
+        `;
+
+        await roll.toMessage({
+          speaker: ChatMessage.getSpeaker({ actor }),
+          flavor: flavor
+        });
+      };
+
+      const dialogContent = `
+        <form class="singularity-roll-dialog">
+          <div class="roll-fields-row">
+            <div class="form-group-inline">
+              <label>Check:</label>
+              <select id="meteor-slam-check" class="editable-input">
+                <option value="might">Might</option>
+                ${canUseAthletics ? "<option value=\"athletics\">Athletics</option>" : ""}
+              </select>
+            </div>
+            <div class="form-group-inline">
+              <label>Target DC:</label>
+              <input type="text" value="${dcLabel} DC ${targetDc}" readonly class="readonly-input" />
+            </div>
+          </div>
+          <p class="help-text">Cost: 2 energy. Target must be flying or climbing.</p>
+        </form>
+      `;
+
+      const dialogOptions = DialogClass?.name === "DialogV2"
+        ? {
+            title: "Meteor Slam",
+            content: dialogContent,
+            buttons: [
+              {
+                action: "roll",
+                icon: '<i class="fas fa-dice-d20"></i>',
+                label: "Roll",
+                callback: async () => {
+                  const root = getDialogRoot();
+                  await rollMeteorSlam(root);
+                }
+              },
+              {
+                action: "cancel",
+                icon: '<i class="fas fa-times"></i>',
+                label: "Cancel"
+              }
+            ],
+            default: "roll"
+          }
+        : {
+            title: "Meteor Slam",
+            content: dialogContent,
+            buttons: {
+              roll: {
+                icon: '<i class="fas fa-dice-d20"></i>',
+                label: "Roll",
+                callback: async (html) => {
+                  const root = html instanceof jQuery ? html[0] : html;
+                  await rollMeteorSlam(root);
+                }
+              },
+              cancel: {
+                icon: '<i class="fas fa-times"></i>',
+                label: "Cancel",
+                callback: () => {}
+              }
+            },
+            default: "roll"
+          };
+
+      dialogOptions.position = { width: 520 };
+      dialogOptions.window = { resizable: true };
+      dialog = new DialogClass(dialogOptions);
+      await dialog.render(true);
+    });
+
+    $html.off("click.singularity-talent-thunderclap").on("click.singularity-talent-thunderclap", ".singularity-talent-thunderclap", async (ev) => {
+      ev.preventDefault();
+      const actor = getActorFromDataset(ev.currentTarget.dataset.actorId);
+      if (!actor) return;
+
+      if (actor.effects?.some(effect => effect.getFlag("core", "statusId") === "paralyzed")) {
+        ui.notifications.warn("Paralyzed: you cannot take actions or reactions.");
+        return;
+      }
+
+      const targets = Array.from(game.user?.targets || []);
+      if (targets.length === 0) {
+        ui.notifications.warn("Select one or more targets for Thunderclap.");
+        return;
+      }
+
+      const computeSavingThrowDc = (actorRef, ability) => {
+        const savingThrow = actorRef.system?.savingThrows?.[ability] || {};
+        const rank = savingThrow.rank || "Novice";
+        const trainingBonus = savingThrowRankBonuses[rank] || 0;
+        const otherBonuses = Number(savingThrow.otherBonuses) || 0;
+        const abilityScore = computeAbilityScore(actorRef, ability);
+        return 10 + abilityScore + trainingBonus + otherBonuses;
+      };
+
+      const mightScore = computeAbilityScore(actor, "might");
+      const dc = computeSavingThrowDc(actor, "might");
+      const results = [];
+
+      for (const targetToken of targets) {
+        const targetActor = targetToken.actor;
+        if (!targetActor) continue;
+        if (targetActor.id === actor.id) continue;
+
+        const savingThrow = targetActor.system?.savingThrows?.might || {};
+        const rank = savingThrow.rank || "Novice";
+        const trainingBonus = savingThrowRankBonuses[rank] || 0;
+        const otherBonuses = Number(savingThrow.otherBonuses) || 0;
+        const abilityScore = computeAbilityScore(targetActor, "might");
+
+        const roll = new Roll(`1d20 + ${abilityScore} + ${trainingBonus} + ${otherBonuses}`);
+        await roll.evaluate();
+
+        let degree = "Failure";
+        if (roll.total >= dc + 10) {
+          degree = "Extreme Success";
+        } else if (roll.total >= dc) {
+          degree = "Success";
+        } else if (roll.total <= dc - 10) {
+          degree = "Extreme Failure";
+        }
+
+        let damageTotal = 0;
+        let damageFormula = "";
+        if (degree !== "Extreme Success") {
+          damageFormula = `2d6${mightScore >= 0 ? "+" : ""}${mightScore}`;
+          const damageRoll = new Roll(damageFormula);
+          await damageRoll.evaluate();
+          damageTotal = damageRoll.total;
+          if (degree === "Success") {
+            damageTotal = Math.floor(damageTotal / 2);
+          }
+        }
+
+        const effectsApplied = [];
+        if (degree === "Extreme Failure") {
+          if (targetActor.isOwner || game.user.isGM) {
+            await applyStatusEffect(targetActor, "prone", null, 1);
+            effectsApplied.push("Prone");
+          } else {
+            effectsApplied.push("Prone");
+          }
+        }
+
+        const pushDistance = degree === "Failure" ? 10 : degree === "Extreme Failure" ? 15 : 0;
+        const resultText = degree === "Extreme Success"
+          ? "No damage, no push."
+          : degree === "Success"
+            ? `Half damage (${damageTotal}) and no push.`
+            : `Damage ${damageTotal}${pushDistance ? `, push ${pushDistance} ft` : ""}${degree === "Extreme Failure" ? ", knocked Prone" : ""}.`;
+
+        results.push({
+          name: targetToken.name || targetActor.name || "Target",
+          total: roll.total,
+          degree: degree,
+          resultText: resultText,
+          effects: effectsApplied
+        });
+      }
+
+      const resultLines = results
+        .map(result => {
+          const effectsText = result.effects.length
+            ? ` - <em>Applied:</em> ${result.effects.join(", ")}`
+            : "";
+          return `<li><strong>${result.name}</strong>: ${result.total} vs DC ${dc} (${result.degree}) - ${result.resultText}${effectsText}</li>`;
+        })
+        .join("");
+
+      const content = `
+        <div class="roll-flavor">
+          <b>Thunderclap</b><br>
+          Might Saving Throw (DC ${dc})
+          <ul>${resultLines}</ul>
+          <p class="help-text">Cost: 4 energy. 15-foot cone.</p>
+        </div>
+      `;
+
+      await ChatMessage.create({
+        content: content,
+        speaker: ChatMessage.getSpeaker({ actor })
+      });
+    });
   });
 
   const updateStatusSummary = (token) => {
@@ -7287,6 +7616,72 @@ const getDamageAdjustment = (actor, damageType) => {
 Hooks.on("renderChatMessageHTML", function(message, html, data) {
   // Convert HTMLElement to jQuery for compatibility (or use vanilla JS)
   const $html = $(html);
+  const savingThrowRankBonuses = {
+    "Novice": 0,
+    "Apprentice": 2,
+    "Competent": 5,
+    "Masterful": 9,
+    "Legendary": 14
+  };
+
+  const getComputedAbility = (actor, ability) => {
+    const value = actor?.system?.abilities?.[ability];
+    return Number(value) || 0;
+  };
+
+  const hasTalentByName = (actor, talentName) => {
+    if (!actor || !talentName) return false;
+    const needle = String(talentName).toLowerCase();
+    const embedded = (actor.items || []).some(item =>
+      item.type === "talent" && String(item.name || "").toLowerCase().includes(needle)
+    );
+    if (embedded) return true;
+    const progression = actor.system?.progression || {};
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelData = progression[`level${lvl}`] || {};
+      const names = [
+        levelData.paragonTalentName,
+        levelData.powersetTalentName,
+        levelData.bastionTalentName,
+        levelData.gadgeteerTalentName,
+        levelData.marksmanTalentName,
+        levelData.genericTalentName
+      ].filter(Boolean);
+      if (names.some(name => String(name).toLowerCase().includes(needle))) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const applyStatusForRounds = async (actor, statusId, rounds = 1) => {
+    if (!actor || !statusId) return false;
+    const statusDef = CONFIG.singularity?.statusEffectsMap?.[statusId];
+    if (!statusDef) return false;
+
+    const existing = actor.effects.find(effect => effect.getFlag("core", "statusId") === statusId);
+    if (existing) {
+      return true;
+    }
+
+    const duration = {};
+    if (game.combat) {
+      duration.rounds = rounds;
+      duration.startRound = game.combat.round;
+      duration.startTurn = game.combat.turn;
+    }
+
+    const effectData = {
+      name: statusDef.label || statusId,
+      icon: statusDef.icon || "icons/svg/aura.svg",
+      flags: foundry.utils.deepClone(statusDef.flags || {}),
+      disabled: false,
+      duration
+    };
+
+    await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    return true;
+  };
   
   // Add click handler for critical hit buttons
   const applyDamageToTarget = async (button, baseDamage, damageType, attackName, options = {}) => {
@@ -7341,13 +7736,43 @@ Hooks.on("renderChatMessageHTML", function(message, html, data) {
 
     await targetActor.update(updateData);
 
+    let legendaryImpactText = "";
+    if (options.legendaryImpact === true && options.sourceActor) {
+      const sourceActor = options.sourceActor;
+      const sourceSavingThrow = sourceActor.system?.savingThrows?.might || {};
+      const sourceRank = sourceSavingThrow.rank || "Novice";
+      const sourceTrainingBonus = savingThrowRankBonuses[sourceRank] || 0;
+      const sourceOtherBonuses = Number(sourceSavingThrow.otherBonuses) || 0;
+      const sourceMight = getComputedAbility(sourceActor, "might");
+      const mightDc = 10 + sourceMight + sourceTrainingBonus + sourceOtherBonuses;
+
+      const targetSavingThrow = targetActor.system?.savingThrows?.might || {};
+      const targetRank = targetSavingThrow.rank || "Novice";
+      const targetTrainingBonus = savingThrowRankBonuses[targetRank] || 0;
+      const targetOtherBonuses = Number(targetSavingThrow.otherBonuses) || 0;
+      const targetMight = getComputedAbility(targetActor, "might");
+
+      const saveRoll = new Roll(`1d20 + ${targetMight} + ${targetTrainingBonus} + ${targetOtherBonuses}`);
+      await saveRoll.evaluate();
+
+      const saveFailed = saveRoll.total < mightDc;
+      let statusApplied = false;
+      if (saveFailed && (targetActor.isOwner || game.user.isGM)) {
+        statusApplied = await applyStatusForRounds(targetActor, "stunned", 1);
+      }
+
+      legendaryImpactText = saveFailed
+        ? `<br>Legendary Impact: Might Save ${saveRoll.total} vs DC ${mightDc} (Failure) — Stunned until end of next turn${statusApplied ? " (applied)" : ""}.`
+        : `<br>Legendary Impact: Might Save ${saveRoll.total} vs DC ${mightDc} (Success).`;
+    }
+
     const targetName = targetToken.name || targetActor.name || "Target";
     const kindLabel = options.isCritical ? "Critical Applied" : "Damage Applied";
     if (unbreakableTriggered) {
       const usesNote = unbreakableUsesLeft !== null ? ` (uses left ${unbreakableUsesLeft})` : "";
       detailText = `${detailText}<br>Unbreakable: 1 HP instead, no wound gained${usesNote}`;
     }
-    const flavor = `<div class="roll-flavor"><b>${attackName} - ${kindLabel}</b><br>Target: ${targetName}<br>Base: ${baseDamage} (${damageType})<br>${detailText}<br><strong>Applied: ${appliedDamage} (${damageType})</strong> (HP: ${currentHp} → ${finalHp}${maxHp ? ` / ${maxHp}` : ""})</div>`;
+    const flavor = `<div class="roll-flavor"><b>${attackName} - ${kindLabel}</b><br>Target: ${targetName}<br>Base: ${baseDamage} (${damageType})<br>${detailText}${legendaryImpactText}<br><strong>Applied: ${appliedDamage} (${damageType})</strong> (HP: ${currentHp} → ${finalHp}${maxHp ? ` / ${maxHp}` : ""})</div>`;
 
     await ChatMessage.create({
       speaker: message.speaker,
@@ -7373,8 +7798,31 @@ Hooks.on("renderChatMessageHTML", function(message, html, data) {
       return;
     }
     
-    const criticalDamage = rollTotal * 2;
-    await applyDamageToTarget(button, criticalDamage, damageType, attackName, { isCritical: true });
+    const sourceActorId = message.speaker?.actor;
+    const sourceActor = sourceActorId ? game.actors?.get(sourceActorId) : null;
+    const isUnarmedStrike = String(attackName || "").trim().toLowerCase() === "unarmed strike";
+    const hasLegendaryImpact = isUnarmedStrike && hasTalentByName(sourceActor, "legendary impact");
+
+    let criticalDamage = rollTotal * 2;
+    if (hasLegendaryImpact) {
+      const damageRollFlag = message.getFlag("singularity", "damageRoll") || {};
+      const formula = String(damageRollFlag.formula || "").trim();
+      if (formula) {
+        try {
+          const maximizedRoll = new Roll(formula);
+          await maximizedRoll.evaluate({ maximize: true });
+          criticalDamage = maximizedRoll.total * 2;
+        } catch (err) {
+          console.warn("Singularity | Failed to maximize Legendary Impact critical damage:", err);
+        }
+      }
+    }
+
+    await applyDamageToTarget(button, criticalDamage, damageType, attackName, {
+      isCritical: true,
+      sourceActor,
+      legendaryImpact: hasLegendaryImpact
+    });
   });
 
   $html.find(".apply-damage-button").click(async function(event) {

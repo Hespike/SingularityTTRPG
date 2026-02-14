@@ -187,6 +187,20 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         powerset: basic.powerset || ""
       };
       const primeLevel = safeBasic.primeLevel || 1;
+
+      const getParagonUnarmedRank = (level) => {
+        if (level >= 15) return "Legendary";
+        if (level >= 10) return "Masterful";
+        if (level >= 5) return "Competent";
+        return "Apprentice";
+      };
+      const getParagonUnarmedBonus = (level) => {
+        const rank = getParagonUnarmedRank(level);
+        return rank === "Legendary" ? 16 : rank === "Masterful" ? 12 : rank === "Competent" ? 8 : 4;
+      };
+      if (powersetName === "Paragon") {
+        context.paragonUnarmedRank = getParagonUnarmedRank(primeLevel);
+      }
       
       // Store safe defaults in context (don't modify actor data)
       context.speeds = safeCombat.speeds;
@@ -317,9 +331,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           
           // Check Paragon Unarmed Strike
           if (weaponCategories.includes("Unarmed Strikes") && powersetName === "Paragon") {
-            if (4 > highestBonus) {
-              highestRank = "Apprentice";
-              highestBonus = 4;
+            const paragonBonus = getParagonUnarmedBonus(primeLevel);
+            if (paragonBonus > highestBonus) {
+              highestRank = getParagonUnarmedRank(primeLevel);
+              highestBonus = paragonBonus;
               foundTraining = true;
             }
           }
@@ -353,8 +368,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         // Fallback: Check Unarmed Strike by name
         else if (weaponCopy.name && weaponCopy.name.toLowerCase() === "unarmed strike") {
           if (powersetName === "Paragon") {
-            weaponCompetenceRank = "Apprentice";
-            weaponCompetenceBonus = 4;
+            weaponCompetenceRank = getParagonUnarmedRank(primeLevel);
+            weaponCompetenceBonus = getParagonUnarmedBonus(primeLevel);
           }
         }
         // Fallback: Check ranged weapons (Marksman) by type
@@ -1033,7 +1048,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       weaponTrainingTalents.push({
         name: "Paragon Unarmed Strike Training",
         category: "Unarmed Strikes",
-        rank: "Apprentice" // Paragon gets Apprentice at level 1
+        rank: getParagonUnarmedRank(primeLevel)
       });
     }
     
@@ -1946,11 +1961,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           weaponCompetenceRank = "Gadget Tuning";
           weaponCompetenceBonus = 0;
         } else if (attack.name && attack.name.toLowerCase() === "unarmed strike") {
-          // Unarmed Strike: Novice by default, Apprentice if Paragon
+          // Unarmed Strike: Novice by default, scaled if Paragon
           if (powersetName === "Paragon") {
-            // Paragon gets Apprentice with unarmed at level 1
-            weaponCompetenceRank = "Apprentice";
-            weaponCompetenceBonus = 4; // Apprentice = +4
+            weaponCompetenceRank = getParagonUnarmedRank(primeLevel);
+            weaponCompetenceBonus = getParagonUnarmedBonus(primeLevel);
           } else {
             weaponCompetenceRank = "Novice";
             weaponCompetenceBonus = 0; // Novice = +0
@@ -2052,9 +2066,10 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           
           // Check Paragon Unarmed Strike (if weapon has "Unarmed Strikes" category and is in melee mode)
           if (relevantCategories.includes("Unarmed Strikes") && powersetName === "Paragon") {
-            if (4 > highestBonus) {
-              highestRank = "Apprentice";
-              highestBonus = 4;
+            const paragonBonus = getParagonUnarmedBonus(primeLevel);
+            if (paragonBonus > highestBonus) {
+              highestRank = getParagonUnarmedRank(primeLevel);
+              highestBonus = paragonBonus;
               foundTraining = true;
             }
           }
@@ -2599,12 +2614,40 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         return false;
       })();
 
+      const hasAerialMastery = (() => {
+        for (let lvl = 1; lvl <= 20; lvl++) {
+          const levelData = progression[`level${lvl}`] || {};
+          const names = [
+            levelData.paragonTalentName,
+            levelData.powersetTalentName
+          ].filter(Boolean);
+          if (names.some(name => String(name).toLowerCase().includes("aerial mastery"))) {
+            return true;
+          }
+        }
+        return false;
+      })();
+
+      const hasPerfectFlight = (() => {
+        for (let lvl = 1; lvl <= 20; lvl++) {
+          const levelData = progression[`level${lvl}`] || {};
+          const names = [
+            levelData.paragonTalentName,
+            levelData.powersetTalentName
+          ].filter(Boolean);
+          if (names.some(name => String(name).toLowerCase().includes("perfect flight"))) {
+            return true;
+          }
+        }
+        return false;
+      })();
+
       // Calculate flying speed - check if Paragon is selected
       // Reuse powersetName that was already declared earlier in the function
       let calculatedFlyingSpeed = null;
       if (powersetName === "Paragon") {
         // Paragon grants 15 ft flying speed at level 1
-        calculatedFlyingSpeed = 15 + (hasEnhancedFlight ? 10 : 0);
+        calculatedFlyingSpeed = 15 + (hasEnhancedFlight ? 10 : 0) + (hasAerialMastery ? 15 : 0) + (hasPerfectFlight ? 20 : 0);
         context.speeds.flying = calculatedFlyingSpeed;
         console.log("Singularity | Paragon detected, flying speed set to 15 ft");
       }
@@ -7677,6 +7720,39 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       return;
     }
 
+    const isMeleeAttack = attack.type === "melee" || (!attack.type && !isRangedAttack) || matchingWeapon?.system?.basic?.type === "melee";
+    const hasAerialTalent = (actor, talentName) => {
+      if (!actor) return false;
+      const powersetName = actor.system?.progression?.level1?.powersetName || actor.system?.basic?.powerset;
+      if (powersetName !== "Paragon") return false;
+      const normalized = String(talentName || "").toLowerCase();
+      if (!normalized) return false;
+      if (actor.items?.some(item => item.type === "talent" && (item.name || "").toLowerCase().includes(normalized))) {
+        return true;
+      }
+      const progression = actor.system?.progression || {};
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelData = progression[`level${lvl}`] || {};
+        const names = [levelData.paragonTalentName, levelData.powersetTalentName].filter(Boolean);
+        if (names.some(name => String(name).toLowerCase().includes(normalized))) {
+          return true;
+        }
+      }
+      return false;
+    };
+    const getAerialEvasionBonus = (actor) => {
+      if (!isMeleeAttack) return 0;
+      const isFlying = actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "flying");
+      if (!isFlying || !hasAerialTalent(actor, "aerial evasion")) return 0;
+      return 2;
+    };
+    const getAerialManeuverabilityBonus = (actor) => {
+      if (!isRangedAttack) return 0;
+      const isFlying = actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "flying");
+      if (!isFlying || !hasAerialTalent(actor, "aerial maneuverability")) return 0;
+      return 2;
+    };
+
     // Calculate dynamic attack bonus (must match the calculation in getData())
     // First, calculate ability bonuses the same way as getData()
     const actorData = foundry.utils.deepClone(this.actor.system);
@@ -7880,9 +7956,19 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       // but only if no Weapon Training was already applied for Unarmed Strikes
       if (attack.name && attack.name.toLowerCase() === "unarmed strike") {
         if (powersetName === "Paragon" && weaponCompetenceBonus === 0) {
-          // Paragon gets Apprentice with unarmed at level 1, but only if no Weapon Training was applied
-          weaponCompetenceRank = "Apprentice";
-          weaponCompetenceBonus = 4; // Apprentice = +4
+          if (primeLevel >= 15) {
+            weaponCompetenceRank = "Legendary";
+            weaponCompetenceBonus = 16;
+          } else if (primeLevel >= 10) {
+            weaponCompetenceRank = "Masterful";
+            weaponCompetenceBonus = 12;
+          } else if (primeLevel >= 5) {
+            weaponCompetenceRank = "Competent";
+            weaponCompetenceBonus = 8;
+          } else {
+            weaponCompetenceRank = "Apprentice";
+            weaponCompetenceBonus = 4;
+          }
         } else if (weaponCompetenceBonus === 0) {
           // Only use default if no Weapon Training was applied
           weaponCompetenceRank = "Novice";
@@ -8063,6 +8149,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
             let acComparison = "";
             let targetAC = null;
+            let effectiveTargetAC = null;
             const targets = Array.from(game.user.targets);
             if (targets.length > 0) {
               const targetToken = targets[0];
@@ -8078,15 +8165,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
               };
               targetAC = await getTargetAc(targetActor);
               if (targetAC !== null) {
-                const difference = roll.total - targetAC;
+                const aerialBonus = getAerialEvasionBonus(targetActor) + getAerialManeuverabilityBonus(targetActor);
+                effectiveTargetAC = targetAC + aerialBonus;
+                const acLabel = aerialBonus ? `${effectiveTargetAC} (+${aerialBonus} Aerial)` : `${effectiveTargetAC}`;
+                const difference = roll.total - effectiveTargetAC;
                 if (difference >= 10) {
-                  acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${targetAC})</span>`;
+                  acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${acLabel})</span>`;
                 } else if (difference >= 0) {
-                  acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${targetAC})</span>`;
+                  acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${acLabel})</span>`;
                 } else if (difference >= -9) {
-                  acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                  acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${acLabel})</span>`;
                 } else {
-                  acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                  acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${acLabel})</span>`;
                 }
               }
             }
@@ -8105,8 +8195,8 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
               attackName: attack.name
             });
             // If this was a success or extreme success vs a target, open the Roll Damage dialog automatically
-            if (targetAC !== null) {
-              const difference = roll.total - targetAC;
+            if (effectiveTargetAC !== null) {
+              const difference = roll.total - effectiveTargetAC;
               if (difference >= 0) {
                 try {
                   await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId, gadgetId: gadgetId } } });
@@ -8169,6 +8259,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 const blindedText = blindedPenalty > 0 ? ` (includes -${blindedPenalty} Blinded)` : "";
                 const advantageText = hasParalyzedTarget ? " (advantage vs Paralyzed)" : "";
                 let acComparison = "";
+                let effectiveTargetAC = null;
                 const targets = Array.from(game.user.targets);
                 if (targets.length > 0) {
                   const targetToken = targets[0];
@@ -8184,15 +8275,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                   };
                   const targetAC = await getTargetAc(targetActor);
                   if (targetAC !== null) {
-                    const difference = roll.total - targetAC;
+                    const aerialBonus = getAerialEvasionBonus(targetActor) + getAerialManeuverabilityBonus(targetActor);
+                    effectiveTargetAC = targetAC + aerialBonus;
+                    const acLabel = aerialBonus ? `${effectiveTargetAC} (+${aerialBonus} Aerial)` : `${effectiveTargetAC}`;
+                    const difference = roll.total - effectiveTargetAC;
                     if (difference >= 10) {
-                      acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${targetAC})</span>`;
+                      acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${acLabel})</span>`;
                     } else if (difference >= 0) {
-                      acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${targetAC})</span>`;
+                      acComparison = `<span style="color: #4caf50; font-weight: bold;">Success vs ${targetName}! (Hit AC ${acLabel})</span>`;
                     } else if (difference >= -9) {
-                      acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                      acComparison = `<span style="color: #d78f1f; font-weight: bold;">Failure vs ${targetName} (${difference} vs AC ${acLabel})</span>`;
                     } else {
-                      acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${targetAC})</span>`;
+                      acComparison = `<span style="color: #c03a3a; font-weight: bold;">Extreme Failure vs ${targetName} (${difference} vs AC ${acLabel})</span>`;
                     }
                   }
                 }
@@ -8370,13 +8464,69 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       ui.notifications.warn("This attack has no damage formula.");
       return;
     }
+
+    const hasUltimateImpact = (() => {
+      const normalized = (attack.name || "").toLowerCase();
+      if (normalized !== "unarmed strike") return false;
+      const embedded = (this.actor.items || []).some(item =>
+        item.type === "talent" && String(item.name || "").toLowerCase().includes("ultimate impact")
+      );
+      if (embedded) return true;
+      const progression = this.actor.system?.progression || {};
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelData = progression[`level${lvl}`] || {};
+        const names = [levelData.paragonTalentName, levelData.powersetTalentName].filter(Boolean);
+        if (names.some(name => String(name).toLowerCase().includes("ultimate impact"))) {
+          return true;
+        }
+      }
+      return false;
+    })();
+    const hasLegendaryImpact = (() => {
+      const normalized = (attack.name || "").toLowerCase();
+      if (normalized !== "unarmed strike") return false;
+      const embedded = (this.actor.items || []).some(item =>
+        item.type === "talent" && String(item.name || "").toLowerCase().includes("legendary impact")
+      );
+      if (embedded) return true;
+      const progression = this.actor.system?.progression || {};
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelData = progression[`level${lvl}`] || {};
+        const names = [levelData.paragonTalentName, levelData.powersetTalentName].filter(Boolean);
+        if (names.some(name => String(name).toLowerCase().includes("legendary impact"))) {
+          return true;
+        }
+      }
+      return false;
+    })();
+    const impactBonus = hasLegendaryImpact ? "2d12" : (hasUltimateImpact ? "1d12" : "");
+    if (impactBonus) {
+      damageFormula += ` + ${impactBonus}`;
+    }
     
     // Check for Supersonic Moment bonus (only applies to melee attacks)
     let supersonicBonus = 0;
     const supersonicData = this.actor.system.combat?.supersonicMoment || { active: false, distance: 0 };
-    if (supersonicData.active && attack.range === "Melee") {
+    const supersonicStep = (() => {
+      if (!supersonicData.active || attack.range !== "Melee") return 0;
+      const progression = this.actor.system?.progression || {};
+      const names = [];
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelData = progression[`level${lvl}`] || {};
+        if (levelData.paragonTalentName) names.push(levelData.paragonTalentName);
+        if (levelData.powersetTalentName) names.push(levelData.powersetTalentName);
+      }
+      const embedded = (this.actor.items || [])
+        .filter(item => item.type === "talent")
+        .map(item => String(item.name || "").toLowerCase());
+      const allNames = names.map(name => String(name).toLowerCase()).concat(embedded);
+      if (allNames.some(name => name.includes("supreme velocity"))) return 6;
+      if (allNames.some(name => name.includes("improved supersonic moment"))) return 4;
+      return 2;
+    })();
+    if (supersonicStep > 0) {
       const distance = Number(supersonicData.distance) || 0;
-      supersonicBonus = Math.floor(distance / 15) * 2; // +2 per 15 feet
+      supersonicBonus = Math.floor(distance / 15) * supersonicStep;
     }
 
     const dialogContent = `
@@ -8397,7 +8547,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             <input type="text" id="extra-modifier" value="0" placeholder="0 or +1d6" class="editable-input"/>
           </div>
         </div>
-        <p class="help-text">Add any extra damage (e.g., +2, +1d6, -1). Base: ${damageFormula} (${attack.damageType}).${supersonicBonus > 0 ? ` Supersonic Moment: +${supersonicBonus} damage.` : ''} Click "Roll Damage" to roll the formula + extra modifier.</p>
+        <p class="help-text">Add any extra damage (e.g., +2, +1d6, -1). Base: ${damageFormula} (${attack.damageType}).${supersonicBonus > 0 ? ` Supersonic Moment: +${supersonicBonus} damage.` : ''}${hasLegendaryImpact ? " Legendary Impact: +2d12 damage (replaces Ultimate Impact)." : (hasUltimateImpact ? " Ultimate Impact: +1d12 damage." : "")} Click "Roll Damage" to roll the formula + extra modifier.</p>
       </form>
     `;
 
@@ -8419,9 +8569,26 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       } else {
         // Fallback: calculate from actor data
         const supersonicData = this.actor.system.combat?.supersonicMoment || { active: false, distance: 0 };
-        if (supersonicData.active && attack.range === "Melee") {
+        const supersonicStep = (() => {
+          if (!supersonicData.active || attack.range !== "Melee") return 0;
+          const progression = this.actor.system?.progression || {};
+          const names = [];
+          for (let lvl = 1; lvl <= 20; lvl++) {
+            const levelData = progression[`level${lvl}`] || {};
+            if (levelData.paragonTalentName) names.push(levelData.paragonTalentName);
+            if (levelData.powersetTalentName) names.push(levelData.powersetTalentName);
+          }
+          const embedded = (this.actor.items || [])
+            .filter(item => item.type === "talent")
+            .map(item => String(item.name || "").toLowerCase());
+          const allNames = names.map(name => String(name).toLowerCase()).concat(embedded);
+          if (allNames.some(name => name.includes("supreme velocity"))) return 6;
+          if (allNames.some(name => name.includes("improved supersonic moment"))) return 4;
+          return 2;
+        })();
+        if (supersonicStep > 0) {
           const distance = Number(supersonicData.distance) || 0;
-          supersonicBonus = Math.floor(distance / 15) * 2;
+          supersonicBonus = Math.floor(distance / 15) * supersonicStep;
         }
       }
       
@@ -8439,6 +8606,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       const supersonicText = supersonicBonus > 0 ? ` + ${supersonicBonus} (Supersonic Moment)` : "";
       const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
+      const impactText = hasLegendaryImpact
+        ? " + 2d12 (Legendary Impact)"
+        : (hasUltimateImpact ? " + 1d12 (Ultimate Impact)" : "");
       
       const isIncorporeal = this.actor?.effects?.some(effect => effect.getFlag("core", "statusId") === "incorporeal");
       const hasCorporealTarget = isIncorporeal && Array.from(game.user?.targets || []).some(
@@ -8450,7 +8620,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         <button type="button" class="apply-damage-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(40, 110, 70, 0.5); color: #ffffff; border: 1px solid rgba(40, 110, 70, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px;"><i class="fas fa-bullseye"></i> Apply Damage</button>
         <button type="button" class="critical-hit-button" data-roll-total="${finalTotal}" data-damage-type="${attack.damageType}" data-attack-name="${attack.name}" style="padding: 4px 8px; background: rgba(220, 53, 69, 0.5); color: #ffffff; border: 1px solid rgba(220, 53, 69, 0.8); border-radius: 3px; cursor: pointer; font-size: 11px; margin-left: 6px;"><i class="fas fa-bolt"></i> Apply Critical (x2)</button>
       </div>`;
-      const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType})${supersonicText}${extraText} = <strong>${roll.total}</strong>${incorporealText}${actionButtons}</div>`;
+      const impactNote = hasLegendaryImpact
+        ? "<br><em>Legendary Impact:</em> On a critical hit with an unarmed attack, maximize all dice for this attack, and the target must succeed a Might Save against your Might DC or be Stunned until the end of their next turn. You can also push the target up to 20 feet (Ultimate Impact)."
+        : (hasUltimateImpact
+          ? "<br><em>Ultimate Impact:</em> On a critical hit with an unarmed attack, you can push the target up to 20 feet."
+          : "");
+      const flavor = `<div class="roll-flavor"><b>${attack.name} - Damage</b><br>${damageFormula} (${attack.damageType})${supersonicText}${impactText}${extraText} = <strong>${roll.total}</strong>${incorporealText}${actionButtons}${impactNote}</div>`;
       
       const message = await roll.toMessage({
         speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -8870,6 +9045,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
               item: gadgetDoc,
               actor: this.actor,
               gadgetActions: gadgetActions,
+              talentActions: this._getTalentChatActions(gadgetDoc),
               hideImage: true
             });
             await ChatMessage.create({
@@ -8904,6 +9080,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
         item: item,
         actor: this.actor,
+        talentActions: this._getTalentChatActions(item),
         hideImage: true
       });
       await ChatMessage.create({
@@ -9244,6 +9421,19 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     };
   }
 
+  _getTalentChatActions(item) {
+    if (!item || item.type !== "talent") return null;
+    const name = String(item.name || "").toLowerCase().trim();
+    if (name !== "meteor slam" && name !== "thunderclap") return null;
+
+    return {
+      canMeteorSlam: name === "meteor slam",
+      canThunderclap: name === "thunderclap",
+      actorId: this.actor?.id,
+      talentName: item.name || "Talent"
+    };
+  }
+
   _getGadgetTuningBonus() {
     const gadgetTuningSkill = this.actor?.system?.skills?.["Gadget Tuning"] || {};
     const gadgetTuningRank = gadgetTuningSkill.rank || "Novice";
@@ -9387,6 +9577,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const content = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
           item: item,
           actor: this.actor,
+          talentActions: this._getTalentChatActions(item),
           hideImage: true
         });
         
@@ -9819,6 +10010,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           item: item,
           actor: this.actor,
           gadgetActions: gadgetActions,
+          talentActions: this._getTalentChatActions(item),
           hideImage: item?.type === "gadget"
         });
         
@@ -10743,6 +10935,219 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
   }
 
+  async _ensureParagonTalents(talentsPack) {
+    if (!talentsPack) return;
+
+    const wasLocked = talentsPack.locked;
+    if (wasLocked) {
+      await talentsPack.configure({ locked: false });
+    }
+
+    try {
+      let index;
+      try {
+        index = await talentsPack.getIndex();
+      } catch (err) {
+        console.warn("Singularity | Failed to read talents compendium index:", err);
+        return;
+      }
+
+      const existing = new Set(index.map(entry => (entry.name || "").toLowerCase()));
+      const talentDefinitions = [
+        {
+          name: "Aerial Evasion",
+          type: "paragon",
+          level: 5,
+          prerequisites: "Paragon 5",
+          description: "<h2>Description</h2><p>Your control in the air lets you weave around incoming blows.</p><h3>Requirements</h3><ul><li>Paragon 5</li></ul><h3>Effect</h3><p>While you are flying, you gain a <strong>+2 bonus to AC against melee attacks</strong>.</p>",
+          img: "icons/svg/shield.svg"
+        },
+        {
+          name: "Aerial Maneuverability",
+          type: "paragon",
+          level: 5,
+          prerequisites: "Paragon 5",
+          description: "<h2>Description</h2><p>Your aerial agility makes you a difficult target. You move through the air with unpredictable patterns that make ranged attacks against you far less effective.</p><h3>Requirements</h3><ul><li>Paragon 5</li></ul><h3>Effect</h3><p>While you are flying, you have a <strong>+2 bonus to AC against ranged attacks</strong>.</p>",
+          img: "icons/svg/shield.svg"
+        },
+        {
+          name: "Breaker's Force",
+          type: "paragon",
+          level: 5,
+          prerequisites: "Paragon 5",
+          description: "<h2>Description</h2><p>Your momentum has become powerful enough to shatter fragile objects. You can smash through weak barriers and obstacles with ease.</p><h3>Requirements</h3><ul><li>Paragon 5</li></ul><h3>Effect</h3><p>You can move through any object or structure made of fragile materials (glass, paper, straw, thin plastic) or soft materials (cloth, leather, wood, plaster), destroying it as you pass through. Objects with higher material durability block your movement normally.</p>",
+          img: "icons/svg/hammer.svg"
+        },
+        {
+          name: "Meteor Slam",
+          type: "paragon",
+          level: 5,
+          prerequisites: "Paragon 5",
+          description: "<h2>Description</h2><p>You use your flight speed to grab or strike an airborne opponent, using your combined weight and thrust to drive them ruthlessly into the earth.</p><h3>Requirements</h3><ul><li>Paragon 5</li></ul><h3>Effect</h3><p>You gain the <strong>Meteor Slam</strong> action.</p>",
+          img: "icons/svg/explosion.svg"
+        },
+        {
+          name: "Shockwave Landing",
+          type: "paragon",
+          level: 5,
+          prerequisites: "Paragon 5; Improved Impact Control",
+          description: "<h2>Description</h2><p>You can channel the force of your landing into a devastating shockwave that knocks nearby enemies off their feet.</p><h3>Requirements</h3><ul><li>Paragon 5</li><li>Improved Impact Control</li></ul><h3>Effect</h3><p>When you land on a solid surface after falling at least 30 feet, you can choose to create a shockwave. All creatures within 10 feet of your landing point must make a Might Save against your Might DC. On a failure, they are knocked Prone.</p>",
+          img: "icons/svg/impact-point.svg"
+        },
+        {
+          name: "Unbreakable Will",
+          type: "paragon",
+          level: 5,
+          prerequisites: "Paragon 5",
+          description: "<h2>Description</h2><p>Your mental fortitude matches your physical power. You resist mental assaults and maintain your composure under extreme pressure.</p><h3>Requirements</h3><ul><li>Paragon 5</li></ul><h3>Effect</h3><p>You gain a <strong>+2 bonus</strong> to all saving throws against being Charmed, Scared, or Stunned.</p>",
+          img: "icons/svg/brain.svg"
+        },
+        {
+          name: "Improved Supersonic Moment",
+          type: "paragon",
+          level: 7,
+          prerequisites: "Paragon 7; Supersonic Moment",
+          description: "<h2>Description</h2><p>Your ability to convert speed into devastating force has reached new heights. Every foot of movement becomes a weapon.</p><h3>Requirements</h3><ul><li>Paragon 7</li><li>Supersonic Moment</li></ul><h3>Effect</h3><p>When you use Supersonic Moment, you now gain a <strong>+4 bonus to damage</strong> for every 15 feet you fly (instead of +2).</p>",
+          img: "icons/svg/wingfoot.svg"
+        },
+        {
+          name: "Thunderclap",
+          type: "paragon",
+          level: 7,
+          prerequisites: "Paragon 7",
+          description: "<h2>Description</h2><p>You clap your hands together with such force that it creates a devastating shockwave, sending enemies reeling.</p><h3>Requirements</h3><ul><li>Paragon 7</li></ul><h3>Effect</h3><p>You gain the <strong>Thunderclap</strong> action.</p>",
+          img: "icons/svg/explosion.svg"
+        },
+        {
+          name: "Inspiring Presence",
+          type: "paragon",
+          level: 9,
+          prerequisites: "Paragon 9",
+          description: "<h2>Description</h2><p>Your overwhelming presence inspires courage in those around you. Your mere presence makes allies feel protected and fearless.</p><h3>Requirements</h3><ul><li>Paragon 9</li></ul><h3>Effect</h3><p>All allies within 30 feet of you have advantage on saving throws against being Scared.</p>",
+          img: "icons/svg/aura.svg"
+        },
+        {
+          name: "Legendary Presence",
+          type: "paragon",
+          level: 9,
+          prerequisites: "Paragon 9; Dominating Presence or Noble Presence",
+          description: "<h2>Description</h2><p>Your presence has become truly legendary. Whether through fear or respect, your mere presence commands attention and shapes the battlefield.</p><h3>Requirements</h3><ul><li>Paragon 9</li><li>Dominating Presence or Noble Presence</li></ul><h3>Effect</h3><p>You gain a <strong>+6 bonus</strong> to Intimidation and Persuasion checks (instead of the +4 from your chosen Presence talent).</p>",
+          img: "icons/svg/aura.svg"
+        },
+        {
+          name: "Aerial Mastery",
+          type: "paragon",
+          level: 10,
+          prerequisites: "Paragon 10",
+          description: "<h2>Description</h2><p>Your flight capabilities continue to improve. You move through the air with even greater speed.</p><h3>Requirements</h3><ul><li>Paragon 10</li></ul><h3>Effect</h3><p>Your flying speed increases by an additional <strong>15 feet</strong>.</p>",
+          img: "icons/svg/windmill.svg"
+        },
+        {
+          name: "Legendary Impact",
+          type: "paragon",
+          level: 19,
+          prerequisites: "Paragon 19; Ultimate Impact",
+          description: "<h2>Description</h2><p>Your strikes have reached legendary status. Every impact is cataclysmic.</p><h3>Requirements</h3><ul><li>Paragon 19</li><li>Ultimate Impact</li></ul><h3>Effect</h3><p>Your unarmed attacks deal an additional <strong>2d12 damage</strong> (instead of 1d12 from Ultimate Impact). Additionally, when you score a critical hit, you deal maximum damage on all dice rolled for that attack, and the target must make a Might Save against your Might DC or be Stunned until the end of their next turn.</p>",
+          img: "icons/svg/impact-point.svg"
+        },
+        {
+          name: "Transcendent Presence",
+          type: "paragon",
+          level: 19,
+          prerequisites: "Paragon 19; Overwhelming Presence",
+          description: "<h2>Description</h2><p>Your presence has transcended the physical realm. You command the battlefield through sheer force of being.</p><h3>Requirements</h3><ul><li>Paragon 19</li><li>Overwhelming Presence</li></ul><h3>Effect</h3><p>Once per turn, you can use your reaction to force an enemy within 60 feet to reroll an attack roll, ability check, or saving throw, and they must use the new result.</p>",
+          img: "icons/svg/aura.svg"
+        },
+        {
+          name: "Ultimate Breaker",
+          type: "paragon",
+          level: 20,
+          prerequisites: "Paragon 20; Hard Breaker",
+          description: "<h2>Description</h2><p>Your momentum has reached legendary proportions. There is no material that can withstand your force. You move through the strongest substances in existence as if they were air.</p><h3>Requirements</h3><ul><li>Paragon 20</li><li>Hard Breaker</li></ul><h3>Effect</h3><p>You can move through any object or structure made of fragile materials, soft materials, average materials, hard materials, or very hard materials (titanium, diamond, advanced alloys), destroying it as you pass through.</p>",
+          img: "icons/svg/hammer.svg"
+        },
+        {
+          name: "Worldbreaker",
+          type: "paragon",
+          level: 20,
+          prerequisites: "Paragon 20; Colossal Slam",
+          description: "<h2>Description</h2><p>Your power has reached such heights that you can shatter the very world around you with a single strike. This is the ultimate expression of overwhelming force.</p><h3>Requirements</h3><ul><li>Paragon 20</li><li>Colossal Slam</li></ul><h3>Action Type</h3><p><strong>Action</strong> (Cost: <strong>10 energy</strong>)</p><h3>Effect</h3><p>While flying at least 200 feet above the ground, you can use an action to perform a Worldbreaker. You dive straight down up to your full flying speed, then make a melee attack against a target at ground level. If you hit, you deal your normal damage plus <strong>12d10 additional damage</strong>. All creatures within 60 feet of the impact point must make a Might Save against your Might DC or take <strong>8d10 kinetic damage</strong> and be knocked Prone. The ground in a 30-foot radius becomes difficult terrain, and all structures in the area are destroyed. The impact creates a crater that persists until the end of the encounter.</p><p>You can use this talent <strong>once per long rest</strong>.</p>",
+          img: "icons/svg/explosion.svg"
+        }
+      ];
+
+      for (const def of talentDefinitions) {
+        if (!existing.has(def.name.toLowerCase())) {
+          continue;
+        }
+
+        const indexEntry = index.find(entry => (entry.name || "").toLowerCase() === def.name.toLowerCase());
+        if (!indexEntry?._id) continue;
+
+        try {
+          const existingDoc = await talentsPack.getDocument(indexEntry._id);
+          if (!existingDoc) continue;
+
+          const nextLevel = Number(existingDoc.system?.basic?.level) || 0;
+          const needsUpdate = nextLevel !== def.level ||
+            existingDoc.system?.basic?.type !== def.type ||
+            existingDoc.system?.basic?.prerequisites !== def.prerequisites ||
+            existingDoc.img !== def.img ||
+            (existingDoc.system?.description || "") !== def.description;
+
+          if (needsUpdate) {
+            await existingDoc.update({
+              img: def.img,
+              system: {
+                description: def.description,
+                basic: {
+                  type: def.type,
+                  level: def.level,
+                  prerequisites: def.prerequisites
+                }
+              }
+            });
+          }
+        } catch (err) {
+          console.warn("Singularity | Failed to update Paragon talent:", err);
+        }
+      }
+
+      const toCreate = talentDefinitions
+        .filter(def => !existing.has(def.name.toLowerCase()))
+        .map(def => ({
+          name: def.name,
+          type: "talent",
+          img: def.img,
+          system: {
+            description: def.description,
+            basic: {
+              type: def.type,
+              level: def.level,
+              prerequisites: def.prerequisites
+            }
+          }
+        }));
+
+      if (!toCreate.length) return;
+
+      try {
+        const createdItems = await Item.createDocuments(toCreate, { render: false });
+        for (const item of createdItems) {
+          await talentsPack.importDocument(item);
+          await item.delete();
+        }
+        await talentsPack.getIndex({ force: true });
+      } catch (err) {
+        console.warn("Singularity | Failed to create Paragon talents:", err);
+      }
+    } finally {
+      if (wasLocked) {
+        await talentsPack.configure({ locked: true });
+      }
+    }
+  }
+
   async _ensureGadgeteerTalents(talentsPack) {
     if (!talentsPack) return;
 
@@ -10909,6 +11314,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
 
     await this._ensureBastionTalents(talentsPack);
+    await this._ensureParagonTalents(talentsPack);
     await this._ensureGadgeteerTalents(talentsPack);
     await this._ensureGenericLevel2Talents(talentsPack);
     
@@ -11439,6 +11845,102 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       if (name === "improved impact control") {
         return hasTalent("impact control");
       }
+      if (name === "aerial evasion") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 5 && powersetName === "Paragon";
+      }
+      if (name === "aerial maneuverability") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 5 && powersetName === "Paragon";
+      }
+      if (name === "breaker's force") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 5 && powersetName === "Paragon";
+      }
+      if (name === "meteor slam") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 5 && powersetName === "Paragon";
+      }
+      if (name === "shockwave landing") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 5 && powersetName === "Paragon" && hasTalent("improved impact control");
+      }
+      if (name === "unbreakable will") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 5 && powersetName === "Paragon";
+      }
+      if (name === "improved supersonic moment") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 7 && powersetName === "Paragon" && hasTalent("supersonic moment");
+      }
+      if (name === "thunderclap") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 7 && powersetName === "Paragon";
+      }
+      if (name === "inspiring presence") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 9 && powersetName === "Paragon";
+      }
+      if (name === "legendary presence") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 9 && powersetName === "Paragon" && (hasTalent("dominating presence") || hasTalent("noble presence"));
+      }
+      if (name === "aerial mastery") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 10 && powersetName === "Paragon";
+      }
+      if (name === "reinforced breaker") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 10 && powersetName === "Paragon" && hasTalent("breaker's force");
+      }
+      if (name === "improved meteor slam") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Paragon" && hasTalent("meteor slam");
+      }
+      if (name === "overwhelming presence") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Paragon" && hasTalent("legendary presence");
+      }
+      if (name === "perfect flight") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 14 && powersetName === "Paragon" && hasTalent("aerial mastery");
+      }
+      if (name === "unstoppable force") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 14 && powersetName === "Paragon" && hasTalent("breaker's force");
+      }
+      if (name === "apex predator") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 15 && powersetName === "Paragon";
+      }
+      if (name === "hard breaker") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 15 && powersetName === "Paragon" && hasTalent("reinforced breaker");
+      }
+      if (name === "ultimate impact") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 15 && powersetName === "Paragon";
+      }
+      if (name === "legendary impact") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 19 && powersetName === "Paragon" && hasTalent("ultimate impact");
+      }
+      if (name === "transcendent presence") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 19 && powersetName === "Paragon" && hasTalent("overwhelming presence");
+      }
+      if (name === "ultimate breaker") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 20 && powersetName === "Paragon" && hasTalent("hard breaker");
+      }
+      if (name === "worldbreaker") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 20 && powersetName === "Paragon" && hasTalent("colossal slam");
+      }
+      if (name === "colossal slam") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 17 && powersetName === "Paragon" && hasTalent("improved meteor slam");
+      }
       if (name === "regenerative fortitude") {
         const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
         return primeLevel >= 7 && powersetName === "Bastion";
@@ -11726,6 +12228,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         if (talentNameLower.includes("noble") && talentNameLower.includes("presence")) {
           if (!skills["Persuasion"] || skills["Persuasion"].lockedSource !== "Noble Presence") {
             skills["Persuasion"] = { rank: "Novice", ability: "charm", otherBonuses: 4, lockedOtherBonuses: true, lockedSource: "Noble Presence" };
+            skillsUpdated = true;
+          }
+        }
+        if (talentNameLower.includes("legendary") && talentNameLower.includes("presence")) {
+          if (skills["Intimidation"]?.lockedSource === "Dominating Presence") {
+            skills["Intimidation"].otherBonuses = 6;
+            skills["Intimidation"].lockedOtherBonuses = true;
+            skillsUpdated = true;
+          }
+          if (skills["Persuasion"]?.lockedSource === "Noble Presence") {
+            skills["Persuasion"].otherBonuses = 6;
+            skills["Persuasion"].lockedOtherBonuses = true;
             skillsUpdated = true;
           }
         }

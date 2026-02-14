@@ -345,18 +345,38 @@ export class SingularityActor extends Actor {
       systemData.skills = {};
     }
     
-    // Check for Paragon talents
-    const paragonTalentName = systemData.progression?.level1?.paragonTalentName || "";
-    const hasDominatingPresence = paragonTalentName && paragonTalentName.toLowerCase().includes("dominating presence");
-    const hasNoblePresence = paragonTalentName && paragonTalentName.toLowerCase().includes("noble presence");
+    // Check for Paragon talents across all levels
+    const progression = systemData.progression || {};
+    let hasDominatingPresence = false;
+    let hasNoblePresence = false;
+    let hasLegendaryPresence = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const names = [];
+      if (lvl === 1 && levelData.paragonTalentName) {
+        names.push(levelData.paragonTalentName);
+      }
+      if (levelData.powersetTalentName) {
+        names.push(levelData.powersetTalentName);
+      }
+      for (const name of names) {
+        const lower = String(name || "").toLowerCase();
+        if (lower.includes("dominating presence")) hasDominatingPresence = true;
+        if (lower.includes("noble presence")) hasNoblePresence = true;
+        if (lower.includes("legendary presence")) hasLegendaryPresence = true;
+      }
+      if (hasDominatingPresence && hasNoblePresence) break;
+    }
     
     // Add Intimidation skill if Dominating Presence is selected
     if (hasDominatingPresence) {
+      const presenceBonus = hasLegendaryPresence ? 6 : 4;
       if (!systemData.skills["Intimidation"]) {
         systemData.skills["Intimidation"] = {
           rank: "Novice",
           ability: "charm",
-          otherBonuses: 4, // +4 bonus while flying
+          otherBonuses: presenceBonus, // +4 or +6 bonus while flying
           lockedOtherBonuses: true, // Mark as locked (from talent)
           lockedSource: "Dominating Presence" // Track the source
         };
@@ -365,22 +385,25 @@ export class SingularityActor extends Actor {
         if (!systemData.skills["Intimidation"].lockedOtherBonuses) {
           // Add the bonus if it doesn't already have it
           const existingBonus = Number(systemData.skills["Intimidation"].otherBonuses) || 0;
-          if (existingBonus < 4) {
-            systemData.skills["Intimidation"].otherBonuses = 4;
+          if (existingBonus < presenceBonus) {
+            systemData.skills["Intimidation"].otherBonuses = presenceBonus;
             systemData.skills["Intimidation"].lockedOtherBonuses = true;
             systemData.skills["Intimidation"].lockedSource = "Dominating Presence";
           }
+        } else if (hasLegendaryPresence && systemData.skills["Intimidation"].otherBonuses !== presenceBonus) {
+          systemData.skills["Intimidation"].otherBonuses = presenceBonus;
         }
       }
     }
     
     // Add Persuasion skill if Noble Presence is selected
     if (hasNoblePresence) {
+      const presenceBonus = hasLegendaryPresence ? 6 : 4;
       if (!systemData.skills["Persuasion"]) {
         systemData.skills["Persuasion"] = {
           rank: "Novice",
           ability: "charm",
-          otherBonuses: 4, // +4 bonus while flying
+          otherBonuses: presenceBonus, // +4 or +6 bonus while flying
           lockedOtherBonuses: true, // Mark as locked (from talent)
           lockedSource: "Noble Presence" // Track the source
         };
@@ -389,13 +412,22 @@ export class SingularityActor extends Actor {
         if (!systemData.skills["Persuasion"].lockedOtherBonuses) {
           // Add the bonus if it doesn't already have it
           const existingBonus = Number(systemData.skills["Persuasion"].otherBonuses) || 0;
-          if (existingBonus < 4) {
-            systemData.skills["Persuasion"].otherBonuses = 4;
+          if (existingBonus < presenceBonus) {
+            systemData.skills["Persuasion"].otherBonuses = presenceBonus;
             systemData.skills["Persuasion"].lockedOtherBonuses = true;
             systemData.skills["Persuasion"].lockedSource = "Noble Presence";
           }
+        } else if (hasLegendaryPresence && systemData.skills["Persuasion"].otherBonuses !== presenceBonus) {
+          systemData.skills["Persuasion"].otherBonuses = presenceBonus;
         }
       }
+    }
+
+    if (!hasDominatingPresence && systemData.skills["Intimidation"]?.lockedSource === "Dominating Presence") {
+      delete systemData.skills["Intimidation"];
+    }
+    if (!hasNoblePresence && systemData.skills["Persuasion"]?.lockedSource === "Noble Presence") {
+      delete systemData.skills["Persuasion"];
     }
   }
   
@@ -417,6 +449,13 @@ export class SingularityActor extends Actor {
     if (!hasUnarmedStrike) {
       // Check if Paragon is selected (for Enhanced Unarmed Strikes - damage die increases by one step)
       const powersetName = systemData.progression?.level1?.powersetName || systemData.basic?.powerset;
+      const primeLevel = Number(systemData.basic?.primeLevel) || 1;
+      const getParagonUnarmedRank = (level) => {
+        if (level >= 15) return "Legendary";
+        if (level >= 10) return "Masterful";
+        if (level >= 5) return "Competent";
+        return "Apprentice";
+      };
       let baseDamage = "1d2"; // Default unarmed strike damage
       let baseAttackBonus = 0; // Default: Novice (no bonus)
       
@@ -425,9 +464,8 @@ export class SingularityActor extends Actor {
         // 1d2 -> 1d4 -> 1d6 -> 1d8 -> 1d10 -> 1d12
         baseDamage = "1d4"; // One step up from 1d2
         
-        // Paragon's Unarmed Weapon Competence: Apprentice at level 1
-        // Apprentice gives +0 bonus, but it's still Apprentice rank
-        baseAttackBonus = 0; // Apprentice = +0, but we track the rank separately if needed
+        // Paragon's Unarmed Weapon Competence scales by level
+        baseAttackBonus = 0; // Competence bonus is handled elsewhere
       }
       
       // Use the newer format with baseDamage and ability (like Blast)
@@ -443,11 +481,19 @@ export class SingularityActor extends Actor {
         traits: ["Natural"],
         hands: 0, // Does not require a weapon
         weaponImg: "systems/singularity/img/weapons/punch.jpg", // Image for unarmed strike
-        isCustom: false
+        isCustom: false,
+        weaponCompetenceRank: powersetName === "Paragon" ? getParagonUnarmedRank(primeLevel) : "Novice"
       });
     } else {
       // If Unarmed Strike exists, check if we need to update it for Paragon
       const powersetName = systemData.progression?.level1?.powersetName || systemData.basic?.powerset;
+      const primeLevel = Number(systemData.basic?.primeLevel) || 1;
+      const getParagonUnarmedRank = (level) => {
+        if (level >= 15) return "Legendary";
+        if (level >= 10) return "Masterful";
+        if (level >= 5) return "Competent";
+        return "Apprentice";
+      };
       const unarmedStrike = systemData.attacks.find(attack => 
         attack.name && attack.name.toLowerCase() === "unarmed strike"
       );
@@ -467,8 +513,8 @@ export class SingularityActor extends Actor {
             // Keep old damage as fallback, but prefer baseDamage + ability
           }
           
-          // Paragon gets Apprentice with unarmed at level 1
-          unarmedStrike.weaponCompetenceRank = "Apprentice";
+          // Paragon unarmed competence scales by level
+          unarmedStrike.weaponCompetenceRank = getParagonUnarmedRank(primeLevel);
           // Ensure baseAttackBonus exists (Paragon starts at Apprentice = +0, but bonus is calculated in getData)
           if (unarmedStrike.baseAttackBonus === undefined) {
             unarmedStrike.baseAttackBonus = 0;

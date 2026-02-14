@@ -28,6 +28,16 @@
     {{/if}}
   </div>
   {{/if}}
+  {{#if talentActions}}
+  <div class="chat-card-buttons">
+    {{#if talentActions.canMeteorSlam}}
+    <button type="button" class="singularity-talent-meteor-slam" data-actor-id="{{talentActions.actorId}}">Meteor Slam</button>
+    {{/if}}
+    {{#if talentActions.canThunderclap}}
+    <button type="button" class="singularity-talent-thunderclap" data-actor-id="{{talentActions.actorId}}">Thunderclap</button>
+    {{/if}}
+  </div>
+  {{/if}}
 </div>
 
 <style>

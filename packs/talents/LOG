@@ -3,3 +3,29 @@
 2026/02/14-11:26:01.589 294c Level-0 table #109: 8049 bytes OK
 2026/02/14-11:26:01.598 294c Delete type=0 #107
 2026/02/14-11:26:01.598 294c Delete type=3 #105
+2026/02/14-16:21:04.379 5b18 Compacting 3@0 + 0@1 files
+2026/02/14-16:21:04.391 5b18 Generated table #111@0: 25 keys, 12585 bytes
+2026/02/14-16:21:04.391 5b18 Compacted 3@0 + 0@1 files => 12585 bytes
+2026/02/14-16:21:04.396 5b18 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/02/14-16:21:04.397 5b18 Delete type=2 #103
+2026/02/14-16:21:04.398 5b18 Delete type=2 #106
+2026/02/14-16:21:04.400 5b18 Delete type=2 #109
+2026/02/14-18:11:40.513 5b18 Level-0 table #113: started
+2026/02/14-18:11:40.519 5b18 Level-0 table #113: 33555 bytes OK
+2026/02/14-18:11:40.522 5b18 Delete type=0 #110
+2026/02/14-18:11:40.543 5b18 Manual compaction at level-0 from '!items!0fQIGGi8AuEm7Oph' @ 72057594037927935 : 1 .. '!items!zuJ6IgnTaecijyVH' @ 0 : 0; will stop at '!items!zuJ6IgnTaecijyVH' @ 94 : 1
+2026/02/14-18:11:40.543 5b18 Compacting 1@0 + 1@1 files
+2026/02/14-18:11:40.549 5b18 Generated table #114@0: 90 keys, 43211 bytes
+2026/02/14-18:11:40.549 5b18 Compacted 1@0 + 1@1 files => 43211 bytes
+2026/02/14-18:11:40.551 5b18 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/02/14-18:11:40.551 5b18 Delete type=2 #111
+2026/02/14-18:11:40.551 5b18 Delete type=2 #113
+2026/02/14-18:11:40.552 5b18 Manual compaction at level-0 from '!items!zuJ6IgnTaecijyVH' @ 94 : 1 .. '!items!zuJ6IgnTaecijyVH' @ 0 : 0; will stop at (end)
+2026/02/14-18:11:40.552 5b18 Manual compaction at level-1 from '!items!0fQIGGi8AuEm7Oph' @ 72057594037927935 : 1 .. '!items!zuJ6IgnTaecijyVH' @ 0 : 0; will stop at '!items!zuJ6IgnTaecijyVH' @ 94 : 1
+2026/02/14-18:11:40.552 5b18 Compacting 1@1 + 1@2 files
+2026/02/14-18:11:40.561 5b18 Generated table #115@1: 88 keys, 43160 bytes
+2026/02/14-18:11:40.561 5b18 Compacted 1@1 + 1@2 files => 43160 bytes
+2026/02/14-18:11:40.562 5b18 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/02/14-18:11:40.563 5b18 Delete type=2 #5
+2026/02/14-18:11:40.563 5b18 Delete type=2 #114
+2026/02/14-18:11:40.576 5b18 Manual compaction at level-1 from '!items!zuJ6IgnTaecijyVH' @ 94 : 1 .. '!items!zuJ6IgnTaecijyVH' @ 0 : 0; will stop at (end)
