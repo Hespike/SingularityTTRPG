@@ -1375,6 +1375,21 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
     context.hasEnoughPrepTime = hasEnoughPrepTime;
+
+    // Check for "Ultimate Preparation" talent (doubles Enough Prep Time bonuses)
+    let hasUltimatePreparation = false;
+    if (hasEnoughPrepTime) {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+        if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("ultimate preparation")) {
+          hasUltimatePreparation = true;
+          break;
+        }
+      }
+    }
+    context.hasUltimatePreparation = hasUltimatePreparation;
     
     // Check for "Expanded Loadout" talent
     let hasExpandedLoadout = false;
@@ -1388,6 +1403,228 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
     context.hasExpandedLoadout = hasExpandedLoadout;
+
+    // Check for "Gadget Mastery" talent
+    let hasGadgetMastery = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("gadget mastery")) {
+        hasGadgetMastery = true;
+        break;
+      }
+    }
+    context.hasGadgetMastery = hasGadgetMastery;
+
+    // Check for "Superior Engineering" talent (upgrades Gadget Mastery bonus to +4)
+    let hasSuperiorEngineering = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("superior engineering")) {
+        hasSuperiorEngineering = true;
+        break;
+      }
+    }
+    context.hasSuperiorEngineering = hasSuperiorEngineering;
+
+    // Check for "Rapid Preparation" talent
+    let hasRapidPreparation = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("rapid preparation")) {
+        hasRapidPreparation = true;
+        break;
+      }
+    }
+    context.hasRapidPreparation = hasRapidPreparation;
+
+    // Check for "Reliable Gadgets" talent
+    let hasReliableGadgets = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("reliable gadgets")) {
+        hasReliableGadgets = true;
+        break;
+      }
+    }
+    context.hasReliableGadgets = hasReliableGadgets;
+
+    // Check for "Advanced Loadout" talent
+    let hasAdvancedLoadout = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("advanced loadout")) {
+        hasAdvancedLoadout = true;
+        break;
+      }
+    }
+    context.hasAdvancedLoadout = hasAdvancedLoadout;
+
+    // Check for "Gadget Efficiency" talent
+    let hasGadgetEfficiency = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("gadget efficiency")) {
+        hasGadgetEfficiency = true;
+        break;
+      }
+    }
+    context.hasGadgetEfficiency = hasGadgetEfficiency;
+    if (hasGadgetEfficiency) {
+      const _geWits = calculatedAbilityScores.wits || 0;
+      const gadgetEfficiencyMaxUses = Math.max(1, _geWits);
+      const gadgetEfficiencyUsesRaw = this.actor.system.combat?.gadgetEfficiency?.usesLeft;
+      const gadgetEfficiencyUsesLeft = gadgetEfficiencyUsesRaw != null ? gadgetEfficiencyUsesRaw : gadgetEfficiencyMaxUses;
+      context.gadgetEfficiencyMaxUses = gadgetEfficiencyMaxUses;
+      context.gadgetEfficiencyUsesLeft = gadgetEfficiencyUsesLeft;
+    }
+
+    // Check for "Gadget Overcharge" talent
+    let hasGadgetOvercharge = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("gadget overcharge")) {
+        hasGadgetOvercharge = true;
+        break;
+      }
+    }
+    context.hasGadgetOvercharge = hasGadgetOvercharge;
+
+    // Check for "Multiple Preparations" talent
+    let hasMultiplePreparations = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("multiple preparations")) {
+        hasMultiplePreparations = true;
+        break;
+      }
+    }
+    context.hasMultiplePreparations = hasMultiplePreparations;
+
+    // Check for "Gadget Synergy" talent (once per long rest double damage)
+    let hasGadgetSynergy = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("gadget synergy")) {
+        hasGadgetSynergy = true;
+        break;
+      }
+    }
+    context.hasGadgetSynergy = hasGadgetSynergy;
+    if (hasGadgetSynergy) {
+      context.gadgetSynergyUsed = this.actor.system.combat?.gadgetSynergy?.used === true;
+    }
+
+    // Check for "Sustained Tuning" talent (+1 Gadget Tuning DC per maintained gadget)
+    let hasSustainedTuning = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("sustained tuning")) {
+        hasSustainedTuning = true;
+        break;
+      }
+    }
+    context.hasSustainedTuning = hasSustainedTuning;
+    if (hasSustainedTuning) {
+      context.sustainedTuningCount = Number(this.actor.system.combat?.sustainedTuning?.maintainedCount ?? 0);
+    }
+
+    // Check for "Gadget Arsenal" talent (pool of extra gadget slots = floor(gadgeteerLevel / 2))
+    let hasGadgetArsenal = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("gadget arsenal")) {
+        hasGadgetArsenal = true;
+        break;
+      }
+    }
+    context.hasGadgetArsenal = hasGadgetArsenal;
+    if (hasGadgetArsenal) {
+      const _arsenalGadgeteerLevel = Number(primeLevel) || 1;
+      const arsenalPool = Math.floor(_arsenalGadgeteerLevel / 2);
+      const arsenalRaw = this.actor.system.gadgets?.arsenal || [];
+      const arsenalUsed = arsenalRaw.reduce((sum, g) => sum + (g ? (Number(g.gadgetLevel) || 1) : 0), 0);
+      const arsenalAvailable = Math.max(0, arsenalPool - arsenalUsed);
+      context.arsenalPool = arsenalPool;
+      context.arsenalUsed = arsenalUsed;
+      context.arsenalAvailable = arsenalAvailable;
+      context.arsenalGadgets = arsenalRaw.map((g, idx) => {
+        if (!g) return null;
+        const normalized = { ...g };
+        if (!normalized.img || normalized.img === "icons/svg/cog.svg") normalized.img = "icons/svg/item-bag.svg";
+        normalized.damage = normalized.damage || normalized.damageFormula || normalized.damageRoll || normalized.attackDamage;
+        normalized.healing = normalized.healing || normalized.healingFormula || normalized.heal || normalized.healFormula;
+        normalized.canHeal = Boolean(normalized.healing) || /trauma\s*stabilizer/i.test(normalized.name || "");
+        normalized.arsenalIndex = idx;
+        normalized.isDepleted = (normalized.used === true) && (Number(normalized.gadgetLevel) || 1) > 0;
+        return normalized;
+      }).filter(Boolean);
+      context.arsenalAddLevels = Array.from({ length: 10 }, (_, i) => ({
+        level: i + 1,
+        cost: i + 1,
+        canAfford: (i + 1) <= arsenalAvailable
+      }));
+    }
+
+    // Check for "Improvised Gadget" / "Improved Improvisation" / "Master Improvisation" talent chain
+    let hasImprovisedGadget = false;
+    let hasImprovedImprovisation = false;
+    let hasMasterImprovisation = false;
+    for (let lvl = 1; lvl <= 20; lvl++) {
+      const levelKey = `level${lvl}`;
+      const levelData = progression[levelKey] || {};
+      const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+      const lc = gadgeteerTalentName.toLowerCase();
+      if (lc.includes("improvised gadget")) hasImprovisedGadget = true;
+      if (lc.includes("improved improvisation")) { hasImprovisedGadget = true; hasImprovedImprovisation = true; }
+      if (lc.includes("master improvisation")) { hasImprovisedGadget = true; hasImprovedImprovisation = true; hasMasterImprovisation = true; }
+    }
+    context.hasImprovisedGadget = hasImprovisedGadget;
+    context.hasImprovedImprovisation = hasImprovedImprovisation;
+    context.hasMasterImprovisation = hasMasterImprovisation;
+    if (hasImprovisedGadget) {
+      const _impWits = calculatedAbilityScores.wits || 0;
+      const improvisedMaxUses = hasMasterImprovisation ? Math.max(1, _impWits) : 1;
+      const improvisedUsesRaw = this.actor.system.combat?.improvisedGadget?.usesLeft;
+      const improvisedUsesLeft = improvisedUsesRaw != null ? improvisedUsesRaw : improvisedMaxUses;
+      const improvisedMaxLevel = hasMasterImprovisation ? 3 : (hasImprovedImprovisation ? 1 : 0);
+      context.improvisedGadgetMaxUses = improvisedMaxUses;
+      context.improvisedGadgetUsesLeft = improvisedUsesLeft;
+      context.improvisedGadgetMaxLevel = improvisedMaxLevel;
+      const improvisedRaw = this.actor.system.gadgets?.improvised || [];
+      context.improvisedGadgets = improvisedRaw.map((g, idx) => {
+        if (!g) return null;
+        const n = { ...g };
+        if (!n.img || n.img === "icons/svg/cog.svg") n.img = "icons/svg/item-bag.svg";
+        n.damage = n.damage || n.damageFormula || n.damageRoll || n.attackDamage;
+        n.healing = n.healing || n.healingFormula || n.heal || n.healFormula;
+        n.canHeal = Boolean(n.healing) || /trauma\s*stabilizer/i.test(n.name || "");
+        n.improvisedIndex = idx;
+        n.isDepleted = n.used === true;
+        return n;
+      }).filter(Boolean);
+    }
     
     // Calculate Supersonic Moment damage bonus if active
     if (hasSupersonicMoment) {
@@ -1791,10 +2028,16 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       
       const slots = gadgetSlotTable[gadgeteerLevel] || { level0: 4, level1: 2 };
       
-      // Apply "Expanded Loadout" bonus (+2 Level 0 gadget slots)
+      // Apply "Expanded Loadout" bonus (+2 Level 0 gadget slots; +4 with Advanced Loadout)
       let level0Slots = slots.level0 || 0;
       if (hasExpandedLoadout) {
-        level0Slots += 2;
+        level0Slots += hasAdvancedLoadout ? 4 : 2;
+      }
+
+      // Apply "Advanced Loadout" bonus (+1 Level 1 gadget slot)
+      let level1Slots = slots.level1 || 0;
+      if (hasAdvancedLoadout) {
+        level1Slots += 1;
       }
       
       // Get prepared gadgets from actor data
@@ -1808,9 +2051,9 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
           available: Math.max(0, level0Slots - (preparedGadgetsData.level0 || []).length)
         },
         level1: {
-          total: slots.level1 || 0,
+          total: level1Slots,
           used: (preparedGadgetsData.level1 || []).length,
-          available: Math.max(0, (slots.level1 || 0) - (preparedGadgetsData.level1 || []).length)
+          available: Math.max(0, level1Slots - (preparedGadgetsData.level1 || []).length)
         },
         level2: {
           total: slots.level2 || 0,
@@ -1842,7 +2085,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
         return gadget;
       });
-      const paddedLevel1 = Array(slots.level1 || 0).fill(null).map((_, index) => {
+      const paddedLevel1 = Array(level1Slots || 0).fill(null).map((_, index) => {
         const gadget = (preparedGadgetsData.level1 || [])[index] || null;
         if (gadget) {
           if (!gadget.img || gadget.img === "icons/svg/cog.svg") {
@@ -1937,12 +2180,17 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       const skillModifier = rankModifiers[gadgetTuningRank] || 0;
       const gadgetTuningAttackBonus = skillModifier;
       let gadgetTuningDC = 10 + wits + skillModifier;
-      
+
+      // Add "Gadget Mastery" bonus (+2 permanent, +4 with Superior Engineering)
+      if (hasGadgetMastery) {
+        gadgetTuningDC += hasSuperiorEngineering ? 4 : 2;
+      }
+
       // Add "Enough Prep Time" bonus if active
       if (hasEnoughPrepTime) {
         const enoughPrepTimeData = actorData.system.combat?.enoughPrepTime || { active: false };
         if (enoughPrepTimeData.active) {
-          const enoughPrepTimeBonus = gadgeteerLevel; // +1 per Gadgeteer level
+          const enoughPrepTimeBonus = gadgeteerLevel * (hasUltimatePreparation ? 2 : 1); // +1 per level, doubled by Ultimate Preparation
           gadgetTuningDC += enoughPrepTimeBonus;
           context.enoughPrepTimeDCBonus = enoughPrepTimeBonus;
         } else {
@@ -1950,6 +2198,15 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       } else {
         context.enoughPrepTimeDCBonus = 0;
+      }
+
+      // Add "Sustained Tuning" bonus (+1 per maintained gadget)
+      if (hasSustainedTuning) {
+        const maintainedCount = Number(actorData.system.combat?.sustainedTuning?.maintainedCount ?? 0);
+        gadgetTuningDC += maintainedCount;
+        context.sustainedTuningDCBonus = maintainedCount;
+      } else {
+        context.sustainedTuningDCBonus = 0;
       }
       
       context.gadgetTuningDC = gadgetTuningDC;
@@ -1961,7 +2218,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const enoughPrepTimeData = actorData.system.combat?.enoughPrepTime || { active: false };
         context.enoughPrepTimeActive = enoughPrepTimeData.active;
         if (enoughPrepTimeData.active) {
-          context.enoughPrepTimeAttackBonus = gadgeteerLevel; // +1 per Gadgeteer level
+          context.enoughPrepTimeAttackBonus = gadgeteerLevel * (hasUltimatePreparation ? 2 : 1); // +1 per level, doubled by Ultimate Preparation
         } else {
           context.enoughPrepTimeAttackBonus = 0;
         }
@@ -3130,6 +3387,21 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     html.find(".gadget-use").click(this._onUseGadget.bind(this));
     html.on("click", ".gadget-remove", this._onRemoveGadget.bind(this));
     html.on("click", ".gadget-item-clickable", this._onGadgetItemClick.bind(this));
+
+    // Gadget Efficiency use button
+    html.find(".gadget-efficiency-use").click(this._onGadgetEfficiencyUse.bind(this));
+
+    // Sustained Tuning maintained gadget counter
+    html.find(".sustained-tuning-increment").click(this._onSustainedTuningIncrement.bind(this));
+    html.find(".sustained-tuning-decrement").click(this._onSustainedTuningDecrement.bind(this));
+
+    // Gadget Arsenal: add and remove handlers
+    html.on("click", ".add-arsenal-gadget", this._onAddArsenalGadget.bind(this));
+    html.on("click", ".arsenal-gadget-remove", this._onRemoveArsenalGadget.bind(this));
+
+    // Improvised Gadget: use button and remove handler
+    html.on("click", ".use-improvised-gadget", this._onUseImprovisedGadget.bind(this));
+    html.on("click", ".improvised-gadget-remove", this._onRemoveImprovisedGadget.bind(this));
 
     // Long Rest button
     html.find(".long-rest-button").click(this._onLongRest.bind(this));
@@ -8303,6 +8575,25 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             
             const roll = new Roll(rollFormula);
             await roll.evaluate();
+
+            // Reliable Gadgets: treat natural 1 as 2 on Gadget Tuning (attack) checks
+            const _rlDie = roll.dice[0]?.results?.[0]?.result;
+            let effectiveTotal = roll.total;
+            let reliableGadgetsNote = "";
+            if (isGadgetAttack) {
+              const _rlProg = this.actor.system.progression || {};
+              let _hasReliableGadgets = false;
+              for (let _lvl = 1; _lvl <= 20; _lvl++) {
+                if ((_rlProg[`level${_lvl}`]?.gadgeteerTalentName || "").toLowerCase().includes("reliable gadgets")) {
+                  _hasReliableGadgets = true;
+                  break;
+                }
+              }
+              if (_hasReliableGadgets && _rlDie === 1) {
+                effectiveTotal += 1;
+                reliableGadgetsNote = ` <em>(Reliable Gadgets: 1&#x2192;2)</em>`;
+              }
+            }
             
             const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
             const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
@@ -8337,7 +8628,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 const aerialBonus = getAerialEvasionBonus(targetActor) + getAerialManeuverabilityBonus(targetActor);
                 effectiveTargetAC = targetAC + aerialBonus;
                 const acLabel = aerialBonus ? `${effectiveTargetAC} (+${aerialBonus} Aerial)` : `${effectiveTargetAC}`;
-                const difference = roll.total - effectiveTargetAC;
+                const difference = effectiveTotal - effectiveTargetAC;
                 if (difference >= 10) {
                   acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${acLabel})</span>`;
                 } else if (difference >= 0) {
@@ -8350,7 +8641,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
               }
             }
             const acLine = acComparison ? `<br>${acComparison}` : "";
-            const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText}${restrictedText})${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}</div>`;
+            const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText}${restrictedText})${advantageText}${repeatedText}${extraText} = <strong>${effectiveTotal}</strong>${reliableGadgetsNote}${acLine}</div>`;
             
             const message = await roll.toMessage({
               speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -8359,13 +8650,13 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
             
             // Store attack roll result for AC comparison when rolling damage
             await message.setFlag("singularity", "attackRoll", {
-              total: roll.total,
+              total: effectiveTotal,
               attackId: isGadgetAttack ? gadgetId : attackId,
               attackName: attack.name
             });
             // If this was a success or extreme success vs a target, open the Roll Damage dialog automatically
             if (effectiveTargetAC !== null) {
-              const difference = roll.total - effectiveTargetAC;
+              const difference = effectiveTotal - effectiveTargetAC;
               if (difference >= 0) {
                 try {
                   await this._onRollDamage({ preventDefault: () => {}, currentTarget: { dataset: { attackId: attackId, gadgetId: gadgetId } } });
@@ -8415,6 +8706,25 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 
                 const roll = new Roll(rollFormula);
                 await roll.evaluate();
+
+                // Reliable Gadgets: treat natural 1 as 2 on Gadget Tuning (attack) checks
+                const _rlDie = roll.dice[0]?.results?.[0]?.result;
+                let effectiveTotal = roll.total;
+                let reliableGadgetsNote = "";
+                if (isGadgetAttack) {
+                  const _rlProg = this.actor.system.progression || {};
+                  let _hasReliableGadgets = false;
+                  for (let _lvl = 1; _lvl <= 20; _lvl++) {
+                    if ((_rlProg[`level${_lvl}`]?.gadgeteerTalentName || "").toLowerCase().includes("reliable gadgets")) {
+                      _hasReliableGadgets = true;
+                      break;
+                    }
+                  }
+                  if (_hasReliableGadgets && _rlDie === 1) {
+                    effectiveTotal += 1;
+                    reliableGadgetsNote = ` <em>(Reliable Gadgets: 1&#x2192;2)</em>`;
+                  }
+                }
                 
                 const repeatedText = repeatedPenalty ? ` ${repeatedPenalty} (Repeated)` : "";
                 const extraText = extra !== "0" ? ` + ${extra} (Extra)` : "";
@@ -8447,7 +8757,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                     const aerialBonus = getAerialEvasionBonus(targetActor) + getAerialManeuverabilityBonus(targetActor);
                     effectiveTargetAC = targetAC + aerialBonus;
                     const acLabel = aerialBonus ? `${effectiveTargetAC} (+${aerialBonus} Aerial)` : `${effectiveTargetAC}`;
-                    const difference = roll.total - effectiveTargetAC;
+                    const difference = effectiveTotal - effectiveTargetAC;
                     if (difference >= 10) {
                       acComparison = `<span style="color: #2b9a5b; font-weight: bold;">Extreme Success vs ${targetName}! (+${difference} over AC ${acLabel})</span>`;
                     } else if (difference >= 0) {
@@ -8460,7 +8770,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                   }
                 }
                 const acLine = acComparison ? `<br>${acComparison}` : "";
-                const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText})${advantageText}${repeatedText}${extraText} = <strong>${roll.total}</strong>${acLine}</div>`;
+                const flavor = `<div class="roll-flavor"><b>${attack.name} - Attack Roll</b><br>${dieFormula} + ${bonus} (Attack Bonus${deadeyeInfo}${scaredText}${proneText}${fatiguedText}${blindedText})${advantageText}${repeatedText}${extraText} = <strong>${effectiveTotal}</strong>${reliableGadgetsNote}${acLine}</div>`;
                 
                 const message = await roll.toMessage({
                   speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -8469,7 +8779,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
                 
                 // Store attack roll result for AC comparison when rolling damage
                 await message.setFlag("singularity", "attackRoll", {
-                  total: roll.total,
+                  total: effectiveTotal,
                   attackId: isGadgetAttack ? gadgetId : attackId,
                   gadgetId: isGadgetAttack ? gadgetId : null,
                   attackName: attack.name
@@ -9241,12 +9551,47 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
   async _onUseGadget(event) {
     event.preventDefault();
     event.stopPropagation();
-    const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
-    const gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
-    
-    const gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] });
-    const levelKey = `level${gadgetLevel}`;
-    
+
+    // Support Gadget Arsenal gadgets (button carries data-arsenal-index instead of data-gadget-level/index)
+    const _arsenalIdxRaw = event.currentTarget.dataset.arsenalIndex;
+    const _isArsenal = _arsenalIdxRaw !== undefined && _arsenalIdxRaw !== "";
+    const _arsenalIndex = _isArsenal ? parseInt(_arsenalIdxRaw) : null;
+    let _arsenalList = null;
+
+    // Support Improvised Gadget entries (data-improvised-index)
+    const _improvisedIdxRaw = event.currentTarget.dataset.improvisedIndex;
+    const _isImprovised = !_isArsenal && _improvisedIdxRaw !== undefined && _improvisedIdxRaw !== "";
+    const _improvisedIndex = _isImprovised ? parseInt(_improvisedIdxRaw) : null;
+    let _improvisedList = null;
+
+    let gadgetLevel, gadgetIndex, gadgets, levelKey;
+    if (_isImprovised) {
+      _improvisedList = foundry.utils.deepClone(this.actor.system.gadgets?.improvised || []);
+      const _ie = _improvisedList[_improvisedIndex];
+      if (!_ie) return;
+      gadgetLevel = Number(_ie.gadgetLevel) || 0;
+      gadgetIndex = _improvisedIndex;
+      const _pseudoSlot = [];
+      _pseudoSlot[_improvisedIndex] = _ie;
+      gadgets = { [`level${gadgetLevel}`]: _pseudoSlot };
+      levelKey = `level${gadgetLevel}`;
+    } else if (_isArsenal) {
+      _arsenalList = foundry.utils.deepClone(this.actor.system.gadgets?.arsenal || []);
+      const _ae = _arsenalList[_arsenalIndex];
+      if (!_ae) return;
+      gadgetLevel = Number(_ae.gadgetLevel) || 1;
+      gadgetIndex = _arsenalIndex;
+      const _pseudoSlot = [];
+      _pseudoSlot[_arsenalIndex] = _ae;
+      gadgets = { [`level${gadgetLevel}`]: _pseudoSlot };
+      levelKey = `level${gadgetLevel}`;
+    } else {
+      gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
+      gadgetIndex = parseInt(event.currentTarget.dataset.gadgetIndex);
+      gadgets = foundry.utils.deepClone(this.actor.system.gadgets?.prepared || { level0: [], level1: [], level2: [], level3: [] });
+      levelKey = `level${gadgetLevel}`;
+    }
+
     if (gadgets[levelKey] && gadgets[levelKey][gadgetIndex]) {
       // Level 0 gadgets can be used unlimited times, Level 1+ can only be used once
       const gadgetEntry = gadgets[levelKey][gadgetIndex];
@@ -9257,6 +9602,153 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         try {
           const gadgetDoc = await fromUuid(gadgetId);
           if (gadgetDoc) {
+            // Check for Gadget Overcharge: level 0 gadgets with damage
+            if (gadgetLevel === 0) {
+              const damageFormula = this._getGadgetDamageFormula(gadgetDoc) ||
+                gadgetEntry.damage || gadgetEntry.damageFormula || "";
+              if (damageFormula) {
+                const _oProg = this.actor.system.progression || {};
+                let _hasOvercharge = false;
+                for (let _lvl = 1; _lvl <= 20; _lvl++) {
+                  if ((_oProg[`level${_lvl}`]?.gadgeteerTalentName || "").toLowerCase().includes("gadget overcharge")) {
+                    _hasOvercharge = true;
+                    break;
+                  }
+                }
+                if (_hasOvercharge) {
+                  const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+                  let doOvercharge = false;
+                  if (DialogClass?.name === "DialogV2") {
+                    const result = await DialogClass.wait({
+                      title: `Overcharge: ${gadgetName}?`,
+                      content: `<p>Do you want to <strong>overcharge</strong> <em>${gadgetName}</em>?</p><ul><li><strong>Normal:</strong> Use as usual (unlimited uses).</li><li><strong>Overcharge:</strong> Deal <strong>double damage</strong>, but this gadget is burned out until your next long rest.</li></ul>`,
+                      buttons: [
+                        { action: "overcharge", icon: '<i class="fas fa-bolt"></i>', label: "Overcharge (double damage, burns out)" },
+                        { action: "normal", icon: '<i class="fas fa-check"></i>', label: "Normal Use" }
+                      ],
+                      default: "normal"
+                    });
+                    doOvercharge = result === "overcharge";
+                  } else {
+                    doOvercharge = await Dialog.confirm({
+                      title: `Overcharge: ${gadgetName}?`,
+                      content: `<p>Overcharge <strong>${gadgetName}</strong> for double damage? It will be burned out until your next long rest.</p>`,
+                      defaultYes: false
+                    });
+                  }
+                  if (doOvercharge) {
+                    // Post the item card
+                    const gadgetActions = this._getGadgetChatActions(gadgetDoc);
+                    if (gadgetActions?.canSave) {
+                      gadgetActions.showSaveButton = (game.user?.targets?.size || 0) > 0;
+                    }
+                    const cardContent = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
+                      item: gadgetDoc,
+                      actor: this.actor,
+                      gadgetActions: gadgetActions,
+                      talentActions: this._getTalentChatActions(gadgetDoc),
+                      hideImage: true
+                    });
+                    await ChatMessage.create({
+                      content: cardContent,
+                      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                      style: CONST.CHAT_MESSAGE_STYLES.OTHER
+                    });
+                    // Roll double damage
+                    const doubledFormula = `(${damageFormula}) + (${damageFormula})`;
+                    const damageRoll = new Roll(doubledFormula);
+                    await damageRoll.evaluate();
+                    const damageType = this._getGadgetDamageTypeFromDescription(
+                      gadgetDoc.system?.description || gadgetDoc.system?.details?.description || ""
+                    ) || "";
+                    const typeLabel = damageType ? ` ${damageType}` : "";
+                    const overchargeContent = `<div class="roll-flavor"><b>${gadgetName} — Overcharge!</b><br>Formula: ${doubledFormula}<br>Damage: <strong>${damageRoll.total}</strong>${typeLabel} damage <em>(double — Gadget Overcharge)</em></div>`;
+                    await damageRoll.toMessage({
+                      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                      flavor: overchargeContent
+                    });
+                    // Mark gadget burned out until long rest
+                    await this._markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName, true, _arsenalList, _improvisedList);
+                    return;
+                  }
+                  // Else fall through to normal use
+                }
+              }
+            }
+
+            // Check for Gadget Synergy: any level gadget with damage, once per long rest
+            const _synergyFormula = this._getGadgetDamageFormula(gadgetDoc) ||
+              gadgetEntry.damage || gadgetEntry.damageFormula || "";
+            if (_synergyFormula) {
+              const _synProg = this.actor.system.progression || {};
+              let _hasSynergy = false;
+              for (let _lvl = 1; _lvl <= 20; _lvl++) {
+                if ((_synProg[`level${_lvl}`]?.gadgeteerTalentName || "").toLowerCase().includes("gadget synergy")) {
+                  _hasSynergy = true;
+                  break;
+                }
+              }
+              const _synergyAlreadyUsed = this.actor.system.combat?.gadgetSynergy?.used === true;
+              if (_hasSynergy && !_synergyAlreadyUsed) {
+                const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+                let doSynergy = false;
+                if (DialogClass?.name === "DialogV2") {
+                  const result = await DialogClass.wait({
+                    title: `Gadget Synergy: ${gadgetName}?`,
+                    content: `<p><strong>Gadget Synergy</strong> is available (1 use remaining).</p><p>Are you maintaining at least one other gadget targeting the same creature or area? If so, you may apply Gadget Synergy to deal <strong>double damage</strong>.</p>`,
+                    buttons: [
+                      { action: "synergy", icon: '<i class="fas fa-link"></i>', label: "Apply Synergy (double damage)" },
+                      { action: "normal", icon: '<i class="fas fa-check"></i>', label: "Normal Use" }
+                    ],
+                    default: "normal"
+                  });
+                  doSynergy = result === "synergy";
+                } else {
+                  doSynergy = await Dialog.confirm({
+                    title: `Gadget Synergy: ${gadgetName}?`,
+                    content: `<p>Apply <strong>Gadget Synergy</strong> for double damage? (Requires maintaining another gadget on the same target. Once per long rest.)</p>`,
+                    defaultYes: false
+                  });
+                }
+                if (doSynergy) {
+                  // Post item card
+                  const synGadgetActions = this._getGadgetChatActions(gadgetDoc);
+                  if (synGadgetActions?.canSave) {
+                    synGadgetActions.showSaveButton = (game.user?.targets?.size || 0) > 0;
+                  }
+                  const synCardContent = await foundry.applications.handlebars.renderTemplate("systems/singularity/templates/chat/item-card.html", {
+                    item: gadgetDoc,
+                    actor: this.actor,
+                    gadgetActions: synGadgetActions,
+                    talentActions: this._getTalentChatActions(gadgetDoc),
+                    hideImage: true
+                  });
+                  await ChatMessage.create({
+                    content: synCardContent,
+                    speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                    style: CONST.CHAT_MESSAGE_STYLES.OTHER
+                  });
+                  // Roll double damage
+                  const synDoubledFormula = `(${_synergyFormula}) + (${_synergyFormula})`;
+                  const synRoll = new Roll(synDoubledFormula);
+                  await synRoll.evaluate();
+                  const synDmgType = this._getGadgetDamageTypeFromDescription(
+                    gadgetDoc.system?.description || gadgetDoc.system?.details?.description || ""
+                  ) || "";
+                  const synTypeLabel = synDmgType ? ` ${synDmgType}` : "";
+                  const synContent = `<div class="roll-flavor"><b>${gadgetName} — Gadget Synergy!</b><br>Formula: ${synDoubledFormula}<br>Damage: <strong>${synRoll.total}</strong>${synTypeLabel} damage <em>(double — Gadget Synergy)</em></div>`;
+                  await synRoll.toMessage({
+                    speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+                    flavor: synContent
+                  });
+                  // Mark synergy used for this long rest
+                  await this.actor.update({ "system.combat.gadgetSynergy.used": true });
+                  await this._markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName, false, _arsenalList, _improvisedList);
+                  return;
+                }
+              }
+            }
+
             const gadgetActions = this._getGadgetChatActions(gadgetDoc);
             if (gadgetActions?.canSave) {
               gadgetActions.showSaveButton = (game.user?.targets?.size || 0) > 0;
@@ -9279,7 +9771,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         }
       }
 
-      await this._markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName);
+      await this._markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName, false, _arsenalList, _improvisedList);
     }
   }
 
@@ -9395,16 +9887,28 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
   }
 
-  async _markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName) {
-    if (gadgetLevel === 0) {
+  async _markGadgetUsed(gadgets, levelKey, gadgetIndex, gadgetLevel, gadgetName, forceUsed = false, arsenalList = null, improvisedList = null) {
+    if (gadgetLevel === 0 && !forceUsed && !improvisedList) {
       ui.notifications.info(`${gadgetName} used! (Level 0 gadgets can be used unlimited times)`);
       return;
     }
 
-    gadgets[levelKey][gadgetIndex].used = true;
-    await this.actor.update({ "system.gadgets.prepared": gadgets });
+    if (improvisedList) {
+      improvisedList[gadgetIndex].used = true;
+      await this.actor.update({ "system.gadgets.improvised": improvisedList });
+    } else if (arsenalList) {
+      arsenalList[gadgetIndex].used = true;
+      await this.actor.update({ "system.gadgets.arsenal": arsenalList });
+    } else {
+      gadgets[levelKey][gadgetIndex].used = true;
+      await this.actor.update({ "system.gadgets.prepared": gadgets });
+    }
     this.render();
-    ui.notifications.info(`${gadgetName} used!`);
+    if (gadgetLevel === 0 && forceUsed) {
+      ui.notifications.info(`${gadgetName} overcharged and burned out! It will refresh on your next long rest.`);
+    } else {
+      ui.notifications.info(`${gadgetName} used!`);
+    }
   }
 
   async _rollGadgetHealing(gadgetEntry, gadgetDoc) {
@@ -10069,6 +10573,16 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     }
     updateData["system.gadgets.prepared"] = gadgets;
 
+    // Also refresh Gadget Arsenal used flags
+    const arsenalData = foundry.utils.deepClone(this.actor.system.gadgets?.arsenal || []);
+    if (arsenalData.length > 0) {
+      updateData["system.gadgets.arsenal"] = arsenalData.map(g => g ? { ...g, used: false } : g);
+    }
+
+    // Clear improvised gadgets and reset uses on long rest
+    updateData["system.gadgets.improvised"] = [];
+    updateData["system.combat.improvisedGadget"] = { usesLeft: null };
+
     const regenerativeData = foundry.utils.deepClone(this.actor.system.combat?.regenerativeFortitude || { used: false });
     regenerativeData.used = false;
     updateData["system.combat.regenerativeFortitude"] = regenerativeData;
@@ -10082,11 +10596,297 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     updateData["system.combat.deadlyFocus"] = { used: 0 };
     updateData["system.combat.impossibleShot"] = { used: false };
     updateData["system.combat.perfectShot"] = { used: false };
+    updateData["system.combat.gadgetEfficiency"] = { usesLeft: null };
+    updateData["system.combat.gadgetSynergy"] = { used: false };
+    updateData["system.combat.sustainedTuning"] = { maintainedCount: 0 };
     
     await this.actor.update(updateData);
     this.render();
     
     ui.notifications.info("Long Rest completed! HP restored, wounds removed (except extreme wounds), and gadgets refreshed.");
+  }
+
+  async _onSustainedTuningIncrement(event) {
+    event.preventDefault();
+    const current = Number(this.actor.system.combat?.sustainedTuning?.maintainedCount ?? 0);
+    await this.actor.update({ "system.combat.sustainedTuning.maintainedCount": current + 1 });
+  }
+
+  async _onSustainedTuningDecrement(event) {
+    event.preventDefault();
+    const current = Number(this.actor.system.combat?.sustainedTuning?.maintainedCount ?? 0);
+    await this.actor.update({ "system.combat.sustainedTuning.maintainedCount": Math.max(0, current - 1) });
+  }
+
+  async _onAddArsenalGadget(event) {
+    event.preventDefault();
+    const gadgetLevel = parseInt(event.currentTarget.dataset.gadgetLevel);
+    if (!gadgetLevel || gadgetLevel < 1) return;
+
+    // Check pool capacity
+    const primeLevel = Number(this.actor.system.basic?.primeLevel || 1);
+    const arsenalPool = Math.floor(primeLevel / 2);
+    const arsenalRaw = this.actor.system.gadgets?.arsenal || [];
+    const arsenalUsed = arsenalRaw.reduce((sum, g) => sum + (g ? (Number(g.gadgetLevel) || 1) : 0), 0);
+    const arsenalAvailable = arsenalPool - arsenalUsed;
+    if (gadgetLevel > arsenalAvailable) {
+      ui.notifications.warn(`Not enough Arsenal slot value. Need ${gadgetLevel}, have ${arsenalAvailable}.`);
+      return;
+    }
+
+    const gadgetsPack = game.packs.find(p => p.metadata.name === "gadgets" && p.metadata.packageName === "singularity");
+    if (!gadgetsPack) { ui.notifications.warn("Gadgets compendium not found."); return; }
+    await gadgetsPack.getIndex();
+
+    const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const dialogOptions = DialogClass?.name === "DialogV2"
+      ? { title: `Arsenal: Add Level ${gadgetLevel} Gadget`, content: `<div class="gadget-selection-dialog"><p>Loading Level ${gadgetLevel} gadgets...</p></div>`, buttons: [{ action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: () => dialog?.close?.() }], default: "cancel" }
+      : { title: `Arsenal: Add Level ${gadgetLevel} Gadget`, content: `<div class="gadget-selection-dialog"><p>Loading Level ${gadgetLevel} gadgets...</p></div>`, buttons: { cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: () => dialog?.close?.() } }, default: "cancel" };
+    dialog = new DialogClass(dialogOptions);
+    dialog.render(true);
+
+    const getRoot = () => { const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element; return el instanceof HTMLElement ? el : null; };
+    setTimeout(() => {
+      const root = getRoot();
+      const win = root ? root.closest(".window-app") : null;
+      if (win) { win.style.width = "650px"; win.style.minWidth = "650px"; win.style.height = "700px"; win.style.minHeight = "700px"; }
+    }, 100);
+
+    const gadgetItems = [];
+    for (const gadgetIndex of gadgetsPack.index) {
+      try {
+        const gadgetDoc = await gadgetsPack.getDocument(gadgetIndex._id);
+        if (gadgetDoc && gadgetDoc.system?.basic?.level === gadgetLevel) {
+          const gadgetUuid = `Compendium.${gadgetsPack.metadata.packageName || "singularity"}.${gadgetsPack.metadata.name || "gadgets"}.${gadgetIndex._id}`;
+          gadgetItems.push({ id: gadgetUuid, name: gadgetDoc.name });
+        }
+      } catch (err) { console.error(`Error loading gadget ${gadgetIndex.name}:`, err); }
+    }
+
+    if (gadgetItems.length === 0) {
+      const root = getRoot();
+      const sel = root?.querySelector(".gadget-selection-dialog");
+      if (sel) sel.innerHTML = `<p>No Level ${gadgetLevel} gadgets found in the compendium.</p>`;
+      return;
+    }
+
+    gadgetItems.sort((a, b) => a.name.localeCompare(b.name));
+    const updatedContent = `<div class="gadget-selection-dialog" style="height:100%;display:flex;flex-direction:column;"><p style="margin-bottom:15px;font-weight:bold;flex-shrink:0;">Select a Level ${gadgetLevel} gadget for your Arsenal:</p><div class="gadget-list" style="flex:1;overflow-y:auto;min-height:550px;max-height:550px;">${gadgetItems.map(g => `<div class="gadget-item-selectable" data-gadget-id="${g.id}" data-gadget-name="${g.name}" style="padding:12px;margin:8px 0;border:1px solid rgba(189,95,255,0.3);border-radius:3px;cursor:pointer;background:rgba(30,33,45,0.5);"><strong>${g.name}</strong></div>`).join("")}</div></div>`;
+    { const root = getRoot(); const sel = root?.querySelector(".gadget-selection-dialog"); if (sel) sel.outerHTML = updatedContent; }
+    setTimeout(() => {
+      const root = getRoot();
+      const win = root ? root.closest(".window-app") : null;
+      if (win) { win.style.width = "650px"; win.style.minWidth = "650px"; win.style.height = "700px"; win.style.minHeight = "700px"; }
+    }, 50);
+
+    const rootAfter = getRoot();
+    const selectables = rootAfter?.querySelectorAll(".gadget-item-selectable") || [];
+    selectables.forEach(element => {
+      element.addEventListener("click", async (clickEvent) => {
+        const tgt = clickEvent.currentTarget;
+        const gadgetId = tgt?.dataset?.gadgetId;
+        const gadgetName = tgt?.dataset?.gadgetName;
+        if (!gadgetId || !gadgetName) return;
+
+        let gadgetImg = "icons/svg/item-bag.svg";
+        let gadgetBasic = {};
+        try {
+          const gadgetDoc = await fromUuid(gadgetId);
+          if (gadgetDoc?.img) gadgetImg = gadgetDoc.img;
+          gadgetBasic = gadgetDoc?.system?.basic || {};
+        } catch (err) { console.warn(`Could not load gadget data for ${gadgetName}:`, err); }
+
+        const damageFormula = this._getGadgetDamageFormulaFromBasic(gadgetBasic);
+        const healingFormula = this._getGadgetHealingFormulaFromBasic(gadgetBasic);
+        const arsenal = foundry.utils.deepClone(this.actor.system.gadgets?.arsenal || []);
+        arsenal.push({
+          id: gadgetId, name: gadgetName, img: gadgetImg, used: false,
+          gadgetLevel: gadgetLevel,
+          damage: damageFormula, damageType: gadgetBasic.damageType,
+          range: gadgetBasic.range, energyCost: gadgetBasic.energyCost,
+          attackBonus: gadgetBasic.attackBonus, healing: healingFormula
+        });
+        this._preferredTab = "gadgets";
+        await this.actor.update({ "system.gadgets.arsenal": arsenal });
+        this.render();
+        dialog?.close?.();
+      });
+    });
+  }
+
+  async _onRemoveArsenalGadget(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const arsenalIndex = parseInt($(event.currentTarget).data("arsenal-index"));
+    if (isNaN(arsenalIndex)) return;
+    const arsenal = foundry.utils.deepClone(this.actor.system.gadgets?.arsenal || []);
+    if (arsenalIndex >= 0 && arsenalIndex < arsenal.length) {
+      arsenal.splice(arsenalIndex, 1);
+      await this.actor.update({ "system.gadgets.arsenal": arsenal });
+      this.render();
+    }
+  }
+
+  async _onUseImprovisedGadget(event) {
+    event.preventDefault();
+    const maxUses = parseInt(event.currentTarget.dataset.maxUses) || 1;
+    const hasMaster = event.currentTarget.dataset.hasMaster === "true";
+    const hasImproved = event.currentTarget.dataset.hasImproved === "true";
+    const usesRaw = this.actor.system.combat?.improvisedGadget?.usesLeft;
+    const usesLeft = usesRaw != null ? usesRaw : maxUses;
+
+    if (usesLeft <= 0) {
+      ui.notifications.warn("No Improvised Gadget uses remaining until your next long rest.");
+      return;
+    }
+
+    const maxLevel = hasMaster ? 3 : (hasImproved ? 1 : 0);
+    let gadgetLevel = maxLevel;
+
+    // Master Improvisation: choose gadget level (0–3)
+    if (hasMaster) {
+      const DialogClass = foundry.applications?.api?.DialogV2 || Dialog;
+      if (DialogClass?.name === "DialogV2") {
+        const result = await DialogClass.wait({
+          title: "Master Improvisation — Choose Gadget Level",
+          content: `<p>Choose the level of gadget to create (up to Level ${maxLevel}):</p>`,
+          buttons: [
+            { action: "0", icon: '<i class="fas fa-circle"></i>', label: "Level 0" },
+            { action: "1", icon: '<i class="fas fa-circle"></i>', label: "Level 1" },
+            { action: "2", icon: '<i class="fas fa-circle"></i>', label: "Level 2" },
+            { action: "3", icon: '<i class="fas fa-circle"></i>', label: "Level 3" }
+          ],
+          default: "1"
+        });
+        if (result === null || result === undefined) return;
+        gadgetLevel = parseInt(result);
+      } else {
+        gadgetLevel = await new Promise(resolve => {
+          new Dialog({
+            title: "Master Improvisation — Choose Gadget Level",
+            content: "<p>Choose the level of gadget to create:</p>",
+            buttons: {
+              l0: { label: "Level 0", callback: () => resolve(0) },
+              l1: { label: "Level 1", callback: () => resolve(1) },
+              l2: { label: "Level 2", callback: () => resolve(2) },
+              l3: { label: "Level 3", callback: () => resolve(3) },
+              cancel: { label: "Cancel", callback: () => resolve(null) }
+            },
+            default: "l1"
+          }).render(true);
+        });
+        if (gadgetLevel === null || gadgetLevel === undefined) return;
+      }
+    }
+
+    if (isNaN(gadgetLevel)) return;
+
+    // Open compendium gadget selection
+    const gadgetsPack = game.packs.find(p => p.metadata.name === "gadgets" && p.metadata.packageName === "singularity");
+    if (!gadgetsPack) { ui.notifications.warn("Gadgets compendium not found."); return; }
+    await gadgetsPack.getIndex();
+
+    const DialogClass2 = foundry.applications?.api?.DialogV2 || Dialog;
+    let dialog;
+    const dialogOptions = DialogClass2?.name === "DialogV2"
+      ? { title: `Improvised Gadget: Select Level ${gadgetLevel} Gadget`, content: `<div class="gadget-selection-dialog"><p>Loading Level ${gadgetLevel} gadgets...</p></div>`, buttons: [{ action: "cancel", icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: () => dialog?.close?.() }], default: "cancel" }
+      : { title: `Improvised Gadget: Select Level ${gadgetLevel} Gadget`, content: `<div class="gadget-selection-dialog"><p>Loading Level ${gadgetLevel} gadgets...</p></div>`, buttons: { cancel: { icon: '<i class="fas fa-times"></i>', label: "Cancel", callback: () => dialog?.close?.() } }, default: "cancel" };
+    dialog = new DialogClass2(dialogOptions);
+    dialog.render(true);
+
+    const getRoot = () => { const el = dialog?.element instanceof jQuery ? dialog.element[0] : dialog?.element; return el instanceof HTMLElement ? el : null; };
+    setTimeout(() => { const root = getRoot(); const win = root ? root.closest(".window-app") : null; if (win) { win.style.width = "650px"; win.style.minWidth = "650px"; win.style.height = "700px"; win.style.minHeight = "700px"; } }, 100);
+
+    const gadgetItems = [];
+    for (const gadgetIndex of gadgetsPack.index) {
+      try {
+        const gadgetDoc = await gadgetsPack.getDocument(gadgetIndex._id);
+        if (gadgetDoc && gadgetDoc.system?.basic?.level === gadgetLevel) {
+          const gadgetUuid = `Compendium.${gadgetsPack.metadata.packageName || "singularity"}.${gadgetsPack.metadata.name || "gadgets"}.${gadgetIndex._id}`;
+          gadgetItems.push({ id: gadgetUuid, name: gadgetDoc.name });
+        }
+      } catch (err) { console.error(`Error loading gadget ${gadgetIndex.name}:`, err); }
+    }
+
+    if (gadgetItems.length === 0) {
+      const root = getRoot();
+      const sel = root?.querySelector(".gadget-selection-dialog");
+      if (sel) sel.innerHTML = `<p>No Level ${gadgetLevel} gadgets found in the compendium.</p>`;
+      return;
+    }
+
+    gadgetItems.sort((a, b) => a.name.localeCompare(b.name));
+    const updatedContent = `<div class="gadget-selection-dialog" style="height:100%;display:flex;flex-direction:column;"><p style="margin-bottom:15px;font-weight:bold;flex-shrink:0;">Select a Level ${gadgetLevel} gadget to create:</p><div class="gadget-list" style="flex:1;overflow-y:auto;min-height:550px;max-height:550px;">${gadgetItems.map(g => `<div class="gadget-item-selectable" data-gadget-id="${g.id}" data-gadget-name="${g.name}" style="padding:12px;margin:8px 0;border:1px solid rgba(189,95,255,0.3);border-radius:3px;cursor:pointer;background:rgba(30,33,45,0.5);"><strong>${g.name}</strong></div>`).join("")}</div></div>`;
+    { const root = getRoot(); const sel = root?.querySelector(".gadget-selection-dialog"); if (sel) sel.outerHTML = updatedContent; }
+    setTimeout(() => { const root = getRoot(); const win = root ? root.closest(".window-app") : null; if (win) { win.style.width = "650px"; win.style.minWidth = "650px"; win.style.height = "700px"; win.style.minHeight = "700px"; } }, 50);
+
+    const rootAfter = getRoot();
+    const selectables = rootAfter?.querySelectorAll(".gadget-item-selectable") || [];
+    selectables.forEach(element => {
+      element.addEventListener("click", async (clickEvent) => {
+        const tgt = clickEvent.currentTarget;
+        const gadgetId = tgt?.dataset?.gadgetId;
+        const gadgetName = tgt?.dataset?.gadgetName;
+        if (!gadgetId || !gadgetName) return;
+
+        let gadgetImg = "icons/svg/item-bag.svg";
+        let gadgetBasic = {};
+        try {
+          const gadgetDoc = await fromUuid(gadgetId);
+          if (gadgetDoc?.img) gadgetImg = gadgetDoc.img;
+          gadgetBasic = gadgetDoc?.system?.basic || {};
+        } catch (err) { console.warn(`Could not load gadget data for ${gadgetName}:`, err); }
+
+        const damageFormula = this._getGadgetDamageFormulaFromBasic(gadgetBasic);
+        const healingFormula = this._getGadgetHealingFormulaFromBasic(gadgetBasic);
+        const improvised = foundry.utils.deepClone(this.actor.system.gadgets?.improvised || []);
+        improvised.push({
+          id: gadgetId, name: gadgetName, img: gadgetImg, used: false,
+          gadgetLevel: gadgetLevel,
+          damage: damageFormula, damageType: gadgetBasic.damageType,
+          range: gadgetBasic.range, energyCost: gadgetBasic.energyCost,
+          attackBonus: gadgetBasic.attackBonus, healing: healingFormula
+        });
+        const newUsesLeft = Math.max(0, usesLeft - 1);
+        this._preferredTab = "gadgets";
+        await this.actor.update({
+          "system.gadgets.improvised": improvised,
+          "system.combat.improvisedGadget.usesLeft": newUsesLeft
+        });
+        this.render();
+        dialog?.close?.();
+      });
+    });
+  }
+
+  async _onRemoveImprovisedGadget(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const improvisedIndex = parseInt($(event.currentTarget).data("improvised-index"));
+    if (isNaN(improvisedIndex)) return;
+    const improvised = foundry.utils.deepClone(this.actor.system.gadgets?.improvised || []);
+    if (improvisedIndex >= 0 && improvisedIndex < improvised.length) {
+      improvised.splice(improvisedIndex, 1);
+      await this.actor.update({ "system.gadgets.improvised": improvised });
+      this.render();
+    }
+  }
+
+  async _onGadgetEfficiencyUse(event) {
+    event.preventDefault();
+    const maxUses = parseInt(event.currentTarget.dataset.maxUses) || 1;
+    const current = this.actor.system.combat?.gadgetEfficiency?.usesLeft ?? maxUses;
+    if (current <= 0) {
+      ui.notifications.warn("No Gadget Efficiency uses remaining until your next long rest.");
+      return;
+    }
+    const remaining = current - 1;
+    await this.actor.update({ "system.combat.gadgetEfficiency.usesLeft": remaining });
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: `<div class="roll-flavor"><b>Gadget Efficiency</b><br>Maintain cost reduced by 1 (minimum 0).<br>Uses remaining: ${remaining} / ${maxUses}</div>`
+    });
   }
 
   /** @override */
@@ -12281,6 +13081,58 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       if (name === "perfect shot") {
         const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
         return primeLevel >= 20 && powersetName === "Marksman" && hasTalent("unerring aim");
+      }
+      if (name === "gadget mastery") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 7 && powersetName === "Gadgeteer";
+      }
+      if (name === "rapid preparation") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 7 && powersetName === "Gadgeteer" && hasTalent("enough prep time");
+      }
+      if (name === "reliable gadgets") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 7 && powersetName === "Gadgeteer";
+      }
+      if (name === "advanced loadout") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 9 && powersetName === "Gadgeteer" && hasTalent("expanded loadout");
+      }
+      if (name === "gadget efficiency") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 10 && powersetName === "Gadgeteer";
+      }
+      if (name === "gadget overcharge") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Gadgeteer";
+      }
+      if (name === "multiple preparations") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Gadgeteer" && hasTalent("enough prep time");
+      }
+      if (name === "superior engineering") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Gadgeteer" && hasTalent("gadget mastery");
+      }
+      if (name === "gadget synergy") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 14 && powersetName === "Gadgeteer";
+      }
+      if (name === "sustained tuning") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 15 && powersetName === "Gadgeteer";
+      }
+      if (name === "gadget arsenal") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 17 && powersetName === "Gadgeteer";
+      }
+      if (name === "master improvisation") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 19 && powersetName === "Gadgeteer" && hasTalent("improved improvisation");
+      }
+      if (name === "ultimate preparation") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 20 && powersetName === "Gadgeteer" && hasTalent("enough prep time");
       }
       return true;
     };

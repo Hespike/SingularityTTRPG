@@ -241,7 +241,7 @@ export class SingularityActor extends Actor {
         "Masterful": 3,
         "Legendary": 4
       };
-      const targetRank = primeLevel >= 5 ? "Competent" : "Apprentice";
+      const targetRank = primeLevel >= 15 ? "Legendary" : primeLevel >= 10 ? "Masterful" : primeLevel >= 5 ? "Competent" : "Apprentice";
 
       // Initialize skills if it doesn't exist
       if (!systemData.skills) {

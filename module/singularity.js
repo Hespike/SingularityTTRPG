@@ -1023,6 +1023,58 @@ Hooks.once("init", function() {
       return false;
     };
 
+    const hasGadgetMasteryTalent = (actor) => {
+      const progression = actor?.system?.progression || {};
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+        if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("gadget mastery")) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const hasSuperiorEngineeringTalent = (actor) => {
+      const progression = actor?.system?.progression || {};
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+        if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("superior engineering")) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const hasSustainedTuningTalent = (actor) => {
+      const progression = actor?.system?.progression || {};
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+        if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("sustained tuning")) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    const hasGadgetArsenalTalent = (actor) => {
+      const progression = actor?.system?.progression || {};
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const gadgeteerTalentName = levelData.gadgeteerTalentName || "";
+        if (gadgeteerTalentName && gadgeteerTalentName.toLowerCase().includes("gadget arsenal")) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     const computeGadgetTuningDC = (actor) => {
       const witsScore = computeAbilityScore(actor, "wits");
       const gadgetTuningSkill = actor?.system?.skills?.["Gadget Tuning"] || {};
@@ -1039,6 +1091,13 @@ Hooks.once("init", function() {
       if (enoughPrepTimeData.active && hasEnoughPrepTimeTalent(actor)) {
         const primeLevel = Number(actor?.system?.basic?.primeLevel || 1);
         dc += primeLevel;
+      }
+      if (hasGadgetMasteryTalent(actor)) {
+        dc += hasSuperiorEngineeringTalent(actor) ? 4 : 2;
+      }
+      if (hasSustainedTuningTalent(actor)) {
+        const maintainedCount = Number(actor?.system?.combat?.sustainedTuning?.maintainedCount ?? 0);
+        dc += maintainedCount;
       }
       return dc;
     };
@@ -5432,7 +5491,20 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
         "Expanded Loadout",
         "Improvised Gadget",
         "Rapid Deployment",
-        "Improved Improvisation"
+        "Improved Improvisation",
+        "Gadget Mastery",
+        "Rapid Preparation",
+        "Reliable Gadgets",
+        "Advanced Loadout",
+        "Gadget Efficiency",
+        "Gadget Overcharge",
+        "Multiple Preparations",
+        "Superior Engineering",
+        "Gadget Synergy",
+        "Sustained Tuning",
+        "Gadget Arsenal",
+        "Master Improvisation",
+        "Ultimate Preparation"
       ];
       
       const allExist = gadgeteerTalentNames.every(name => 
@@ -5557,6 +5629,233 @@ Improvised Gadget talent</p>
 <p>You can use this ability a number of times per encounter equal to your <strong>Wits modifier</strong> (minimum <strong>1</strong>).</p>`,
           type: "gadgeteer",
           prerequisites: "Gadgeteer 3"
+        },
+        {
+          name: "Gadget Mastery",
+          level: 7,
+          description: `<h2>Description</h2>
+<p>Your expertise with your devices allows you to push them beyond their normal limits, achieving more powerful and reliable results through superior tuning and calibration.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 7</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You gain a <strong>+2 bonus</strong> to your <strong>Gadget Tuning DC</strong>.</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 7"
+        },
+        {
+          name: "Rapid Preparation",
+          level: 7,
+          description: `<h2>Description</h2>
+<p>Your ability to analyze threats and prepare countermeasures has become so refined that you can complete your preparations in a fraction of the time.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 7</li>
+  <li>Enough Prep Time</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use <strong>Enough Prep Time</strong>, the preparation time is reduced to <strong>10 minutes</strong> (instead of 1 hour).</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 7; Enough Prep Time"
+        },
+        {
+          name: "Reliable Gadgets",
+          level: 7,
+          description: `<h2>Description</h2>
+<p>Your gadgets are built so precisely that even your worst misfires are better than most.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 7</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you roll a <strong>natural 1</strong> on a Gadget Tuning check, you may treat the die result as a <strong>2</strong> instead.</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 7"
+        },
+        {
+          name: "Advanced Loadout",
+          level: 9,
+          description: `<h2>Description</h2>
+<p>Your carrying capacity and organizational systems have been refined, allowing you to prepare even more gadgets.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 9</li>
+  <li>Expanded Loadout</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You can prepare <strong>1 additional Level 1 gadget slot</strong> each day. Additionally, your <strong>Expanded Loadout</strong> now grants <strong>4 additional Level 0 gadget slots</strong> (instead of 2).</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 9; Expanded Loadout"
+        },
+        {
+          name: "Gadget Efficiency",
+          level: 10,
+          description: `<h2>Description</h2>
+<p>Your mastery of gadget design allows you to maintain your devices more efficiently, requiring less energy to keep them running.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 10</li>
+</ul>
+
+<h3>Effect</h3>
+<p>A number of times per long rest equal to your <strong>Wits modifier</strong> (minimum 1), when you use the <strong>Maintain</strong> action, you can reduce the maintain cost by <strong>1</strong> (minimum 0).</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 10"
+        },
+        {
+          name: "Gadget Overcharge",
+          level: 12,
+          description: `<h2>Description</h2>
+<p>You can push your simpler gadgets beyond their normal operating parameters, channeling extra power through them for devastating results at the cost of burning them out.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 12</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use a <strong>Level 0 gadget</strong> that deals damage, you can choose to <strong>overcharge</strong> it. If you do, the gadget deals <strong>double damage</strong>. However, after using an overcharged gadget, you cannot use that same gadget again until after your next long rest.</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 12"
+        },
+        {
+          name: "Multiple Preparations",
+          level: 12,
+          description: `<h2>Description</h2>
+<p>Your tactical mind can track multiple threats simultaneously, allowing you to maintain preparations against several enemies at once.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 12</li>
+  <li>Enough Prep Time</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use <strong>Enough Prep Time</strong>, you can maintain <strong>2 active preparations</strong> at once (instead of 1). Each preparation can target a different enemy, granting the full Enough Prep Time bonuses against each.</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 12; Enough Prep Time"
+        },
+        {
+          name: "Superior Engineering",
+          level: 12,
+          description: `<h2>Description</h2>
+<p>Your engineering skills have reached superior levels, allowing you to create and modify gadgets with enhanced precision and power.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 12</li>
+  <li>Gadget Mastery</li>
+</ul>
+
+<h3>Effect</h3>
+<p>Your <strong>Gadget Mastery</strong> bonus increases to <strong>+4</strong> to your Gadget Tuning DC (instead of +2).</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 12; Gadget Mastery"
+        },
+        {
+          name: "Gadget Synergy",
+          level: 14,
+          description: `<h2>Description</h2>
+<p>Your understanding of gadget interactions allows you to combine effects for more powerful results when actively maintaining multiple devices.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 14</li>
+</ul>
+
+<h3>Effect</h3>
+<p>Once per long rest, when you use a gadget that deals damage while you are maintaining at least one other gadget that targets the same creature or area, the damage-dealing gadget deals <strong>double damage</strong>.</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 14"
+        },
+        {
+          name: "Sustained Tuning",
+          level: 15,
+          description: `<h2>Description</h2>
+<p>Your ability to maintain multiple active gadgets simultaneously creates a feedback loop of optimization, allowing you to tune each device more effectively as you coordinate between them.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 15</li>
+</ul>
+
+<h3>Effect</h3>
+<p>Your Gadget Tuning DC increases by <strong>+1 for each gadget you are currently maintaining</strong>. Track your maintained gadgets on the Gadgets tab of your character sheet.</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 15"
+        },
+        {
+          name: "Gadget Arsenal",
+          level: 17,
+          description: `<h2>Description</h2>
+<p>Your preparation and organization allow you to maintain a vast array of gadgets, ready for any situation.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 17</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You gain additional gadget slot value equal to half your Gadgeteer level, rounded down. Each gadget in your Arsenal costs slot value equal to its level.</p>
+
+<p><strong>Examples at level 20 (10 slot value):</strong></p>
+<ul>
+  <li>10 Level 1 gadgets</li>
+  <li>2 Level 5 gadgets</li>
+  <li>3 Level 3 gadgets and 1 Level 1 gadget</li>
+</ul>
+
+<p>Arsenal gadgets are managed on the Gadgets tab of your character sheet.</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 17"
+        },
+        {
+          name: "Master Improvisation",
+          level: 19,
+          description: `<h2>Description</h2>
+<p>Your ability to create gadgets from nothing has reached its peak. You can assemble complex devices from the most basic materials in moments.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 19</li>
+  <li>Improved Improvisation</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use <strong>Improvised Gadget</strong>, you can create a gadget of any level up to <strong>Level 3</strong>. You can use Improvised Gadget a number of times per long rest equal to your <strong>Wits</strong> (minimum 1).</p>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 19; Improved Improvisation"
+        },
+        {
+          name: "Ultimate Preparation",
+          level: 20,
+          description: `<h2>Description</h2>
+<p>You have achieved the pinnacle of tactical preparation. Given enough time, you can analyze and counter any threat with perfect precision.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Gadgeteer 20</li>
+  <li>Enough Prep Time</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use <strong>Enough Prep Time</strong>, the bonuses from your preparations are doubled:</p>
+<ul>
+  <li>Gain a <strong>+2 bonus per Gadgeteer level</strong> to your <strong>Gadget Tuning DC</strong> against the chosen enemy (instead of +1).</li>
+  <li>Gain a <strong>+2 bonus per Gadgeteer level</strong> to <strong>attack rolls</strong> made with gadgets against the chosen enemy (instead of +1).</li>
+</ul>`,
+          type: "gadgeteer",
+          prerequisites: "Gadgeteer 20; Enough Prep Time"
         }
       ];
 

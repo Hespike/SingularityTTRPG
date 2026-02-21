@@ -303,7 +303,22 @@
           {{/if}}
           {{/if}}
         </div>
+        {{#if hasUltimatePreparation}}
+        <p class="enough-prep-time-help-text">When active, gain <strong>+2 per Gadgeteer level</strong> to Gadget Tuning DC and attack rolls with gadgets <em>(Ultimate Preparation — doubled)</em>.</p>
+        {{else}}
         <p class="enough-prep-time-help-text">When active, gain +1 per Gadgeteer level to Gadget Tuning DC and attack rolls with gadgets.</p>
+        {{/if}}
+        {{#if hasRapidPreparation}}
+        <p class="enough-prep-time-help-text">Preparation time: <strong>10 minutes</strong> (Rapid Preparation).</p>
+        {{else}}
+        <p class="enough-prep-time-help-text">Preparation time: <strong>1 hour</strong>.</p>
+        {{/if}}
+        {{#if hasMultiplePreparations}}
+        <p class="enough-prep-time-help-text"><strong>Multiple Preparations:</strong> You may maintain preparations against <strong>2 targets simultaneously</strong>.</p>
+        {{/if}}
+        {{#if hasUltimatePreparation}}
+        <p class="enough-prep-time-help-text"><strong>Ultimate Preparation:</strong> All Enough Prep Time bonuses are doubled.</p>
+        {{/if}}
       </div>
       {{/if}}
 
@@ -817,14 +832,114 @@
         </div>
         {{/if}}
       </div>
-      
+
+      {{#if hasGadgetArsenal}}
+      <div class="gadget-arsenal-section">
+        <h4>Gadget Arsenal</h4>
+        <p>Slot Value: <strong>{{arsenalAvailable}}/{{arsenalPool}}</strong> remaining ({{arsenalUsed}} used)</p>
+        {{#if arsenalGadgets}}
+        <ol class="gadget-list" style="list-style:none;padding:0;margin:0 0 8px;">
+          {{#each arsenalGadgets}}
+          <li class="gadget-item {{#if isDepleted}}gadget-depleted{{/if}}" style="display:flex;align-items:center;gap:6px;padding:4px;border:1px solid rgba(189,95,255,0.2);border-radius:3px;margin:3px 0;">
+            <img class="gadget-icon item-icon" src="{{img}}" alt="{{name}}" width="28" height="28" style="border:none;border-radius:2px;">
+            <span class="gadget-name" style="flex:1;">{{name}}</span>
+            <span style="font-size:10px;background:rgba(100,100,200,0.3);padding:1px 5px;border-radius:3px;">L{{gadgetLevel}}</span>
+            <div class="gadget-controls" style="display:flex;gap:3px;">
+              <button type="button" class="gadget-use" data-arsenal-index="{{arsenalIndex}}" {{#if isDepleted}}disabled{{/if}} style="padding:2px 6px;">Use</button>
+              <button type="button" class="arsenal-gadget-remove" data-arsenal-index="{{arsenalIndex}}" style="padding:2px 6px;color:#c03a3a;">✕</button>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+        {{/if}}
+        {{#if arsenalAvailable}}
+        <div style="margin-top:6px;">
+          <p class="gadgets-help-text" style="margin-bottom:4px;">Add gadget to Arsenal (costs level in slot value):</p>
+          {{#each arsenalAddLevels}}
+          <button type="button" class="add-arsenal-gadget" data-gadget-level="{{level}}" {{#unless canAfford}}disabled{{/unless}} style="margin:2px;padding:2px 6px;font-size:11px;">+L{{level}} ({{cost}}pt)</button>
+          {{/each}}
+        </div>
+        {{/if}}
+        <p class="gadgets-help-text">Pool = ½ Gadgeteer level ({{arsenalPool}}). Arsenal gadgets refresh on long rest.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasImprovisedGadget}}
+      <div class="gadget-efficiency-section">
+        <h4>Improvised Gadget{{#if hasMasterImprovisation}} <em style="font-size:11px;font-weight:normal;">(Master)</em>{{else if hasImprovedImprovisation}} <em style="font-size:11px;font-weight:normal;">(Improved)</em>{{/if}}</h4>
+        <p>Uses remaining: <strong>{{improvisedGadgetUsesLeft}} / {{improvisedGadgetMaxUses}}</strong></p>
+        {{#if improvisedGadgets}}
+        <ol class="gadget-list" style="list-style:none;padding:0;margin:0 0 8px;">
+          {{#each improvisedGadgets}}
+          <li class="gadget-item {{#if isDepleted}}gadget-depleted{{/if}}" style="display:flex;align-items:center;gap:6px;padding:4px;border:1px solid rgba(189,95,255,0.2);border-radius:3px;margin:3px 0;">
+            <img class="gadget-icon item-icon" src="{{img}}" alt="{{name}}" width="28" height="28" style="border:none;border-radius:2px;">
+            <span class="gadget-name" style="flex:1;">{{name}}</span>
+            <span style="font-size:10px;background:rgba(100,100,200,0.3);padding:1px 5px;border-radius:3px;">L{{gadgetLevel}}</span>
+            <div class="gadget-controls" style="display:flex;gap:3px;">
+              <button type="button" class="gadget-use" data-improvised-index="{{improvisedIndex}}" {{#if isDepleted}}disabled{{/if}} style="padding:2px 6px;">Use</button>
+              <button type="button" class="improvised-gadget-remove" data-improvised-index="{{improvisedIndex}}" style="padding:2px 6px;color:#c03a3a;">✕</button>
+            </div>
+          </li>
+          {{/each}}
+        </ol>
+        {{/if}}
+        {{#if improvisedGadgetUsesLeft}}
+        <button type="button" class="use-improvised-gadget" data-max-uses="{{improvisedGadgetMaxUses}}" data-has-master="{{hasMasterImprovisation}}" data-has-improved="{{hasImprovedImprovisation}}" style="margin-top:4px;">Create Improvised Gadget (2 Energy)</button>
+        {{/if}}
+        <p class="gadgets-help-text">{{#if hasMasterImprovisation}}Create any gadget up to Level 3. Uses = Wits per long rest.{{else if hasImprovedImprovisation}}Create a Level 1 gadget. Once per long rest.{{else}}Create a Level 0 gadget. Once per long rest.{{/if}}</p>
+      </div>
+      {{/if}}
+
+      {{#if hasSustainedTuning}}
+      <div class="gadget-efficiency-section">
+        <h4>Sustained Tuning</h4>
+        <p>Maintained Gadgets: 
+          <button type="button" class="sustained-tuning-decrement" style="width:24px;padding:0;">-</button>
+          <strong>{{sustainedTuningCount}}</strong>
+          <button type="button" class="sustained-tuning-increment" style="width:24px;padding:0;">+</button>
+        </p>
+        {{#if sustainedTuningDCBonus}}
+        <p class="gadgets-help-text">(+{{sustainedTuningDCBonus}} to Gadget Tuning DC from Sustained Tuning)</p>
+        {{/if}}
+        <p class="gadgets-help-text">+1 Gadget Tuning DC per gadget you are currently maintaining. Update the count above as you maintain/release gadgets.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasGadgetSynergy}}
+      <div class="gadget-efficiency-section">
+        <h4>Gadget Synergy</h4>
+        {{#if gadgetSynergyUsed}}
+        <p>Status: <strong style="color:#c03a3a;">Used</strong> (resets on long rest)</p>
+        {{else}}
+        <p>Status: <strong style="color:#2b9a5b;">Available</strong></p>
+        {{/if}}
+        <p class="gadgets-help-text">When using a damage gadget while maintaining another gadget on the same target, deal <strong>double damage</strong>. Prompts automatically on gadget use. Once per long rest.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasGadgetEfficiency}}
+      <div class="gadget-efficiency-section">
+        <h4>Gadget Efficiency</h4>
+        <p>Uses remaining: <strong>{{gadgetEfficiencyUsesLeft}} / {{gadgetEfficiencyMaxUses}}</strong></p>
+        <p class="gadgets-help-text">When you use the <strong>Maintain</strong> action, spend a use to reduce the energy cost by 1 (minimum 0). Resets on long rest.</p>
+        <button type="button" class="gadget-efficiency-use" data-max-uses="{{gadgetEfficiencyMaxUses}}" {{#unless gadgetEfficiencyUsesLeft}}disabled{{/unless}}>Use Gadget Efficiency</button>
+      </div>
+      {{/if}}
+
       <div class="gadget-tuning-section">
         <h4>Gadget Tuning</h4>
         <p>Rank: <strong>{{gadgetTuningRank}}</strong></p>
         {{#if gadgetTuningDC}}
         <p>DC: <strong>{{gadgetTuningDC}}</strong>
           {{#if enoughPrepTimeDCBonus}}
+            {{#if hasUltimatePreparation}}
+            <span class="enough-prep-time-dc-bonus">(+{{enoughPrepTimeDCBonus}} from Enough Prep Time × Ultimate Preparation)</span>
+            {{else}}
             <span class="enough-prep-time-dc-bonus">(+{{enoughPrepTimeDCBonus}} from Enough Prep Time)</span>
+            {{/if}}
+          {{/if}}
+          {{#if sustainedTuningDCBonus}}
+            <span class="sustained-tuning-dc-bonus">(+{{sustainedTuningDCBonus}} from Sustained Tuning)</span>
           {{/if}}
         </p>
         {{/if}}
@@ -1399,6 +1514,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1444,6 +1561,12 @@
                 <div class="marksman-bonus-display">You are now <strong>Competent</strong> with all ranged weapons.</div>
               </div>
               {{/if}}
+              {{#if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+              <div class="progression-slot ability-boost-slot" data-level="5" data-slot-type="gadgeteerGadgetTuning">
+                <label>Gadget Tuning (Gadgeteer):</label>
+                <div class="gadgeteer-bonus-display">You are now <strong>Competent</strong> with Gadget Tuning.</div>
+              </div>
+              {{/if}}
               <div class="progression-slot asi-slot ability-boost-slot" data-level="5" data-slot-type="abilityScoreImprovement">
                 <label>Ability Score Improvement:</label>
                 <div class="asi-selects">
@@ -1481,6 +1604,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1536,6 +1661,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1612,6 +1739,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1633,6 +1762,12 @@
               <div class="progression-slot ability-boost-slot" data-level="10" data-slot-type="marksmanRangedCompetence10">
                 <label>Ranged Weapon Competence (Marksman):</label>
                 <div class="marksman-bonus-display">You are now <strong>Masterful</strong> with all ranged weapons.</div>
+              </div>
+              {{/if}}
+              {{#if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+              <div class="progression-slot ability-boost-slot" data-level="10" data-slot-type="gadgeteerGadgetTuning">
+                <label>Gadget Tuning (Gadgeteer):</label>
+                <div class="gadgeteer-bonus-display">You are now <strong>Masterful</strong> with Gadget Tuning.</div>
               </div>
               {{/if}}
               <div class="progression-slot asi-slot ability-boost-slot" data-level="10" data-slot-type="abilityScoreImprovement">
@@ -1672,6 +1807,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1727,6 +1864,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1803,6 +1942,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1824,6 +1965,12 @@
               <div class="progression-slot ability-boost-slot" data-level="15" data-slot-type="marksmanRangedCompetence15">
                 <label>Ranged Weapon Competence (Marksman):</label>
                 <div class="marksman-bonus-display">You are now <strong>Legendary</strong> with all ranged weapons.</div>
+              </div>
+              {{/if}}
+              {{#if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+              <div class="progression-slot ability-boost-slot" data-level="15" data-slot-type="gadgeteerGadgetTuning">
+                <label>Gadget Tuning (Gadgeteer):</label>
+                <div class="gadgeteer-bonus-display">You are now <strong>Legendary</strong> with Gadget Tuning.</div>
               </div>
               {{/if}}
               <div class="progression-slot asi-slot ability-boost-slot" data-level="15" data-slot-type="abilityScoreImprovement">
@@ -1863,6 +2010,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1918,6 +2067,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1994,6 +2145,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -2048,6 +2201,8 @@
                       Bastion Talent: Click to choose
                     {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
                       Marksman Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Gadgeteer") (eq actor.system.basic.powerset "Gadgeteer"))}}
+                      Gadgeteer Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
