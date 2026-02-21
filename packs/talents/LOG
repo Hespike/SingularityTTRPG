@@ -1,5 +1,5 @@
-2026/02/21-15:53:18.315 ca8 Recovering log #117
-2026/02/21-15:53:18.316 ca8 Level-0 table #119: started
-2026/02/21-15:53:18.321 ca8 Level-0 table #119: 11171 bytes OK
-2026/02/21-15:53:18.332 ca8 Delete type=0 #117
-2026/02/21-15:53:18.332 ca8 Delete type=3 #116
+2026/02/21-19:35:16.902 64a0 Recovering log #120
+2026/02/21-19:35:16.903 64a0 Level-0 table #122: started
+2026/02/21-19:35:16.920 64a0 Level-0 table #122: 4008 bytes OK
+2026/02/21-19:35:16.934 64a0 Delete type=0 #120
+2026/02/21-19:35:16.935 64a0 Delete type=3 #118

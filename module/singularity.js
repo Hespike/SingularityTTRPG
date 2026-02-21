@@ -1337,8 +1337,17 @@ Hooks.once("init", function() {
         console.warn("Singularity | Failed to load gadget for save roll:", err);
       }
       const isSonicGrenade = String(gadgetName || "").trim().toLowerCase() === "sonic grenade";
-
+        const isDisruptionField = String(gadgetName || "").trim().toLowerCase() === "disruption field";
+        const isQuantumLock = String(gadgetName || "").trim().toLowerCase() === "quantum lock";
+        const isGravityWell = String(gadgetName || "").trim().toLowerCase() === "gravity well";
+        const isOmnidirectionalPulse = String(gadgetName || "").trim().toLowerCase() === "omnidirectional pulse";
+        const isDimensionalVortex = String(gadgetName || "").trim().toLowerCase() === "dimensional vortex";
+        const isTemporalStasisField = String(gadgetName || "").trim().toLowerCase() === "temporal stasis field";
+        const isUltimateWeaponSystem = String(gadgetName || "").trim().toLowerCase() === "ultimate weapon system";
       const dc = computeGadgetTuningDC(actor);
+      const _gadgetTuningSkill = actor?.system?.skills?.["Gadget Tuning"] || {};
+      const _tuningRankBonuses = { "Novice": 0, "Apprentice": 2, "Competent": 5, "Masterful": 9, "Legendary": 14 };
+      const _tuningRankBonus = _tuningRankBonuses[_gadgetTuningSkill.rank || "Novice"] ?? 0;
       const results = [];
 
       for (const targetToken of targets) {
@@ -1384,6 +1393,110 @@ Hooks.once("init", function() {
               await applyStatusEffect(targetActor, "deafened");
               effectsApplied.push("Staggered 2", "Dazed", "Deafened");
             }
+          }
+        } else if (isDisruptionField) {
+          if (degree === "Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "staggered", 1);
+              effectsApplied.push("Staggered 1", "Energy abilities suppressed");
+            }
+          } else if (degree === "Extreme Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "staggered", 2);
+              effectsApplied.push("Staggered 2", "Energy abilities suppressed");
+            }
+          }
+        } else if (isQuantumLock) {
+          if (degree === "Success") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "staggered", 2);
+              effectsApplied.push("Staggered 2 (1 round)");
+            }
+          } else if (degree === "Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "paralyzed");
+              effectsApplied.push("Paralyzed (1 round), then Staggered 2 (1 min) — remove Paralyzed next turn");
+            }
+          } else if (degree === "Extreme Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "paralyzed");
+              effectsApplied.push("Paralyzed (1 min, Endurance save each turn to end)");
+            }
+          }
+        } else if (isGravityWell) {
+          if (degree === "Success") {
+            effectsApplied.push("Half damage (roll 3d6 + rank, halved), pulled 5 ft toward center");
+          } else if (degree === "Failure") {
+            effectsApplied.push("3d6 + Gadget Tuning rank Force damage, pulled 10 ft toward center");
+          } else if (degree === "Extreme Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "prone");
+            }
+            effectsApplied.push("5d6 + Gadget Tuning rank Force damage, pulled 15 ft toward center, Prone");
+          }
+        } else if (isOmnidirectionalPulse) {
+          if (degree === "Extreme Success") {
+            effectsApplied.push("3d6 Force damage");
+          } else if (degree === "Success") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "prone");
+            }
+            effectsApplied.push("5d6 Force damage, Prone");
+          } else if (degree === "Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "prone");
+              await applyStatusEffect(targetActor, "staggered", 2);
+            }
+            effectsApplied.push(`7d6 + ${_tuningRankBonus} Force damage, Prone, Staggered 2 (1 round)`);
+          } else if (degree === "Extreme Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "prone");
+              await applyStatusEffect(targetActor, "staggered", 2);
+            }
+            effectsApplied.push(`10d6 + ${_tuningRankBonus} Force damage, Prone, Staggered 2 (1 round)`);
+          }
+        } else if (isDimensionalVortex) {
+          if (degree === "Extreme Success") {
+            effectsApplied.push("Resists the vortex — unaffected");
+          } else if (degree === "Success") {
+            effectsApplied.push("Pulled 5 ft closer to vortex center");
+          } else if (degree === "Failure") {
+            effectsApplied.push("Pulled 10 ft closer to vortex center");
+          } else if (degree === "Extreme Failure") {
+            effectsApplied.push(`Banished to dimensional pocket! Takes 10d10 + ${_tuningRankBonus} Cosmic damage per turn until they escape (Might save vs DC ${dc} to return within 5 ft of vortex center)`);
+          }
+        } else if (isTemporalStasisField) {
+          if (degree === "Extreme Success") {
+            effectsApplied.push("Resists — unaffected");
+          } else if (degree === "Success") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "staggered", 3);
+            }
+            effectsApplied.push("Staggered 3 (1 round)");
+          } else if (degree === "Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "paralyzed");
+            }
+            effectsApplied.push("Frozen in time (Paralyzed, 1 round) — no actions, reactions, or movement; conditions/durations do not progress");
+          } else if (degree === "Extreme Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "paralyzed");
+            }
+            effectsApplied.push("Frozen in time (Paralyzed, 1d4+1 rounds) — no actions, reactions, or movement; conditions/durations do not progress; Endurance save vs DC " + dc + " each round after the first to end early");
+          }
+        } else if (isUltimateWeaponSystem) {
+          if (degree === "Extreme Success" || degree === "Success") {
+            effectsApplied.push("Resists concussive force — unaffected");
+          } else if (degree === "Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "staggered", 2);
+            }
+            effectsApplied.push("Staggered 2 (1 round) — if all 5 attacks hit same target, apply Staggered 3 instead");
+          } else if (degree === "Extreme Failure") {
+            if (targetActor.isOwner || game.user.isGM) {
+              await applyStatusEffect(targetActor, "staggered", 3);
+            }
+            effectsApplied.push("Staggered 3 (1 round) — if all 5 attacks hit same target, also apply Prone");
           }
         }
 
@@ -6542,10 +6655,38 @@ Improvised Gadget talent</p>
           "Adrenaline Injector",
           "Force Cannon",
           "Plasma Wall"
+        ],
+        level4: [
+          "Disruption Field",
+          "Quantum Lock"
+        ],
+        level5: [
+          "Combat Swarm",
+          "Gravity Well"
+        ],
+        level6: [
+          "Phase Shifter",
+          "Temporal Anchor"
+        ],
+        level7: [
+          "Adaptive Armor Matrix",
+          "Omnidirectional Pulse"
+        ],
+        level8: [
+          "Quantum Teleporter",
+          "Reality Anchor"
+        ],
+        level9: [
+          "Dimensional Vortex",
+          "Temporal Stasis Field"
+        ],
+        level10: [
+          "Omnipotence Matrix",
+          "Ultimate Weapon System"
         ]
       };
       
-      const allGadgetNames = [...gadgetNames.level0, ...gadgetNames.level1, ...gadgetNames.level2, ...gadgetNames.level3];
+      const allGadgetNames = [...gadgetNames.level0, ...gadgetNames.level1, ...gadgetNames.level2, ...gadgetNames.level3, ...gadgetNames.level4, ...gadgetNames.level5, ...gadgetNames.level6, ...gadgetNames.level7, ...gadgetNames.level8, ...gadgetNames.level9, ...gadgetNames.level10];
       
       // Check which gadgets exist
       const existingGadgets = [];
@@ -6563,7 +6704,7 @@ Improvised Gadget talent</p>
       console.log("Singularity | Missing gadgets:", missingGadgets.length, missingGadgets);
       
       if (missingGadgets.length === 0) {
-        console.log("Singularity | All Level 0 through Level 3 gadgets already exist in compendium");
+        console.log("Singularity | All Level 0 through Level 6 gadgets already exist in compendium");
         // Still check and update icons even if all gadgets exist
         // Update existing gadgets that have the old cog.svg icon
         for (const gadgetIndex of pack.index) {
@@ -6866,6 +7007,322 @@ Improvised Gadget talent</p>
 <h3>Effect</h3>
 <p>You create a straight wall of plasma up to 30 feet long and 10 feet high within range. The wall must be continuous and cannot pass through occupied spaces. The wall provides <strong>standard cover</strong> and blocks line of effect.</p>
 <p>Any creature that enters the wall's space or starts their turn there takes <strong>2d6 + Gadget Tuning rank Fire damage</strong>. The wall has <strong>3 × Gadget Tuning DC</strong> HP. When reduced to 0 HP, the wall disappears.</p>`
+        },
+        // Level 4 gadgets
+        {
+          name: "Disruption Field",
+          level: 4,
+          description: `<h2>Description</h2>
+<p>You deploy an electromagnetic pulse emitter that creates an area of interference, disrupting electronic systems, energy weapons, and even biological functions.</p>
+
+<h2>Disruption Field</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You create a <strong>20-foot radius</strong> field of disruptive energy centered on a point within range. Any creature that enters or starts their turn in the field must make an <strong>Endurance saving throw</strong> against your <strong>Gadget Tuning DC</strong>. The effect depends on their result:</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The creature is unaffected.</li>
+  <li><strong>Success:</strong> The creature is unaffected.</li>
+  <li><strong>Failure:</strong> The creature is <strong>Staggered 1</strong> until they leave the field and cannot use any abilities or gadgets that require energy points while in the field.</li>
+  <li><strong>Extreme Failure:</strong> The creature is <strong>Staggered 2</strong> until they leave the field and cannot use any abilities or gadgets that require energy points while in the field.</li>
+</ul>
+<p>Electronic devices, energy weapons, and powered armor within the field malfunction. Creatures must make the saving throw each time they enter or start their turn in the field.</p>`
+        },
+        {
+          name: "Quantum Lock",
+          level: 4,
+          description: `<h2>Description</h2>
+<p>You fire a specialized device that generates a localized quantum field, freezing a target in place by manipulating their molecular vibration.</p>
+
+<h2>Quantum Lock</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>Target a creature within range. That creature must make an <strong>Endurance saving throw</strong> against your <strong>Gadget Tuning DC</strong>. The effect depends on their result:</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The creature is unaffected.</li>
+  <li><strong>Success:</strong> The creature is <strong>Staggered 2</strong> for 1 round.</li>
+  <li><strong>Failure:</strong> The creature is <strong>Paralyzed</strong> for 1 round, then <strong>Staggered 2</strong> for 1 minute. At the end of each of their turns, they can attempt a new Endurance saving throw to end the Staggered effect.</li>
+  <li><strong>Extreme Failure:</strong> The creature is <strong>Paralyzed</strong> for 1 minute. At the end of each of their turns, they can attempt a new Endurance saving throw to end the effect.</li>
+</ul>`
+        },
+        // Level 5 gadgets
+        {
+          name: "Combat Swarm",
+          level: 5,
+          description: `<h2>Description</h2>
+<p>You release a cloud of micro-drones equipped with cutting lasers and taser probes, creating an autonomous attack force that harasses enemies.</p>
+
+<h2>Combat Swarm</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You create a swarm of micro-drones in a <strong>20-foot radius</strong> centered on a point within range. The swarm persists for the duration.</p>
+<p>When you maintain this gadget, the swarm makes a <strong>melee attack roll</strong> using your <strong>Gadget Tuning</strong> skill against all creatures within the swarm's area. Each creature that would be hit by the attack takes <strong>2d6 + Gadget Tuning rank Kinetic damage</strong>. You can also move the swarm's 20-foot radius area up to <strong>Gadget Tuning training × 5 feet</strong>.</p>`
+        },
+        {
+          name: "Gravity Well",
+          level: 5,
+          description: `<h2>Description</h2>
+<p>You deploy a gravity manipulation device that creates an intense gravitational field, pulling creatures toward a central point and crushing them with immense pressure.</p>
+
+<h2>Gravity Well</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You create a gravity well centered on a point within range. The well affects a <strong>15-foot radius</strong> area. Any creature that enters or starts their turn in the area must make an <strong>Endurance saving throw</strong> against your <strong>Gadget Tuning DC</strong>. The effect depends on their result:</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The creature takes no damage and is unaffected by the gravity pull.</li>
+  <li><strong>Success:</strong> The creature takes <strong>half damage</strong> (roll 3d6 + Gadget Tuning rank Force damage, halved) and is pulled <strong>5 feet</strong> toward the center of the well.</li>
+  <li><strong>Failure:</strong> The creature takes <strong>3d6 + Gadget Tuning rank Force damage</strong> and is pulled <strong>10 feet</strong> toward the center of the well.</li>
+  <li><strong>Extreme Failure:</strong> The creature takes <strong>5d6 + Gadget Tuning rank Force damage</strong>, is pulled <strong>15 feet</strong> toward the center of the well, and is knocked <strong>Prone</strong>.</li>
+</ul>
+<p>Creatures within 5 feet of the center take <strong>double damage</strong> from the gravity well. The area is <strong>difficult terrain</strong>, and flying creatures must land or fall.</p>`
+        },
+        // Level 6 gadgets
+        {
+          name: "Phase Shifter",
+          level: 6,
+          description: `<h2>Description</h2>
+<p>You activate a quantum displacement device that allows you or an ally to phase partially out of reality, becoming incorporeal and able to pass through solid matter.</p>
+
+<h2>Phase Shifter</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> Touch<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You or a willing creature within range becomes <strong>Incorporeal</strong> for the duration. You can end this effect early as a free action on your turn.</p>`
+        },
+        {
+          name: "Temporal Anchor",
+          level: 6,
+          description: `<h2>Description</h2>
+<p>You implant a temporal displacement beacon on an ally that allows them to "rewind" to a previous state, healing wounds and removing negative conditions.</p>
+
+<h2>Temporal Anchor</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> Touch<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You place a temporal anchor on a willing creature. For the duration, once per round as a <strong>reaction</strong> when the target would take damage or be affected by a condition, they can activate the anchor to "rewind" that effect. The target immediately regains HP equal to the damage they would have taken, or removes the condition, as if the attack or effect never occurred.</p>
+<p>The anchor can be used a number of times equal to <strong>1 + Gadget Tuning rank</strong> before it is depleted. Once depleted, the effect ends.</p>
+<ul>
+  <li><strong>Novice:</strong> 2 uses</li>
+  <li><strong>Apprentice:</strong> 3 uses</li>
+  <li><strong>Competent:</strong> 4 uses</li>
+  <li><strong>Masterful:</strong> 5 uses</li>
+  <li><strong>Legendary:</strong> 6 uses</li>
+</ul>`
+        },
+        {
+          name: "Adaptive Armor Matrix",
+          level: 7,
+          description: `<h2>Description</h2>
+<p>You deploy a network of nanites that form a protective energy barrier around an ally, adapting in real-time to incoming attacks and providing comprehensive defensive capabilities.</p>
+
+<h2>Adaptive Armor Matrix</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 30 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You or a willing creature within range gains the following benefits:</p>
+<ul>
+  <li><strong>+2 bonus to AC</strong></li>
+  <li><strong>Resistance 10</strong> to all damage types</li>
+  <li><strong>+2 bonus</strong> to all saving throws</li>
+</ul>
+<p>The armor matrix can absorb up to <strong>50 + (Gadget Tuning rank &times; 5)</strong> total damage. Once this limit is reached, the effect ends.</p>
+<ul>
+  <li><strong>Novice:</strong> 55 damage absorbed</li>
+  <li><strong>Apprentice:</strong> 60 damage absorbed</li>
+  <li><strong>Competent:</strong> 65 damage absorbed</li>
+  <li><strong>Masterful:</strong> 70 damage absorbed</li>
+  <li><strong>Legendary:</strong> 75 damage absorbed</li>
+</ul>`
+        },
+        {
+          name: "Omnidirectional Pulse",
+          level: 7,
+          description: `<h2>Description</h2>
+<p>You trigger a massive burst of energy in all directions from a specialized device, devastating everything in a wide radius around you.</p>
+
+<h2>Omnidirectional Pulse</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 30-foot burst (centered on you)<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 0<br>
+<strong>Duration:</strong> Instantaneous</p>
+
+<h3>Effect</h3>
+<p>You release a devastating pulse of energy in all directions. All creatures other than you within the radius must make an <strong>Agility saving throw</strong> against your Gadget Tuning DC.</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The creature takes 3d6 Force damage.</li>
+  <li><strong>Success:</strong> The creature takes 5d6 Force damage and is knocked <strong>Prone</strong>.</li>
+  <li><strong>Failure:</strong> The creature takes 7d6 + Gadget Tuning rank Force damage, is knocked <strong>Prone</strong>, and is <strong>Staggered 2</strong> for 1 round.</li>
+  <li><strong>Extreme Failure:</strong> The creature takes 10d6 + Gadget Tuning rank Force damage, is knocked <strong>Prone</strong>, and is <strong>Staggered 2</strong> for 1 round.</li>
+</ul>`
+        },
+        {
+          name: "Quantum Teleporter",
+          level: 8,
+          description: `<h2>Description</h2>
+<p>You activate a device that instantly transports you or an ally across vast distances by manipulating quantum entanglement and spatial coordinates.</p>
+
+<h2>Quantum Teleporter</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 500 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> Instantaneous</p>
+
+<h3>Effect</h3>
+<p>You teleport yourself or a willing creature within range to an unoccupied space you can see within range. The teleportation is instantaneous and does not provoke attacks of opportunity.</p>
+<p>You can instead teleport to a location you have visited before or can clearly visualize, even if it is beyond the normal range, up to <strong>1 mile away</strong>. If you attempt to teleport to a space that is occupied or dangerous, the teleportation fails and the energy cost is still expended.</p>`
+        },
+        {
+          name: "Reality Anchor",
+          level: 8,
+          description: `<h2>Description</h2>
+<p>You deploy a device that stabilizes the fabric of reality in an area, preventing teleportation, dimensional travel, and other reality-warping effects while reinforcing the laws of physics.</p>
+
+<h2>Reality Anchor</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 10 minutes (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You create a <strong>30-foot radius</strong> field of stabilized reality centered on a point within range. While active:</p>
+<ul>
+  <li>Teleportation and dimensional travel effects fail automatically within the field</li>
+  <li>Creatures cannot become incorporeal or phase through matter</li>
+  <li>Illusions and phantasmal effects are suppressed</li>
+  <li>All creatures in the field have <strong>advantage</strong> on saving throws against abilities that manipulate time, space, or reality</li>
+</ul>
+<p>The anchor has <strong>30 + Gadget Tuning rank HP</strong>. When reduced to 0 HP, the effect ends.</p>
+<ul>
+  <li><strong>Novice:</strong> 30 HP</li>
+  <li><strong>Apprentice:</strong> 32 HP</li>
+  <li><strong>Competent:</strong> 35 HP</li>
+  <li><strong>Masterful:</strong> 39 HP</li>
+  <li><strong>Legendary:</strong> 44 HP</li>
+</ul>`
+        },
+        {
+          name: "Dimensional Vortex",
+          level: 9,
+          description: `<h2>Description</h2>
+<p>You open a tear in the fabric of reality, creating a portal to another dimension that pulls enemies into a dangerous pocket space before violently ejecting them back.</p>
+
+<h2>Dimensional Vortex</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute (2 energy to maintain)</p>
+
+<h3>Effect</h3>
+<p>You create a vortex with a 5-foot center and a 60-foot radius, centered on a point within range. Any creature that enters or starts their turn in the vortex must make an <strong>Endurance saving throw</strong> against your Gadget Tuning DC.</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The creature resists the vortex and is unaffected.</li>
+  <li><strong>Success:</strong> The creature is pulled 5 feet closer to the vortex's center.</li>
+  <li><strong>Failure:</strong> The creature is pulled 10 feet closer to the vortex's center.</li>
+  <li><strong>Extreme Failure:</strong> The creature is instantly banished into a dimensional pocket space. At the start of each of their turns while in the pocket dimension, they take 10d10 + Gadget Tuning rank <strong>Cosmic damage</strong>. They can attempt a <strong>Might saving throw</strong> against your Gadget Tuning DC to escape, reappearing in an unoccupied space within 5 feet of the vortex's center. While in the dimensional pocket, creatures cannot take any actions other than attempting to escape, cannot be targeted, and are in a state of suspended animation.</li>
+</ul>`
+        },
+        {
+          name: "Temporal Stasis Field",
+          level: 9,
+          description: `<h2>Description</h2>
+<p>You create a field that halts the flow of time for all creatures except yourself within a large area, effectively freezing them in place.</p>
+
+<h2>Temporal Stasis Field</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 60 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 round</p>
+
+<h3>Effect</h3>
+<p>You create a <strong>30-foot radius</strong> field of temporal stasis centered on a point within range. All creatures other than you within the field must make an <strong>Endurance saving throw</strong> against your Gadget Tuning DC.</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The creature is unaffected.</li>
+  <li><strong>Success:</strong> The creature is <strong>Staggered 3</strong> for 1 round.</li>
+  <li><strong>Failure:</strong> The creature is frozen in time (treat as <strong>Paralyzed</strong>) for 1 round. They cannot take any actions, reactions, or movement. Time does not pass for them, so conditions, ongoing effects, and durations do not progress.</li>
+  <li><strong>Extreme Failure:</strong> The creature is frozen in time (treat as <strong>Paralyzed</strong>) for 1d4 + 1 rounds. They cannot take any actions, reactions, or movement. Time does not pass for them, so conditions, ongoing effects, and durations do not progress. At the end of each round after the first, they can attempt a new <strong>Endurance saving throw</strong> to end the effect early.</li>
+</ul>`
+        },
+        {
+          name: "Omnipotence Matrix",
+          level: 10,
+          description: `<h2>Description</h2>
+<p>You activate your ultimate creation—a master control system that links all your gadgets, amplifying their power and granting you near-complete battlefield control.</p>
+
+<h2>Omnipotence Matrix</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> Self<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> 1 minute</p>
+
+<h3>Effect</h3>
+<p>You activate the ultimate integration of all your gadget systems. For the duration, you gain the following benefits:</p>
+<ul>
+  <li>All your gadget energy costs are reduced by <strong>half</strong> (rounded down, minimum 1)</li>
+  <li><strong>+3 bonus</strong> to AC and attack rolls</li>
+  <li>Your <strong>Gadget Tuning DC increases by 3</strong></li>
+  <li>All damage dealt by your gadgets is <strong>maximized</strong> (roll maximum damage instead of rolling dice)</li>
+</ul>
+<p><strong>Drawback:</strong> After this effect ends, you become <strong>Exhausted</strong> and cannot use any gadgets for <strong>1 hour</strong>.</p>`
+        },
+        {
+          name: "Ultimate Weapon System",
+          level: 10,
+          description: `<h2>Description</h2>
+<p>You deploy your most devastating array of weapon systems\u2014energy cannons, plasma launchers, and missile batteries that lock onto multiple targets simultaneously.</p>
+
+<h2>Ultimate Weapon System</h2>
+<p><strong>Type:</strong> Action<br>
+<strong>Range:</strong> 120 feet<br>
+<strong>Cost:</strong> 4 energy<br>
+<strong>Hands:</strong> 1<br>
+<strong>Duration:</strong> Instantaneous</p>
+
+<h3>Effect</h3>
+<p>You deploy a comprehensive weapon array that simultaneously attacks up to <strong>5 different targets</strong> within range. For each target, make a separate attack roll using your Gadget Tuning skill. Each hit deals <strong>6d10 + Gadget Tuning rank</strong> damage of a type you choose: Fire, Cold, Electricity, or Force. You can choose a different damage type for each attack.</p>
+<p>Each target hit must also make an <strong>Endurance saving throw</strong> against your Gadget Tuning DC.</p>
+<ul>
+  <li><strong>Extreme Success:</strong> The creature is unaffected by the weapon system\u2019s concussive force.</li>
+  <li><strong>Success:</strong> The creature is unaffected by the weapon system\u2019s concussive force.</li>
+  <li><strong>Failure:</strong> The creature is <strong>Staggered 2</strong> for 1 round. If all 5 attacks hit the same target, that target is <strong>Staggered 3</strong> instead.</li>
+  <li><strong>Extreme Failure:</strong> The creature is <strong>Staggered 3</strong> for 1 round. If all 5 attacks hit the same target, that target is Staggered 3 and knocked <strong>Prone</strong> instead.</li>
+</ul>`
         }
       ];
 
