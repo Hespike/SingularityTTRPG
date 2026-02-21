@@ -1135,7 +1135,7 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       for (let lvl = 1; lvl <= 20; lvl++) {
         const levelKey = `level${lvl}`;
         const levelData = progression[levelKey] || {};
-        const marksmanTalentName = levelData.marksmanTalentName || "";
+        const marksmanTalentName = levelData.marksmanTalentName || levelData.powersetTalentName || "";
         if (marksmanTalentName && marksmanTalentName.toLowerCase().includes("deadeye")) {
           hasDeadeye = true;
           break;
@@ -1143,6 +1143,157 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
     }
     context.hasDeadeye = hasDeadeye;
+
+    // Check for Improved Deadeye talent (requires Deadeye, Marksman L7+)
+    let hasImprovedDeadeye = false;
+    if (hasDeadeye) {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const talentName = (levelData.marksmanTalentName || levelData.powersetTalentName || "").toLowerCase();
+        if (talentName.includes("improved deadeye")) {
+          hasImprovedDeadeye = true;
+          break;
+        }
+      }
+      // Also check embedded talent items
+      if (!hasImprovedDeadeye) {
+        const embedded = actorData.items || [];
+        hasImprovedDeadeye = embedded.some(i => i.type === "talent" && (i.name || "").toLowerCase().includes("improved deadeye"));
+      }
+    }
+    context.hasImprovedDeadeye = hasImprovedDeadeye;
+
+    // Check for Enhanced Precision talent (requires Deadeye, Marksman L10+)
+    let hasEnhancedPrecision = false;
+    if (hasDeadeye) {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const levelKey = `level${lvl}`;
+        const levelData = progression[levelKey] || {};
+        const talentName = (levelData.marksmanTalentName || levelData.powersetTalentName || "").toLowerCase();
+        if (talentName.includes("enhanced precision")) {
+          hasEnhancedPrecision = true;
+          break;
+        }
+      }
+      if (!hasEnhancedPrecision) {
+        const embedded = actorData.items || [];
+        hasEnhancedPrecision = embedded.some(i => i.type === "talent" && (i.name || "").toLowerCase().includes("enhanced precision"));
+      }
+    }
+    context.hasEnhancedPrecision = hasEnhancedPrecision;
+
+    // Check for Stabilized Movement talent (requires Deadeye)
+    let hasStabilizedMovement = false;
+    if (hasDeadeye) {
+      const allLevelTalents = [];
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const ld = progression[`level${lvl}`] || {};
+        allLevelTalents.push((ld.marksmanTalentName || ld.powersetTalentName || ld.genericTalentName || "").toLowerCase());
+      }
+      hasStabilizedMovement = allLevelTalents.some(n => n.includes("stabilized movement"))
+        || (actorData.items || []).some(i => i.type === "talent" && (i.name || "").toLowerCase().includes("stabilized movement"));
+    }
+    context.hasStabilizedMovement = hasStabilizedMovement;
+
+    // Check for Specialized Ammunition talent (Marksman 9)
+    let hasSpecializedAmmo = false;
+    if (powersetName === "Marksman") {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const ld = progression[`level${lvl}`] || {};
+        const tn = (ld.marksmanTalentName || ld.powersetTalentName || "").toLowerCase();
+        if (tn.includes("specialized ammunition")) { hasSpecializedAmmo = true; break; }
+      }
+      if (!hasSpecializedAmmo) {
+        hasSpecializedAmmo = (actorData.items || []).some(i => i.type === "talent" && (i.name || "").toLowerCase().includes("specialized ammunition"));
+      }
+    }
+    context.hasSpecializedAmmo = hasSpecializedAmmo;
+    if (hasSpecializedAmmo) {
+      const ammoData = actorData.system.combat?.specializedAmmo || { used: 0 };
+      const wits = calculatedAbilityScores.wits || 0;
+      context.specializedAmmoMax = Math.max(1, wits);
+      context.specializedAmmoUsed = Math.min(ammoData.used || 0, context.specializedAmmoMax);
+      context.specializedAmmoRemaining = context.specializedAmmoMax - context.specializedAmmoUsed;
+    }
+
+    // Check for Lightning Reload talent (Marksman 12, requires Fast Reload)
+    let hasLightningReload = false;
+    if (powersetName === "Marksman") {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const ld = progression[`level${lvl}`] || {};
+        const tn = (ld.marksmanTalentName || ld.powersetTalentName || "").toLowerCase();
+        if (tn.includes("lightning reload")) { hasLightningReload = true; break; }
+      }
+      if (!hasLightningReload) {
+        hasLightningReload = (actorData.items || []).some(i => i.type === "talent" && (i.name || "").toLowerCase().includes("lightning reload"));
+      }
+    }
+    context.hasLightningReload = hasLightningReload;
+    if (hasLightningReload) {
+      const lrData = actorData.system.combat?.lightningReload || { used: 0 };
+      const agility = calculatedAbilityScores.agility || 0;
+      context.lightningReloadMax = Math.max(1, agility);
+      context.lightningReloadUsed = Math.min(lrData.used || 0, context.lightningReloadMax);
+      context.lightningReloadRemaining = context.lightningReloadMax - context.lightningReloadUsed;
+    }
+
+    // Check for Deadly Focus talent (Marksman 17, requires Deadeye)
+    let hasDeadlyFocus = false;
+    if (hasDeadeye) {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const ld = progression[`level${lvl}`] || {};
+        const tn = (ld.marksmanTalentName || ld.powersetTalentName || "").toLowerCase();
+        if (tn.includes("deadly focus")) { hasDeadlyFocus = true; break; }
+      }
+      if (!hasDeadlyFocus) {
+        hasDeadlyFocus = (actorData.items || []).some(i => i.type === "talent" && (i.name || "").toLowerCase().includes("deadly focus"));
+      }
+    }
+    context.hasDeadlyFocus = hasDeadlyFocus;
+    if (hasDeadlyFocus) {
+      const dfData = actorData.system.combat?.deadlyFocus || { used: 0 };
+      const agility = calculatedAbilityScores.agility || 0;
+      context.deadlyFocusMax = Math.max(1, agility);
+      context.deadlyFocusUsed = Math.min(dfData.used || 0, context.deadlyFocusMax);
+      context.deadlyFocusRemaining = context.deadlyFocusMax - context.deadlyFocusUsed;
+    }
+
+    // Check for Impossible Shot talent (Marksman 20)
+    let hasImpossibleShot = false;
+    if (powersetName === "Marksman") {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const ld = progression[`level${lvl}`] || {};
+        const tn = (ld.marksmanTalentName || ld.powersetTalentName || "").toLowerCase();
+        if (tn.includes("impossible shot")) { hasImpossibleShot = true; break; }
+      }
+      if (!hasImpossibleShot) {
+        hasImpossibleShot = (actorData.items || []).some(i => i.type === "talent" && (i.name || "").toLowerCase().includes("impossible shot"));
+      }
+    }
+    context.hasImpossibleShot = hasImpossibleShot;
+    if (hasImpossibleShot) {
+      const isData = actorData.system.combat?.impossibleShot || { used: false };
+      context.impossibleShotUsed = !!isData.used;
+    }
+
+    // Check for Perfect Shot talent (Marksman 20, requires Unerring Aim)
+    let hasPerfectShot = false;
+    if (powersetName === "Marksman") {
+      for (let lvl = 1; lvl <= 20; lvl++) {
+        const ld = progression[`level${lvl}`] || {};
+        const tn = (ld.marksmanTalentName || ld.powersetTalentName || "").toLowerCase();
+        if (tn.includes("perfect shot")) { hasPerfectShot = true; break; }
+      }
+      if (!hasPerfectShot) {
+        hasPerfectShot = (actorData.items || []).some(i => i.type === "talent" && (i.name || "").toLowerCase().includes("perfect shot"));
+      }
+    }
+    context.hasPerfectShot = hasPerfectShot;
+    if (hasPerfectShot) {
+      const psData = actorData.system.combat?.perfectShot || { used: false };
+      context.perfectShotUsed = !!psData.used;
+    }
 
     // Check for Regenerative Fortitude talent (check all levels, but only if Bastion powerset is selected)
     let hasRegenerativeFortitude = false;
@@ -2952,6 +3103,24 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
     // Regenerative Fortitude controls
     html.find(".regenerative-fortitude-toggle").on("change", this._onRegenerativeFortitudeToggle.bind(this));
+
+    // Specialized Ammunition controls
+    html.find(".specialized-ammo-use").on("click", this._onSpecializedAmmoUse.bind(this));
+    html.find(".specialized-ammo-reset").on("click", this._onSpecializedAmmoReset.bind(this));
+
+    // Lightning Reload controls
+    html.find(".lightning-reload-use").on("click", this._onLightningReloadUse.bind(this));
+    html.find(".lightning-reload-reset").on("click", this._onLightningReloadReset.bind(this));
+
+    // Deadly Focus controls
+    html.find(".deadly-focus-use").on("click", this._onDeadlyFocusUse.bind(this));
+    html.find(".deadly-focus-reset").on("click", this._onDeadlyFocusReset.bind(this));
+
+    // Impossible Shot controls
+    html.find(".impossible-shot-toggle").on("change", this._onImpossibleShotToggle.bind(this));
+
+    // Perfect Shot controls
+    html.find(".perfect-shot-toggle").on("change", this._onPerfectShotToggle.bind(this));
 
     // Protective Barrier controls
     html.find(".protective-barrier-toggle").on("change", this._onProtectiveBarrierToggle.bind(this));
@@ -8740,6 +8909,57 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     // Don't call render() to preserve current tab state
   }
 
+  async _onSpecializedAmmoUse(event) {
+    event.preventDefault();
+    const max = parseInt(event.currentTarget.dataset.max) || 1;
+    const ammoData = foundry.utils.deepClone(this.actor.system.combat?.specializedAmmo || { used: 0 });
+    ammoData.used = Math.min((ammoData.used || 0) + 1, max);
+    await this.actor.update({ "system.combat.specializedAmmo": ammoData });
+  }
+
+  async _onSpecializedAmmoReset(event) {
+    event.preventDefault();
+    await this.actor.update({ "system.combat.specializedAmmo": { used: 0 } });
+  }
+
+  async _onLightningReloadUse(event) {
+    event.preventDefault();
+    const max = parseInt(event.currentTarget.dataset.max) || 1;
+    const lrData = foundry.utils.deepClone(this.actor.system.combat?.lightningReload || { used: 0 });
+    lrData.used = Math.min((lrData.used || 0) + 1, max);
+    await this.actor.update({ "system.combat.lightningReload": lrData });
+  }
+
+  async _onLightningReloadReset(event) {
+    event.preventDefault();
+    await this.actor.update({ "system.combat.lightningReload": { used: 0 } });
+  }
+
+  async _onDeadlyFocusUse(event) {
+    event.preventDefault();
+    const max = parseInt(event.currentTarget.dataset.max) || 1;
+    const dfData = foundry.utils.deepClone(this.actor.system.combat?.deadlyFocus || { used: 0 });
+    dfData.used = Math.min((dfData.used || 0) + 1, max);
+    await this.actor.update({ "system.combat.deadlyFocus": dfData });
+  }
+
+  async _onDeadlyFocusReset(event) {
+    event.preventDefault();
+    await this.actor.update({ "system.combat.deadlyFocus": { used: 0 } });
+  }
+
+  async _onImpossibleShotToggle(event) {
+    event.preventDefault();
+    const isUsed = event.currentTarget.checked;
+    await this.actor.update({ "system.combat.impossibleShot": { used: isUsed } });
+  }
+
+  async _onPerfectShotToggle(event) {
+    event.preventDefault();
+    const isUsed = event.currentTarget.checked;
+    await this.actor.update({ "system.combat.perfectShot": { used: isUsed } });
+  }
+
   async _onProtectiveBarrierToggle(event) {
     event.preventDefault();
     const isActive = event.currentTarget.checked;
@@ -9856,6 +10076,12 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
     const unbreakableData = foundry.utils.deepClone(this.actor.system.combat?.unbreakable || { used: 0 });
     unbreakableData.used = 0;
     updateData["system.combat.unbreakable"] = unbreakableData;
+
+    updateData["system.combat.specializedAmmo"] = { used: 0 };
+    updateData["system.combat.lightningReload"] = { used: 0 };
+    updateData["system.combat.deadlyFocus"] = { used: 0 };
+    updateData["system.combat.impossibleShot"] = { used: false };
+    updateData["system.combat.perfectShot"] = { used: false };
     
     await this.actor.update(updateData);
     this.render();
@@ -11983,6 +12209,78 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
       }
       if (name === "stabilized movement") {
         return hasTalent("deadeye");
+      }
+      if (name === "improved deadeye") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 7 && powersetName === "Marksman" && hasTalent("deadeye");
+      }
+      if (name === "trick shot") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 7 && powersetName === "Marksman";
+      }
+      if (name === "rapid fire") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 9 && powersetName === "Marksman";
+      }
+      if (name === "specialized ammunition") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 9 && powersetName === "Marksman";
+      }
+      if (name === "enhanced precision") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 10 && powersetName === "Marksman" && hasTalent("deadeye");
+      }
+      if (name === "tripoint trauma") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 10 && powersetName === "Marksman" && hasTalent("surgical precision");
+      }
+      if (name === "lightning reload") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Marksman" && hasTalent("fast reload");
+      }
+      if (name === "perfect aim") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Marksman" && hasTalent("deadeye");
+      }
+      if (name === "ricochet shot") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 12 && powersetName === "Marksman";
+      }
+      if (name === "master marksman") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 14 && powersetName === "Marksman";
+      }
+      if (name === "pinpoint accuracy") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 14 && powersetName === "Marksman";
+      }
+      if (name === "versatile arsenal") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 15 && powersetName === "Marksman" && hasTalent("quickdraw");
+      }
+      if (name === "deadly focus") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 17 && powersetName === "Marksman" && hasTalent("deadeye");
+      }
+      if (name === "master ricochet") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 17 && powersetName === "Marksman" && hasTalent("ricochet shot");
+      }
+      if (name === "penetrating shot") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 17 && powersetName === "Marksman" && hasTalent("perfect aim");
+      }
+      if (name === "unerring aim") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 19 && powersetName === "Marksman" && hasTalent("enhanced precision");
+      }
+      if (name === "impossible shot") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 20 && powersetName === "Marksman";
+      }
+      if (name === "perfect shot") {
+        const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
+        return primeLevel >= 20 && powersetName === "Marksman" && hasTalent("unerring aim");
       }
       return true;
     };

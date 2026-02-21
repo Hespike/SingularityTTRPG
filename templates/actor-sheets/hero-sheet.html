@@ -176,10 +176,82 @@
             <span>Active</span>
           </label>
           {{#if actor.system.combat.deadeye.active}}
-          <span class="deadeye-bonus-display">+5 attack bonus</span>
+          <span class="deadeye-bonus-display">{{#if hasEnhancedPrecision}}+10{{else}}+5{{/if}} attack bonus</span>
           {{/if}}
         </div>
-        <p class="deadeye-help-text">Spend an action to carefully aim. Your next attack with a ranged weapon gains a +5 bonus to the attack roll. If you or your target moves before the attack is made, you lose this bonus.</p>
+        {{#if hasImprovedDeadeye}}
+        <p class="deadeye-help-text">Spend an action to carefully aim. Your next attack with a ranged weapon gains a {{#if hasEnhancedPrecision}}<strong>+10</strong>{{else}}+5{{/if}} bonus to the attack roll. <strong>Improved Deadeye:</strong> Target movement no longer cancels this bonus. You still lose the bonus if you move{{#if hasStabilizedMovement}}, but Stabilized Movement prevents that{{/if}}.{{#if hasEnhancedPrecision}} <strong>Enhanced Precision:</strong> Deadeye bonus is +10.{{/if}}{{#if hasDeadlyFocus}} <strong>Deadly Focus:</strong> Next hit deals double damage (uses limited per long rest).{{/if}}</p>
+        {{else}}
+        <p class="deadeye-help-text">Spend an action to carefully aim. Your next attack with a ranged weapon gains a {{#if hasEnhancedPrecision}}<strong>+10</strong>{{else}}+5{{/if}} bonus to the attack roll. If you or your target moves before the attack is made, you lose this bonus.{{#if hasEnhancedPrecision}} <strong>Enhanced Precision:</strong> Deadeye bonus is +10.{{/if}}{{#if hasDeadlyFocus}} <strong>Deadly Focus:</strong> Next hit deals double damage (uses limited per long rest).{{/if}}</p>
+        {{/if}}
+      </div>
+      {{/if}}
+
+      {{#if hasSpecializedAmmo}}
+      <div class="specialized-ammo-section">
+        <h3>Specialized Ammunition</h3>
+        <div class="specialized-ammo-controls">
+          <span class="specialized-ammo-counter">Uses: {{specializedAmmoUsed}} / {{specializedAmmoMax}}</span>
+          <button type="button" class="specialized-ammo-use" data-max="{{specializedAmmoMax}}" {{#if (lte specializedAmmoMax specializedAmmoUsed)}}disabled{{/if}}>Use</button>
+          <button type="button" class="specialized-ammo-reset">Reset</button>
+        </div>
+        <p class="specialized-ammo-help-text">Change your ranged attack's damage type to Fire, Cold, Electricity, Poison, or Photonic. Uses reset on Long Rest.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasLightningReload}}
+      <div class="lightning-reload-section">
+        <h3>Lightning Reload</h3>
+        <div class="lightning-reload-controls">
+          <span class="lightning-reload-counter">Uses: {{lightningReloadUsed}} / {{lightningReloadMax}}</span>
+          <button type="button" class="lightning-reload-use" data-max="{{lightningReloadMax}}" {{#if (lte lightningReloadMax lightningReloadUsed)}}disabled{{/if}}>Use</button>
+          <button type="button" class="lightning-reload-reset">Reset</button>
+        </div>
+        <p class="lightning-reload-help-text">Reload a ranged weapon without spending energy. Uses reset on Long Rest.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasDeadlyFocus}}
+      <div class="deadly-focus-section">
+        <h3>Deadly Focus</h3>
+        <div class="deadly-focus-controls">
+          <span class="deadly-focus-counter">Uses: {{deadlyFocusUsed}} / {{deadlyFocusMax}}</span>
+          <button type="button" class="deadly-focus-use" data-max="{{deadlyFocusMax}}" {{#if (lte deadlyFocusMax deadlyFocusUsed)}}disabled{{/if}}>Use</button>
+          <button type="button" class="deadly-focus-reset">Reset</button>
+        </div>
+        <p class="deadly-focus-help-text">When you use Deadeye, your next ranged attack deals double damage on a hit. Uses reset on Long Rest.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasImpossibleShot}}
+      <div class="impossible-shot-section">
+        <h3>Impossible Shot</h3>
+        <div class="impossible-shot-controls">
+          <label class="impossible-shot-toggle-label">
+            <input type="checkbox" name="system.combat.impossibleShot.used" {{checked impossibleShotUsed}} class="impossible-shot-toggle"/>
+            <span>Used</span>
+          </label>
+          {{#unless impossibleShotUsed}}
+          <span class="impossible-shot-available">Available (4 Energy)</span>
+          {{/unless}}
+        </div>
+        <p class="impossible-shot-help-text">Attack any target you can see, ignoring all cover and range limits. -5 penalty to attack roll. Resets on Long Rest.</p>
+      </div>
+      {{/if}}
+
+      {{#if hasPerfectShot}}
+      <div class="perfect-shot-section">
+        <h3>Perfect Shot</h3>
+        <div class="perfect-shot-controls">
+          <label class="perfect-shot-toggle-label">
+            <input type="checkbox" name="system.combat.perfectShot.used" {{checked perfectShotUsed}} class="perfect-shot-toggle"/>
+            <span>Used</span>
+          </label>
+          {{#unless perfectShotUsed}}
+          <span class="perfect-shot-available">Available (4 Energy)</span>
+          {{/unless}}
+        </div>
+        <p class="perfect-shot-help-text">Automatically hits and crits. Deals triple damage. Ignores all cover and range. Resets on Long Rest.</p>
       </div>
       {{/if}}
 
@@ -1325,6 +1397,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1364,6 +1438,12 @@
               <h4>Level 5</h4>
             </div>
             <div class="progression-slots">
+              {{#if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+              <div class="progression-slot ability-boost-slot" data-level="5" data-slot-type="marksmanRangedCompetence5">
+                <label>Ranged Weapon Competence (Marksman):</label>
+                <div class="marksman-bonus-display">You are now <strong>Competent</strong> with all ranged weapons.</div>
+              </div>
+              {{/if}}
               <div class="progression-slot asi-slot ability-boost-slot" data-level="5" data-slot-type="abilityScoreImprovement">
                 <label>Ability Score Improvement:</label>
                 <div class="asi-selects">
@@ -1399,6 +1479,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1452,6 +1534,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1526,6 +1610,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1543,6 +1629,12 @@
               <h4>Level 10</h4>
             </div>
             <div class="progression-slots">
+              {{#if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+              <div class="progression-slot ability-boost-slot" data-level="10" data-slot-type="marksmanRangedCompetence10">
+                <label>Ranged Weapon Competence (Marksman):</label>
+                <div class="marksman-bonus-display">You are now <strong>Masterful</strong> with all ranged weapons.</div>
+              </div>
+              {{/if}}
               <div class="progression-slot asi-slot ability-boost-slot" data-level="10" data-slot-type="abilityScoreImprovement">
                 <label>Ability Score Improvement:</label>
                 <div class="asi-selects">
@@ -1578,6 +1670,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1631,6 +1725,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1705,6 +1801,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1722,6 +1820,12 @@
               <h4>Level 15</h4>
             </div>
             <div class="progression-slots">
+              {{#if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+              <div class="progression-slot ability-boost-slot" data-level="15" data-slot-type="marksmanRangedCompetence15">
+                <label>Ranged Weapon Competence (Marksman):</label>
+                <div class="marksman-bonus-display">You are now <strong>Legendary</strong> with all ranged weapons.</div>
+              </div>
+              {{/if}}
               <div class="progression-slot asi-slot ability-boost-slot" data-level="15" data-slot-type="abilityScoreImprovement">
                 <label>Ability Score Improvement:</label>
                 <div class="asi-selects">
@@ -1757,6 +1861,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1810,6 +1916,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1884,6 +1992,8 @@
                   <div class="slot-placeholder">
                     {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
                       Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
                     {{else}}
                       Powerset Talent: Click to choose
                     {{/if}}
@@ -1933,7 +2043,15 @@
                     <a class="slot-delete" data-level="20" data-slot-type="powersetTalent" title="Remove"><i class="fas fa-times"></i></a>
                   </div>
                 {{else}}
-                  <div class="slot-placeholder">Powerset Talent: Click to choose</div>
+                  <div class="slot-placeholder">
+                    {{#if (or (eq actor.system.progression.level1.powersetName "Bastion") (eq actor.system.basic.powerset "Bastion"))}}
+                      Bastion Talent: Click to choose
+                    {{else if (or (eq actor.system.progression.level1.powersetName "Marksman") (eq actor.system.basic.powerset "Marksman"))}}
+                      Marksman Talent: Click to choose
+                    {{else}}
+                      Powerset Talent: Click to choose
+                    {{/if}}
+                  </div>
                 {{/if}}
               </div>
             </div>

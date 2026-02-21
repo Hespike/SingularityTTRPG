@@ -5650,7 +5650,25 @@ Improvised Gadget talent</p>
         "Quickdraw",
         "Suppressive Fire",
         "Stabilized Movement",
-        "Fast Reload"
+        "Fast Reload",
+        "Improved Deadeye",
+        "Trick Shot",
+        "Rapid Fire",
+        "Specialized Ammunition",
+        "Enhanced Precision",
+        "Tripoint Trauma",
+        "Lightning Reload",
+        "Perfect Aim",
+        "Ricochet Shot",
+        "Master Marksman",
+        "Pinpoint Accuracy",
+        "Versatile Arsenal",
+        "Deadly Focus",
+        "Master Ricochet",
+        "Penetrating Shot",
+        "Unerring Aim",
+        "Impossible Shot",
+        "Perfect Shot"
       ];
       
       const allExist = marksmanTalentNames.every(name => 
@@ -5762,6 +5780,325 @@ Improvised Gadget talent</p>
 <p>Once per round, when you reload a ranged weapon, you reduce the energy cost by <strong>1</strong> (minimum <strong>1</strong> energy).</p>`,
           type: "marksman",
           prerequisites: "Marksman 3; Reloading ranged weapon"
+        },
+        {
+          name: "Improved Deadeye",
+          level: 7,
+          description: `<h2>Description</h2>
+<p>Your aim has become so refined that you can maintain perfect focus even when your target moves.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 7</li>
+  <li>Deadeye</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use Deadeye, you do not lose the attack bonus if the target moves before you make the attack.</p>
+<p>You still lose the bonus if you move (unless you have Stabilized Movement).</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 7; Deadeye"
+        },
+        {
+          name: "Trick Shot",
+          level: 7,
+          description: `<h2>Description</h2>
+<p>You can perform incredible feats with your ranged weapon, using special ammunition or unconventional techniques to achieve remarkable effects.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 7</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you make a ranged weapon attack, you can choose to perform a trick shot instead of dealing normal damage. Choose one of the following effects:</p>
+<ul>
+  <li><strong>Disarming Shot:</strong> The target must make a <strong>Might</strong> saving throw against your attack roll. On a failure, they drop one held item of your choice.</li>
+  <li><strong>Blinding Shot:</strong> The target must make an <strong>Agility</strong> saving throw against your attack roll. On a failure, they are <strong>Blinded</strong> for 1 round.</li>
+  <li><strong>Tripping Shot:</strong> The target must make an <strong>Agility</strong> saving throw against your attack roll. On a failure, they are knocked <strong>Prone</strong>.</li>
+  <li><strong>Dazing Shot:</strong> The target must make an <strong>Endurance</strong> saving throw against your attack roll. On a failure, they are <strong>Dazed</strong> for 1 round.</li>
+</ul>
+<p>You can use this ability a number of times per long rest equal to your <strong>Agility</strong> (minimum 1).</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 7"
+        },
+        {
+          name: "Rapid Fire",
+          level: 9,
+          description: `<h2>Description</h2>
+<p>You unleash a flurry of shots in rapid succession, overwhelming your target with sheer volume of fire.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 9</li>
+  <li>You wield a ranged weapon</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you make a ranged weapon attack, you can choose to use <strong>Rapid Fire</strong>. If you do, you make <strong>two separate ranged weapon attacks</strong> against the same target. Roll damage for both attacks normally. Combine the damage from both attacks, then apply resistance once to the combined total.</p>
+<p>You can use this ability a number of times per long rest equal to your <strong>Agility</strong> (minimum 1).</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 9"
+        },
+        {
+          name: "Specialized Ammunition",
+          level: 9,
+          description: `<h2>Description</h2>
+<p>You have access to or can craft specialized ammunition that changes the damage type of your attacks, allowing you to adapt to different threats.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 9</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you make a ranged weapon attack, you can choose to change the damage type to one of the following: <strong>Fire</strong>, <strong>Cold</strong>, <strong>Electricity</strong>, <strong>Poison</strong>, or <strong>Photonic</strong>. The damage amount remains the same.</p>
+<p>You can use this ability a number of times per long rest equal to your <strong>Wits</strong> (minimum 1).</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 9"
+        },
+        {
+          name: "Enhanced Precision",
+          level: 10,
+          description: `<h2>Description</h2>
+<p>Your focus and precision have reached new heights, allowing you to achieve even greater accuracy when taking careful aim.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 10</li>
+  <li>Deadeye</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use <strong>Deadeye</strong>, the bonus to your attack roll increases to <strong>+10</strong> (instead of +5).</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 10, Deadeye"
+        },
+        {
+          name: "Tripoint Trauma",
+          level: 10,
+          description: `<h2>Description</h2>
+<p>Your shots are so devastatingly precise that they shatter multiple systems at once.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 10</li>
+  <li>Surgical Precision</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you score a <strong>Critical Hit</strong> and reduce a creature to 0 Health with a ranged weapon attack, you may choose to inflict <strong>three different Wounds</strong> instead of a single Extreme Wound.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 10, Surgical Precision"
+        },
+        {
+          name: "Lightning Reload",
+          level: 12,
+          description: `<h2>Description</h2>
+<p>Your reloading speed has reached superhuman levels, allowing you to reload your weapon instantly without expending energy.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 12</li>
+  <li>Fast Reload</li>
+</ul>
+
+<h3>Effect</h3>
+<p>A number of times per long rest equal to your <strong>Agility</strong> (minimum 1), you can reload a ranged weapon without spending energy.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 12, Fast Reload"
+        },
+        {
+          name: "Perfect Aim",
+          level: 12,
+          description: `<h2>Description</h2>
+<p>Your aim is so precise that you can ignore most obstacles and defensive measures.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 12</li>
+  <li>Deadeye</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you make a ranged weapon attack, you ignore <strong>Minor Cover</strong>. Additionally, <strong>Standard Cover</strong> is treated as Minor Cover for your attacks.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 12, Deadeye"
+        },
+        {
+          name: "Ricochet Shot",
+          level: 12,
+          description: `<h2>Description</h2>
+<p>You can angle your shots to bounce off surfaces, hitting targets around corners or behind cover.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 12</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you make a ranged weapon attack, you can choose to have the projectile ricochet off a solid surface within range before reaching the target. The ricochet allows you to attack a target that you cannot see directly, as long as you know the exact square they are in (either because a teammate pointed it out to you, or it is evident from the creature's previous movement). The attack roll takes a <strong>-5 penalty</strong> due to the ricochet.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 12"
+        },
+        {
+          name: "Master Marksman",
+          level: 14,
+          description: `<h2>Description</h2>
+<p>Your expertise with ranged weapons has reached a level where you can accurately engage targets at extreme distances.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 14</li>
+</ul>
+
+<h3>Effect</h3>
+<p>The range of all ranged weapons you wield is <strong>doubled</strong>.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 14"
+        },
+        {
+          name: "Pinpoint Accuracy",
+          level: 14,
+          description: `<h2>Description</h2>
+<p>Your precision is so refined that you can consistently strike critical areas.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 14</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you roll a natural 20 on a ranged weapon attack roll, you can roll <strong>one additional damage die</strong>.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 14"
+        },
+        {
+          name: "Versatile Arsenal",
+          level: 15,
+          description: `<h2>Description</h2>
+<p>You are equally skilled with all types of ranged weapons, seamlessly switching between them as the situation demands.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 15</li>
+  <li>Quickdraw</li>
+</ul>
+
+<h3>Effect</h3>
+<p>You can draw or stow a ranged weapon as a <strong>free action</strong>.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 15, Quickdraw"
+        },
+        {
+          name: "Deadly Focus",
+          level: 17,
+          description: `<h2>Description</h2>
+<p>When you take the time to aim, your shots become devastatingly powerful.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 17</li>
+  <li>Deadeye</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use <strong>Deadeye</strong>, your next ranged weapon attack deals <strong>double damage</strong> on a hit.</p>
+<p>You can use this ability a number of times per long rest equal to your <strong>Agility</strong> (minimum 1).</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 17, Deadeye"
+        },
+        {
+          name: "Master Ricochet",
+          level: 17,
+          description: `<h2>Description</h2>
+<p>Your mastery of ricochet shots has reached such perfection that you can execute them with the same accuracy as direct shots.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 17</li>
+  <li>Ricochet Shot</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you use <strong>Ricochet Shot</strong>, you ignore the -5 penalty to the attack roll. Your ricochet shots are as accurate as direct shots.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 17, Ricochet Shot"
+        },
+        {
+          name: "Penetrating Shot",
+          level: 17,
+          description: `<h2>Description</h2>
+<p>Your precision has reached such a level that you can thread your shots through even the smallest gaps, completely bypassing most cover.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 17</li>
+  <li>Perfect Aim</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you make a ranged weapon attack, you completely ignore <strong>Minor Cover</strong> and <strong>Standard Cover</strong>. Your attacks are unaffected by these types of cover.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 17, Perfect Aim"
+        },
+        {
+          name: "Unerring Aim",
+          level: 19,
+          description: `<h2>Description</h2>
+<p>Your aim is so refined that even your worst shots are still remarkably accurate.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 19</li>
+  <li>Enhanced Precision</li>
+</ul>
+
+<h3>Effect</h3>
+<p>When you make a ranged weapon attack, you can treat a roll of <strong>1–5</strong> on the d20 as a <strong>6</strong>.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 19, Enhanced Precision"
+        },
+        {
+          name: "Impossible Shot",
+          level: 20,
+          description: `<h2>Description</h2>
+<p>You can make shots that seem physically impossible, threading through narrow gaps, curving around obstacles, or hitting targets at extreme ranges.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 20</li>
+</ul>
+
+<h3>Action</h3>
+<p><strong>Cost:</strong> 4 Energy</p>
+
+<h3>Effect</h3>
+<p>Make a ranged weapon attack against a target you can see, regardless of cover, range, or line of sight obstacles. The attack ignores all cover and has no maximum range. The attack roll takes a <strong>-5 penalty</strong> due to the impossible nature of the shot.</p>
+<p>You can use this ability <strong>once per long rest</strong>.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 20"
+        },
+        {
+          name: "Perfect Shot",
+          level: 20,
+          description: `<h2>Description</h2>
+<p>You have achieved the pinnacle of marksmanship. When you take the time to line up the perfect shot, nothing can stop it.</p>
+
+<h3>Requirements</h3>
+<ul>
+  <li>Marksman 20</li>
+  <li>Unerring Aim</li>
+</ul>
+
+<h3>Action</h3>
+<p><strong>Cost:</strong> 4 Energy</p>
+
+<h3>Effect</h3>
+<p>Make a ranged weapon attack against a target you can see. This attack <strong>automatically hits</strong> and scores a <strong>critical hit</strong>, regardless of cover, range, or other obstacles. The attack deals <strong>triple damage</strong> instead of double damage.</p>
+<p>You can use this ability <strong>once per long rest</strong>.</p>`,
+          type: "marksman",
+          prerequisites: "Marksman 20, Unerring Aim"
         }
       ];
 
@@ -5809,12 +6146,12 @@ Improvised Gadget talent</p>
       }
 
       if (itemsToCreate.length === 0) {
-        console.log("Singularity | All Level 1 Marksman talents already exist");
+        console.log("Singularity | All Marksman talents already exist");
         if (wasLocked) await pack.configure({ locked: true });
         return;
       }
 
-      console.log(`Singularity | Creating ${itemsToCreate.length} Level 1 Marksman talents...`);
+      console.log(`Singularity | Creating ${itemsToCreate.length} Marksman talents...`);
       const createdItems = await Item.createDocuments(itemsToCreate, { render: false });
       
       for (const item of createdItems) {
@@ -5836,10 +6173,10 @@ Improvised Gadget talent</p>
       
       if (wasLocked) await pack.configure({ locked: true });
       
-      ui.notifications.info(`Created ${itemsToCreate.length} Level 1 Marksman talents in Talents compendium!`);
+      ui.notifications.info(`Created ${itemsToCreate.length} Marksman talents in Talents compendium!`);
     } catch (error) {
-      console.error("Singularity | Could not auto-create Level 1 Marksman talents:", error);
-      ui.notifications.error(`Failed to create Level 1 Marksman talents: ${error.message}`);
+      console.error("Singularity | Could not auto-create Marksman talents:", error);
+      ui.notifications.error(`Failed to create Marksman talents: ${error.message}`);
     }
   }, 6100);
 
