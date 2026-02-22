@@ -6795,10 +6795,22 @@ Improvised Gadget talent</p>
 <strong>Range:</strong> 30 feet<br>
 <strong>Cost:</strong> 2 energy<br>
 <strong>Hands:</strong> 1<br>
-<strong>Damage:</strong> 1d4 + Wits modifier Fire damage</p>
+<strong>Damage:</strong> See scaling table below (Fire)</p>
 
 <h3>Effect</h3>
-<p>You use your <strong>Gadget Tuning</strong> skill for the attack roll.</p>`
+<p>You use your <strong>Gadget Tuning</strong> skill for the attack roll. On a hit, the missile deals Fire damage equal to your current tier plus your Wits modifier.</p>
+
+<h3>Damage Scaling</h3>
+<table>
+  <thead><tr><th>Level</th><th>Damage</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>1d4 + Wits modifier</td></tr>
+    <tr><td>4</td><td>3d4 + Wits modifier</td></tr>
+    <tr><td>8</td><td>5d4 + Wits modifier</td></tr>
+    <tr><td>13</td><td>7d4 + Wits modifier</td></tr>
+    <tr><td>18</td><td>9d4 + Wits modifier</td></tr>
+  </tbody>
+</table>`
         },
         {
           name: "Photon Projector",

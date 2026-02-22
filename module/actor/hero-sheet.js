@@ -10074,6 +10074,17 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
 
   _getGadgetDamageFormula(gadgetDoc) {
     if (!gadgetDoc?.system) return "";
+    // Level-scaled damage for Micro-Missile Launcher
+    if (String(gadgetDoc.name || "").trim().toLowerCase() === "micro-missile launcher") {
+      const primeLevel = Number(this.actor?.system?.basic?.primeLevel ?? 1);
+      let dice;
+      if (primeLevel >= 18) dice = "9d4";
+      else if (primeLevel >= 13) dice = "7d4";
+      else if (primeLevel >= 8) dice = "5d4";
+      else if (primeLevel >= 4) dice = "3d4";
+      else dice = "1d4";
+      return dice;
+    }
     const basicFormula = this._getGadgetDamageFormulaFromBasic(gadgetDoc.system.basic || {});
     if (basicFormula) return basicFormula;
     return this._getGadgetDamageFormulaFromDescription(
