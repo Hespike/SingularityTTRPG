@@ -13197,6 +13197,18 @@ export class SingularityActorSheetHero extends foundry.applications.api.Handleba
         const powersetName = this.actor.system.progression?.level1?.powersetName || this.actor.system.basic?.powerset;
         return primeLevel >= 20 && powersetName === "Gadgeteer" && hasTalent("enough prep time");
       }
+      if (name === "public image ii") {
+        return primeLevel >= 4 && hasTalent("public image i");
+      }
+      if (name === "public image iii") {
+        return primeLevel >= 8 && hasTalent("public image ii");
+      }
+      if (name === "public image iv") {
+        return primeLevel >= 13 && hasTalent("public image iii");
+      }
+      if (name === "public image v") {
+        return primeLevel >= 16 && hasTalent("public image iv");
+      }
       return true;
     };
 

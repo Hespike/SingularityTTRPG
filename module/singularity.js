@@ -4786,7 +4786,12 @@ Hooks.once("ready", async function() {
         "Saving Throw Training (Apprentice)",
         "Skill Training (Apprentice)",
         "Swift Runner",
-        "Weapon Training (Apprentice)"
+        "Weapon Training (Apprentice)",
+        "Public Image I",
+        "Public Image II",
+        "Public Image III",
+        "Public Image IV",
+        "Public Image V"
       ];
       
       const allExist = existingTalents.every(name => pack.index.find(i => i.name === name));
@@ -4984,6 +4989,61 @@ Whenever you gain a level thereafter, your hit point maximum increases by an add
 <p>Choose one weapon category in which your character is currently <strong>Novice</strong>. Your training level in that category increases to <strong>Apprentice</strong>.</p>`,
           type: "generic",
           prerequisites: ""
+        },
+        {
+          name: "Public Image I",
+          level: 1,
+          description: `<h2>Description</h2>
+<p>You have become a recognizable figure among ordinary civilians. Your appearance, actions, or reputation leave a strong impression, causing people to react more readily to your presence, whether through trust, fear, admiration, or unease. Civilians are more inclined to listen, cooperate, or respond when addressed by you.</p>
+
+<h3>Effect</h3>
+<p>You gain <strong>+5</strong> to Charm-based checks when interacting with civilians who recognize you or are aware of your public identity.</p>`,
+          type: "generic",
+          prerequisites: ""
+        },
+        {
+          name: "Public Image II",
+          level: 4,
+          description: `<h2>Description</h2>
+<p>Your reputation has grown significantly, and your name and image are widely recognized within your community and beyond. You are a household name, and civilians not only recognize you but actively seek you out or remember you from broadcasts, news, or word of mouth. Your influence extends further, and people are eager to cooperate or assist you in their own interest.</p>
+
+<h3>Effect</h3>
+<p>You gain <strong>+10</strong> to Charm-based checks when interacting with civilians who recognize you or are aware of your public identity.</p>`,
+          type: "generic",
+          prerequisites: "Public Image I, Prime Level 4"
+        },
+        {
+          name: "Public Image III",
+          level: 8,
+          description: `<h2>Description</h2>
+<p>You are now a legendary figure whose name inspires awe and devotion among the masses. Your image has transcended local fame and reached international prominence. When civilians see you, they react with reverence or fear depending on your public persona. Your very presence can calm crowds or sway entire groups to your cause. You are living mythology to many.</p>
+
+<h3>Effect</h3>
+<p>You gain <strong>+15</strong> to Charm-based checks when interacting with civilians who recognize you or are aware of your public identity.</p>`,
+          type: "generic",
+          prerequisites: "Public Image II, Prime Level 8"
+        },
+        {
+          name: "Public Image IV",
+          level: 13,
+          description: `<h2>Description</h2>
+<p>You have become an icon\u2014a symbol greater than yourself, transcending individual recognition to represent an ideal or movement. Civilians don't just know who you are; they know what you stand for. Your public image wields enormous political and social power. Governments, organizations, and movements align themselves with or against you based on your reputation alone. You command respect and fear in equal measure.</p>
+
+<h3>Effect</h3>
+<p>You gain <strong>+20</strong> to Charm-based checks when interacting with civilians who recognize you or are aware of your public identity.</p>`,
+          type: "generic",
+          prerequisites: "Public Image III, Prime Level 13"
+        },
+        {
+          name: "Public Image V",
+          level: 16,
+          description: `<h2>Description</h2>
+<p>You are no longer merely a famous individual\u2014you are a force of nature in the eyes of the world. Your public image is so powerful that it transcends personal interaction and becomes woven into the fabric of society itself. Nations consult with you, movements rally behind your ideals, and the masses hang on your every word. You are a legend, a name spoken in reverent whispers, and your legacy shapes generations. Your influence is nearly absolute among those who know of you.</p>
+
+<h3>Effect</h3>
+<p>You gain <strong>+25</strong> to Charm-based checks when interacting with civilians who recognize you or are aware of your public identity.</p>`,
+          type: "generic",
+          prerequisites: "Public Image IV, Prime Level 16"
         }
       ];
 
